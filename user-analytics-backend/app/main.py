@@ -4,6 +4,7 @@ from app.core.database import engine, Base
 from app.routers import users
 from app.routers import analyticsOverview
 from app.routers import auth
+from app.routers import platform_user
 
 app = FastAPI(
     title="User Analytics Platform",
@@ -26,9 +27,10 @@ def on_startup():
 
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
-app.include_router(users.router)          # ✅ ajoute cette ligne
+app.include_router(users.router)
 app.include_router(analyticsOverview.router)
 app.include_router(auth.router)
+app.include_router(platform_user.router, prefix="/platform-users", tags=["Platform Users"])
 
 @app.get("/")
 def root():

@@ -10,7 +10,7 @@ from app.schemas.platform_user_schemas import PlatformUserCreate, PlatformUserUp
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-VALID_ROLES = {"admin", "analyst"}
+VALID_ROLES = {"admin", "analyst", "viewer"}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ def get_all_users(
     search: str | None,
     role: str | None,
     is_active: bool | None,
-) -> list[PlatformUser]:
+) -> dict:
     """Return paginated list of platform users with optional filters."""
     query = db.query(PlatformUser)
 
@@ -62,7 +62,10 @@ def get_all_users(
     if is_active is not None:
         query = query.filter(PlatformUser.is_active == is_active)
 
-    return query.order_by(PlatformUser.created_at.desc()).offset(skip).limit(limit).all()
+    total = query.count()
+    users = query.order_by(PlatformUser.created_at.desc()).offset(skip).limit(limit).all()
+
+    return {"items": users, "total": total}
 
 
 def get_user_by_id(db: Session, user_id: UUID) -> PlatformUser:

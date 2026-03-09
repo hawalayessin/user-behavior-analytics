@@ -3,16 +3,18 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db, require_admin
+from app.core.database import get_db
+from app.core.dependencies import require_admin
 from app.models.platform_users import PlatformUser
 from app.schemas.platform_user_schemas import (
     PlatformUserCreate,
+    PlatformUserListResponse,
     PlatformUserResponse,
     PlatformUserUpdate,
     UpdateRoleRequest,
     UpdateStatusRequest,
 )
-from app.services import platform_users_service as service
+from app.services import platform_user_service as service
 
 router = APIRouter()
 
@@ -21,18 +23,18 @@ router = APIRouter()
 
 @router.get(
     "/",
-    response_model=list[PlatformUserResponse],
+    response_model=PlatformUserListResponse,
     status_code=status.HTTP_200_OK,
 )
 def list_platform_users(
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=500),  # ← 100 → 500
     search: str | None = Query(default=None),
     role: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
     db: Session = Depends(get_db),
     _: PlatformUser = Depends(require_admin),
-) -> list[PlatformUserResponse]:
+) -> PlatformUserListResponse:
     """List all platform users with optional filters and pagination."""
     return service.get_all_users(db, skip, limit, search, role, is_active)
 

@@ -32,7 +32,7 @@ class TokenPayload(BaseModel):
 class PlatformUserBase(BaseModel):
     email: EmailStr
     full_name: str | None = Field(None, min_length=2, max_length=100)
-    role: Literal["admin", "analyst"] = "analyst"
+    role: Literal["admin", "analyst", "viewer"] = "analyst"
     is_active: bool = True
 
 
@@ -43,7 +43,7 @@ class PlatformUserCreate(PlatformUserBase):
 class PlatformUserUpdate(BaseModel):
     email: EmailStr | None = None
     full_name: str | None = Field(None, min_length=2, max_length=100)
-    role: Literal["admin", "analyst"] | None = None
+    role: Literal["admin", "analyst", "viewer"] | None = None
     is_active: bool | None = None
 
 
@@ -59,6 +59,11 @@ class PlatformUserRead(PlatformUserBase):
 PlatformUserResponse = PlatformUserRead
 
 
+class PlatformUserListResponse(BaseModel):
+    items: list[PlatformUserResponse]
+    total: int
+
+
 # ══════════════════════════════════════════════════════════════
 # STATUS / ROLE PATCH
 # ══════════════════════════════════════════════════════════════
@@ -68,4 +73,4 @@ class UpdateStatusRequest(BaseModel):
 
 
 class UpdateRoleRequest(BaseModel):
-    role: Literal["admin", "analyst"]
+    role: Literal["admin", "analyst", "viewer"]

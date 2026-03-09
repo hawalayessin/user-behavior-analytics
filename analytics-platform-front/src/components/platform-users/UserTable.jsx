@@ -13,8 +13,7 @@ const UserTable = ({
   limit,
   onPageChange,
 }) => {
-  const { role: currentRole, access_token } = useAuth()
-  const currentUserId = localStorage.getItem("user_id")
+  const { role: currentRole, userId: currentUserId } = useAuth()
 
   if (loading) {
     return (

@@ -100,6 +100,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(
         access_token=token,
         token_type="bearer",
+        user_id=user.id,
         role=user.role,
         full_name=user.full_name,
     )

@@ -15,7 +15,7 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
-        allowed = {"admin", "analyst"}
+        allowed = {"admin", "analyst", "viewer"}
         if v not in allowed:
             raise ValueError(f"role doit être l'un de : {allowed}")
         return v
@@ -30,6 +30,7 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    user_id: UUID
     role: str
     full_name: Optional[str] = None
 

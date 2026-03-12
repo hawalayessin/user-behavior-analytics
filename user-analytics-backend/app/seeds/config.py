@@ -115,27 +115,7 @@ SERVICE_TYPES_DATA = [
 ]
 
 
-# ── Platform users ────────────────────────────────────────
-PLATFORM_USERS_DATA = [
-    {
-        "email": "admin@analytics.tn",
-        "password": "Admin@2026",
-        "full_name": "Administrateur Principal",
-        "role": "admin",
-    },
-    {
-        "email": "data.analyst@analytics.tn",
-        "password": "Analyst@2026",
-        "full_name": "Data Analyst",
-        "role": "analyst",
-    },
-    {
-        "email": "manager@analytics.tn",
-        "password": "Manager@2026",
-        "full_name": "Product Manager",
-        "role": "analyst",
-    },
-]
+
 
 
 # ── Campaigns ─────────────────────────────────────────────

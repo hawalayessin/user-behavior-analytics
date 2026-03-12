@@ -20,17 +20,17 @@ export const navigationConfig = [
     section: 'ANALYTICS',
     items: [
       {
-        label: 'Dashboard',
+        label: 'overview',
         icon: LayoutDashboard,
         route: '/dashboard',
       },
       {
-        label: 'Behaviors',
+        label: ' User Activity ',
         icon: Activity,
         route: '/analytics/behaviors',
       },
       {
-        label: 'Trial Analysis',
+        label: ' Free Trial Behavior',
         icon: FlaskConical,
         route: '/analytics/trial',
       },

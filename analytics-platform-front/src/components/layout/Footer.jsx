@@ -10,7 +10,7 @@ export default function Footer() {
   return (
     <footer className="flex-shrink-0 border-t border-slate-800 bg-slate-900/50 px-6 py-3 flex items-center justify-between">
       <p className="text-xs text-slate-500">
-        © {currentYear} Tunisie Telecom. All rights reserved.
+        © {currentYear} Digmaco . All rights reserved.
       </p>
       <p className="text-xs text-slate-600">
         Built with DigMaco · IT Analytics Division

@@ -6,6 +6,8 @@ import AdminRoute from './router/AdminRoute'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import RootRedirect from './pages/RootRedirect'
 import PlatformUsersPage from './pages/platform-users/PlatformUsersPage'
+import UserActivityPage from './pages/UserActivityPage'
+import SubscribersPage from './pages/SubscribersPage'
 
 function App() {
   return (
@@ -21,6 +23,14 @@ function App() {
           <Route
             path="/dashboard-1"
             element={<PrivateRoute><DashboardPage /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/behaviors"
+            element={<PrivateRoute><UserActivityPage /></PrivateRoute>}
+          />
+          <Route
+            path="/management/subscribers"
+            element={<PrivateRoute><SubscribersPage /></PrivateRoute>}
           />
           <Route
             path="/admin/users"

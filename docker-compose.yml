@@ -1,0 +1,54 @@
+services:
+
+  # ── PostgreSQL ─────────────────────────
+  db:
+    image: postgres:15
+    container_name: analytics_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345hawala
+      POSTGRES_DB: analytics_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend ────────────────────────────
+  backend:
+    build: ./user-analytics-backend
+    container_name: analytics_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:12345hawala@db:5432/analytics_db
+    volumes:
+      - ./user-analytics-backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Frontend ───────────────────────────
+  frontend:
+    build: ./analytics-platform-front
+    container_name: analytics_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./analytics-platform-front:/app
+      - /app/node_modules
+      - /app/.vite
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

@@ -20,11 +20,11 @@ function computeDates(period, customStart, customEnd) {
 }
 
 const PERIOD_OPTIONS = [
-  { value: "today",   label: "Aujourd'hui"         },
-  { value: "7days",   label: "7 derniers jours"    },
-  { value: "30days",  label: "30 derniers jours"   },
-  { value: "3months", label: "3 derniers mois"     },
-  { value: "custom",  label: "Plage personnalisée" },
+  { value: "today",   label: "Today" },
+  { value: "7days",   label: "Last 7 days" },
+  { value: "30days",  label: "Last 30 days" },
+  { value: "3months", label: "Last 3 months" },
+  { value: "custom",  label: "Custom range" },
 ]
 
 function Dropdown({ options, value, onChange, isOpen, onToggle }) {
@@ -35,7 +35,7 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
         onClick={onToggle}
         className="flex items-center gap-2 px-4 py-2 bg-[#1A1D27] border border-slate-700 rounded-full text-sm text-slate-300 hover:bg-slate-800 transition-all"
       >
-        <span>{selected?.label ?? "Sélectionner"}</span>
+        <span>{selected?.label ?? "Select"}</span>
         <ChevronDown size={14} className={`text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
@@ -112,7 +112,7 @@ export default function FilterBar({ onApply }) {
   }, [])
 
   const serviceOptions = [
-    { value: null, label: "Tous les services" },
+    { value: null, label: "All services" },
     ...services.map((s) => ({ value: s.id, label: s.name })),
   ]
 
@@ -137,32 +137,32 @@ export default function FilterBar({ onApply }) {
 
       {/* ── Ligne 1 : badges stats globales ── */}
       <div className="flex flex-wrap items-center gap-2 px-1">
-        <span className="text-xs text-slate-500 font-medium mr-1">Base totale :</span>
+        <span className="text-xs text-slate-500 font-medium mr-1">All-time totals:</span>
         <GlobalStatBadge
           icon={Users}
           iconColor="#6366F1"
-          label="Utilisateurs"
+          label="Users"
           value={globalStats?.users?.total}
           loading={globalStatsLoading}
         />
         <GlobalStatBadge
           icon={CreditCard}
           iconColor="#10B981"
-          label="Abonnements"
+          label="Subscriptions"
           value={globalStats?.subscriptions?.total}
           loading={globalStatsLoading}
         />
         <GlobalStatBadge
           icon={Users}
           iconColor="#8B5CF6"
-          label="Actifs"
+          label="Active users"
           value={globalStats?.users?.active}
           loading={globalStatsLoading}
         />
         <GlobalStatBadge
           icon={CreditCard}
           iconColor="#F59E0B"
-          label="Abonnements actifs"
+          label="Active subscriptions"
           value={globalStats?.subscriptions?.active}
           loading={globalStatsLoading}
         />
@@ -218,7 +218,7 @@ export default function FilterBar({ onApply }) {
           onClick={handleApply}
           className="px-4 py-2 bg-violet-700 hover:bg-violet-800 text-white text-sm font-semibold rounded-full transition"
         >
-          Appliquer les filtres
+          Apply filters
         </button>
 
         {/* Reset */}
@@ -226,7 +226,7 @@ export default function FilterBar({ onApply }) {
           onClick={handleReset}
           className="px-3 py-2 text-sm text-slate-500 hover:text-slate-300 transition"
         >
-          Réinitialiser
+          Reset
         </button>
       </div>
 

@@ -6,15 +6,14 @@ from app.routers import analyticsOverview
 from app.routers import auth
 from app.routers import platform_user
 from app.routers import service
+from app.routers import userActivity 
 
 app = FastAPI(
     title="User Analytics Platform",
     version="1.0.0",
 )
 
-# ── CORS ───────────────────────────────────────────────────────
-# ⚠️ allow_credentials=True est INCOMPATIBLE avec allow_origins=["*"]
-# Il faut lister les origines explicitement
+# ⚠️ CORS DOIT être ajouté AVANT tous les routers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -35,7 +34,7 @@ app.include_router(users.router)
 app.include_router(analyticsOverview.router)
 app.include_router(platform_user.router, prefix="/platform-users", tags=["Platform Users"])
 app.include_router(service.router)
-
+app.include_router(userActivity.router) 
 @app.get("/")
 def root():
     return {"message": "API running"}

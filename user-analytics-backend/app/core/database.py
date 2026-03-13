@@ -1,28 +1,22 @@
+import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from app.core.config import settings
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = settings.DATABASE_URL
-
-
-# 1️⃣ Engine = connexion PostgreSQL
-engine = create_engine(
-    DATABASE_URL,
-    echo=False  # affiche requêtes SQL dans terminal
+# ── Lecture depuis variable d'environnement (Docker) ─────────
+# Fallback localhost pour le développement sans Docker
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:12345hawala@localhost:5433/analytics_db"
 )
 
-# 2️⃣ Session factory
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+engine = create_engine(DATABASE_URL)
 
-# 3️⃣ Base ORM
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 Base = declarative_base()
 
 
-# 4️⃣ Dependency FastAPI (IMPORTANT)
 def get_db():
     db = SessionLocal()
     try:

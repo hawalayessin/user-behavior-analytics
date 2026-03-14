@@ -16,7 +16,7 @@ const GROWTH_DATA = [
   { month: "Nov", nouveaux: 1920, churnés: 580 },
   { month: "Dec", nouveaux: 2280, churnés: 760 },
   { month: "Jan", nouveaux: 2100, churnés: 630 },
-  { month: "Fév", nouveaux: 1220, churnés: 500 },
+  { month: "Feb", nouveaux: 1220, churnés: 500 },
 ]
 
 function CustomTooltip({ active, payload }) {
@@ -42,7 +42,7 @@ function CustomTooltip({ active, payload }) {
 export default function UserGrowthChart() {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-slate-100 mb-4">Croissance Utilisateurs</h3>
+      <h3 className="text-lg font-semibold text-slate-100 mb-4">User Growth</h3>
       <ResponsiveContainer width="100%" height={350}>
         <BarChart
           data={GROWTH_DATA}
@@ -70,7 +70,7 @@ export default function UserGrowthChart() {
           <YAxis
             tick={{ fontSize: 12, fill: "#9CA3AF" }}
             axisLine={{ stroke: "#404854" }}
-            label={{ value: "Nombre d'utilisateurs", angle: -90, position: "insideLeft" }}
+            label={{ value: "Number of Users", angle: -90, position: "insideLeft" }}
           />
 
           <Tooltip content={<CustomTooltip />} />
@@ -84,14 +84,14 @@ export default function UserGrowthChart() {
           <Bar
             dataKey="nouveaux"
             fill="url(#colorNouveaux)"
-            name="Nouveaux"
+            name="New"
             radius={[8, 8, 0, 0]}
           />
 
           <Bar
             dataKey="churnés"
             fill="url(#colorChurnés)"
-            name="Churnés"
+            name="Churned"
             radius={[8, 8, 0, 0]}
           />
         </BarChart>

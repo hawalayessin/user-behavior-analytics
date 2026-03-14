@@ -6,7 +6,8 @@ from app.routers import analyticsOverview
 from app.routers import auth
 from app.routers import platform_user
 from app.routers import service
-from app.routers import userActivity 
+from app.routers import userActivity
+from app.routers import trialAnalytics 
 
 app = FastAPI(
     title="User Analytics Platform",
@@ -34,7 +35,8 @@ app.include_router(users.router)
 app.include_router(analyticsOverview.router)
 app.include_router(platform_user.router, prefix="/platform-users", tags=["Platform Users"])
 app.include_router(service.router)
-app.include_router(userActivity.router) 
+app.include_router(userActivity.router)
+app.include_router(trialAnalytics.router) 
 @app.get("/")
 def root():
     return {"message": "API running"}

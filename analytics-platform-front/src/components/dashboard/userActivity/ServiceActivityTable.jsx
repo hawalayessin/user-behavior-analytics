@@ -54,9 +54,9 @@ export default function ServiceActivityTable({ data }) {
     return data
       .map((service) => ({
         name: service.service_name || "N/A",
-        Actifs: service.active_users || 0,
-        "En essai": service.trial_users || 0,
-        Inactifs: service.inactive_7d || 0,
+        Active: service.active_users || 0,
+        "On Trial": service.trial_users || 0,
+        Inactive: service.inactive_7d || 0,
         stickiness_pct: service.stickiness_pct || 0,
         avg_lifetime_days: service.avg_lifetime_days || 0,
       }))
@@ -93,14 +93,14 @@ export default function ServiceActivityTable({ data }) {
   if (!data || data.length === 0) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <p className="text-slate-400 text-center py-8">Aucune donnée disponible</p>
+        <p className="text-slate-400 text-center py-8">No data available</p>
       </div>
     )
   }
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-6">
-      <h3 className="text-lg font-semibold text-slate-100">Activité par service</h3>
+      <h3 className="text-lg font-semibold text-slate-100">Activity by Service</h3>
 
       {/* Chart */}
       <div className="h-80">
@@ -123,9 +123,9 @@ export default function ServiceActivityTable({ data }) {
               wrapperStyle={{ paddingTop: "10px" }}
               contentStyle={{ backgroundColor: "transparent", border: "none" }}
             />
-            <Bar dataKey="Actifs" stackId="a" fill={COLORS.active} />
-            <Bar dataKey="En essai" stackId="a" fill={COLORS.trial} />
-            <Bar dataKey="Inactifs" stackId="a" fill={COLORS.inactive} />
+            <Bar dataKey="Active" stackId="a" fill={COLORS.active} name="Active" />
+            <Bar dataKey="On Trial" stackId="a" fill={COLORS.trial} name="On Trial" />
+            <Bar dataKey="Inactive" stackId="a" fill={COLORS.inactive} name="Inactive" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -140,7 +140,7 @@ export default function ServiceActivityTable({ data }) {
                   onClick={() => toggleSort("name")}
                   className="flex items-center gap-1 hover:text-slate-100 transition"
                 >
-                  Service
+                  Service Name
                   {sortKey === "name" && (
                     sortOrder === "asc" ? (
                       <ChevronUp size={14} />
@@ -152,11 +152,11 @@ export default function ServiceActivityTable({ data }) {
               </th>
               <th className="text-right px-4 py-2 text-slate-300 font-semibold">
                 <button
-                  onClick={() => toggleSort("Actifs")}
+                  onClick={() => toggleSort("Active")}
                   className="flex items-center justify-end gap-1 hover:text-slate-100 transition w-full"
                 >
-                  Actifs
-                  {sortKey === "Actifs" && (
+                  Active
+                  {sortKey === "Active" && (
                     sortOrder === "asc" ? (
                       <ChevronUp size={14} />
                     ) : (
@@ -170,7 +170,7 @@ export default function ServiceActivityTable({ data }) {
                   onClick={() => toggleSort("inactive_7d")}
                   className="flex items-center justify-end gap-1 hover:text-slate-100 transition w-full"
                 >
-                  Inactifs +7j
+                  Inactive +7d
                   {sortKey === "inactive_7d" && (
                     sortOrder === "asc" ? (
                       <ChevronUp size={14} />
@@ -185,7 +185,7 @@ export default function ServiceActivityTable({ data }) {
                   onClick={() => toggleSort("avg_lifetime_days")}
                   className="flex items-center justify-end gap-1 hover:text-slate-100 transition w-full"
                 >
-                  Durée vie
+                  Lifetime
                   {sortKey === "avg_lifetime_days" && (
                     sortOrder === "asc" ? (
                       <ChevronUp size={14} />

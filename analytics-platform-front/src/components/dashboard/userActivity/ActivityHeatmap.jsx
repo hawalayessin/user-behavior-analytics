@@ -73,7 +73,7 @@ export default function ActivityHeatmap({ data }) {
   if (!data || data.length === 0) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <p className="text-slate-400 text-center py-8">Aucune donnée disponible</p>
+        <p className="text-slate-400 text-center py-8">No data available</p>
       </div>
     )
   }
@@ -82,7 +82,7 @@ export default function ActivityHeatmap({ data }) {
     <div className="space-y-6">
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
         <h3 className="text-lg font-semibold text-slate-100 mb-6">
-          Heatmap d'activité (jour × heure)
+          Activity Heatmap (Day × Hour)
         </h3>
 
         {/* Heatmap Grid */}
@@ -122,7 +122,7 @@ export default function ActivityHeatmap({ data }) {
                         style={{ backgroundColor: color }}
                         onMouseEnter={() => setHoveredCell(key)}
                         onMouseLeave={() => setHoveredCell(null)}
-                        title={`${DAYS_FR[dayIndex]} ${hour}h — ${count} utilisateurs`}
+                        title={`${DAYS_FR[dayIndex]} ${hour}h — ${count} users`}
                       />
 
                       {/* Hover Tooltip */}

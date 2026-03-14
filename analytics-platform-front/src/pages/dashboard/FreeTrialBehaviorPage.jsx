@@ -1,25 +1,23 @@
 import { useState, useMemo, useEffect } from "react"
 import { AlertCircle, RotateCcw, ChevronUp, ChevronDown, Search, Download } from "lucide-react"
 import * as XLSX from "xlsx"
-import AppLayout            from "../components/layout/AppLayout"
-import FilterBar            from "../components/dashboard/FilterBar"
-import KPICard              from "../components/dashboard/KPICard"
-import DAUTrendChart        from "../components/dashboard/userActivity/DAUTrendChart"
-import ServiceActivityTable from "../components/dashboard/userActivity/ServiceActivityTable"
-import UserGrowthChart      from "../components/dashboard/userActivity/UserGrowthChart"
-import ActivityHeatmap      from "../components/dashboard/userActivity/ActivityHeatmap"
-import { useUserActivity }  from "../hooks/useUserActivity"
-import { useUsers }         from "../hooks/useUsers"
+import AppLayout            from "../../components/layout/AppLayout"
+import FilterBar            from "../../components/dashboard/FilterBar"
+import KPICard              from "../../components/dashboard/KPICard"
+import TrialDropoffChart    from "../../components/dashboard/TrialDropoffChart"
+import SubscriptionDonutChart from "../../components/dashboard/SubscriptionDonutChart"
+import EngagementHealthPanel from "../../components/dashboard/EngagementHealthPanel"
+import { useTrialKPIs }     from "../../hooks/useTrialKPIs"
+import { useTrialUsers }    from "../../hooks/useTrialUsers"
 import {
-  Users, TrendingUp, Calendar,
-  Zap, AlertTriangle, Clock,
+  TrendingDown, TrendingUp, Calendar,
+  AlertTriangle, Clock,
 } from "lucide-react"
 
-const STATUT_MAP = {
-  active:   { label: "Actif",   bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/30" },
-  trial:    { label: "Essai",   bg: "bg-blue-500/20",    text: "text-blue-300",    border: "border-blue-500/30"    },
-  inactive: { label: "Inactif", bg: "bg-amber-500/20",   text: "text-amber-300",   border: "border-amber-500/30"   },
-  churned:  { label: "Churné",  bg: "bg-red-500/20",     text: "text-red-300",     border: "border-red-500/30"     },
+const TRIAL_STATUS_MAP = {
+  active:    { label: "Trial Active",  bg: "bg-amber-500/20", text: "text-amber-300", border: "border-amber-500/30" },
+  converted: { label: "Converted",     bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/30" },
+  dropped:   { label: "Dropped",       bg: "bg-red-500/20",     text: "text-red-300",     border: "border-red-500/30" },
 }
 
 const ITEMS_PER_PAGE = 8
@@ -35,7 +33,7 @@ const KPISkeleton   = () => <div className="w-full h-32 bg-slate-800 animate-pul
 const ChartSkeleton = () => <div className="w-full h-96 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
 const RowSkeleton   = () => (
   <tr>
-    {Array.from({ length: 6 }).map((_, i) => (
+    {Array.from({ length: 7 }).map((_, i) => (
       <td key={i} className="px-6 py-4">
         <div className="h-4 bg-slate-700 animate-pulse rounded w-3/4" />
       </td>
@@ -43,18 +41,18 @@ const RowSkeleton   = () => (
   </tr>
 )
 
-export default function UserActivityPage() {
+export default function FreeTrialBehaviorPage() {
 
-  const [filters,      setFilters]      = useState(getDateRange(7))
-  const [searchInput,  setSearchInput]  = useState("")
-  const [search,       setSearch]       = useState("")
-  const [statutFilter, setStatutFilter] = useState("")
-  const [sortField,    setSortField]    = useState("created_at")
-  const [sortDir,      setSortDir]      = useState("desc")
-  const [page,         setPage]         = useState(1)
-  const [exportOpen,   setExportOpen]   = useState(false)
-  const [exportLoading,setExportLoading]= useState(false)
-  const [toastMsg,     setToastMsg]     = useState(null)
+  const [filters,        setFilters]       = useState(getDateRange(7))
+  const [searchInput,    setSearchInput]   = useState("")
+  const [search,         setSearch]        = useState("")
+  const [statusFilter,   setStatusFilter]  = useState("")
+  const [sortField,      setSortField]     = useState("trial_start_date")
+  const [sortDir,        setSortDir]       = useState("desc")
+  const [page,           setPage]          = useState(1)
+  const [exportOpen,     setExportOpen]    = useState(false)
+  const [exportLoading,  setExportLoading] = useState(false)
+  const [toastMsg,       setToastMsg]      = useState(null)
 
   // ── Debounce search 400ms ─────────────────────────────────
   useEffect(() => {
@@ -72,19 +70,19 @@ export default function UserActivityPage() {
   }, [])
 
   const {
-    data:    activityData,
-    loading: activityLoading,
-    error:   activityError,
-    refetch: refetchActivity,
-  } = useUserActivity(filters)
+    data:    kpiData,
+    loading: kpiLoading,
+    error:   kpiError,
+    refetch: refetchKPIs,
+  } = useTrialKPIs(filters)
 
   const {
-    data:    usersData,
-    loading: usersLoading,
-    error:   usersError,
-    refetch: refetchUsers,
-  } = useUsers({
-    status:     statutFilter || undefined,
+    data:    trialUsersData,
+    loading: trialUsersLoading,
+    error:   trialUsersError,
+    refetch: refetchTrialUsers,
+  } = useTrialUsers({
+    status:     statusFilter || undefined,
     search:     search       || undefined,
     service_id: filters.service_id || undefined,
     page,
@@ -92,30 +90,28 @@ export default function UserActivityPage() {
   })
 
   const kpis = useMemo(() => {
-    if (!activityData?.kpis) return null
+    if (!kpiData) return null
     return {
-      dau_today:         activityData.kpis.dau_today         ?? 0,
-      wau_current_week:  activityData.kpis.wau_current_week  ?? 0,
-      mau_current_month: activityData.kpis.mau_current_month ?? 0,
-      stickiness_pct:    activityData.kpis.stickiness_pct    ?? 0,
-      inactive_count:    activityData.kpis.inactive_count    ?? 0,
-      avg_lifetime_days: activityData.kpis.avg_lifetime_days ?? 0,
+      total_trials:     kpiData.total_trials     ?? 0,
+      conversion_rate:  kpiData.conversion_rate  ?? 0,
+      avg_duration:     kpiData.avg_duration     ?? 0,
+      dropoff_j3:       kpiData.dropoff_j3       ?? 0,
     }
-  }, [activityData?.kpis])
+  }, [kpiData])
 
-  const users      = usersData?.data  ?? []
-  const totalCount = usersData?.total ?? 0
+  const trialUsers = trialUsersData?.data  ?? []
+  const totalCount = trialUsersData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE))
 
-  const sortedUsers = useMemo(() => {
-    return [...users].sort((a, b) => {
+  const sortedTrialUsers = useMemo(() => {
+    return [...trialUsers].sort((a, b) => {
       const va = a[sortField] ?? ""
       const vb = b[sortField] ?? ""
       if (va < vb) return sortDir === "asc" ? -1 :  1
       if (va > vb) return sortDir === "asc" ?  1 : -1
       return 0
     })
-  }, [users, sortField, sortDir])
+  }, [trialUsers, sortField, sortDir])
 
   const toggleSort = (field) => {
     if (sortField === field) setSortDir((d) => d === "asc" ? "desc" : "asc")
@@ -140,32 +136,35 @@ export default function UserActivityPage() {
   // ── Build rows for export ─────────────────────────────────
   const buildRows = (list) =>
     list.map((user) => {
-      const cfg = STATUT_MAP[user.status] ?? STATUT_MAP.inactive
+      const cfg = TRIAL_STATUS_MAP[user.status] ?? TRIAL_STATUS_MAP.dropped
+      const duration = user.trial_duration_days ?? 0
+      const converted = user.status === "converted" ? "Yes" : "No"
       return {
-        "Number":        user.phone_number ?? "—",
-        "Status":        cfg.label,
-        "Services":      (user.services ?? []).map((s) => s.name).join(" | ") || "—",
-        "Registered On": user.created_at
-                           ? new Date(user.created_at).toLocaleDateString("en-GB")
-                           : "—",
-        "Last Activity": user.last_activity_at
-                           ? new Date(user.last_activity_at).toLocaleDateString("en-GB")
-                           : "—",
-        "Campaign":      user.campaign_name || "None",
+        "Number":         user.phone_number ?? "—",
+        "Service":        user.service_name || "—",
+        "Trial Start":    user.trial_start_date
+                            ? new Date(user.trial_start_date).toLocaleDateString("en-GB")
+                            : "—",
+        "Trial End":      user.trial_end_date
+                            ? new Date(user.trial_end_date).toLocaleDateString("en-GB")
+                            : "—",
+        "Status":         cfg.label,
+        "Converted":      converted,
+        "Duration (days)": duration.toFixed(1),
       }
     })
 
-  // ── Fetch ALL users via export=true ───────────────────────
-  const fetchAllUsersForExport = async () => {
+  // ── Fetch ALL trial users via export=true ──────────────────
+  const fetchAllTrialUsersForExport = async () => {
     setExportLoading(true)
     try {
       const params = new URLSearchParams()
-      if (statutFilter)       params.append("status",     statutFilter)
+      if (statusFilter)       params.append("status",     statusFilter)
       if (search)             params.append("search",     search)
       if (filters.service_id) params.append("service_id", filters.service_id)
-      params.append("export", "true")   // ✅ pas de LIMIT côté backend
+      params.append("export", "true")
 
-      const res  = await fetch(`/api/users?${params.toString()}`)
+      const res  = await fetch(`/api/users/trial?${params.toString()}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       return json.data ?? []
@@ -179,11 +178,11 @@ export default function UserActivityPage() {
 
   // ── Export CSV ────────────────────────────────────────────
   const exportCSV = async () => {
-    const allUsers = await fetchAllUsersForExport()
+    const allUsers = await fetchAllTrialUsersForExport()
     if (!allUsers.length) return showToast("⚠️ No data to export")
 
     const rows    = buildRows(allUsers)
-    const headers = ["Number", "Status", "Services", "Registered On", "Last Activity", "Campaign"]
+    const headers = ["Number", "Service", "Trial Start", "Trial End", "Status", "Converted", "Duration (days)"]
     const csvContent = [
       headers,
       ...rows.map((r) => headers.map((h) => `"${String(r[h]).replace(/"/g, '""')}"`)),
@@ -195,121 +194,183 @@ export default function UserActivityPage() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement("a")
     a.href     = url
-    a.download = `users_export_${new Date().toISOString().split("T")[0]}.csv`
+    a.download = `trial_users_export_${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    showToast(`✅ ${allUsers.length} users exported to CSV`)
+    showToast(`✅ ${allUsers.length} trial users exported to CSV`)
   }
 
   // ── Export Excel ──────────────────────────────────────────
   const exportExcel = async () => {
-    const allUsers = await fetchAllUsersForExport()
+    const allUsers = await fetchAllTrialUsersForExport()
     if (!allUsers.length) return showToast("⚠️ No data to export")
 
     const rows = buildRows(allUsers)
     const ws   = XLSX.utils.json_to_sheet(rows)
     const wb   = XLSX.utils.book_new()
     ws["!cols"] = [
-      { wch: 18 }, { wch: 12 }, { wch: 24 },
-      { wch: 15 }, { wch: 15 }, { wch: 22 },
+      { wch: 18 }, { wch: 16 }, { wch: 15 },
+      { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 15 },
     ]
-    XLSX.utils.book_append_sheet(wb, ws, "Users")
-    XLSX.writeFile(wb, `users_export_${new Date().toISOString().split("T")[0]}.xlsx`)
-    showToast(`✅ ${allUsers.length} users exported to Excel`)
+    XLSX.utils.book_append_sheet(wb, ws, "Trial Users")
+    XLSX.writeFile(wb, `trial_users_export_${new Date().toISOString().split("T")[0]}.xlsx`)
+    showToast(`✅ ${allUsers.length} trial users exported to Excel`)
   }
 
   return (
-    <AppLayout pageTitle="Users Activity">
+    <AppLayout pageTitle="Free Trial Behavior">
       <div className="space-y-6">
 
         {/* ── Header ────────────────────────────────────────── */}
         <div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">Users Activity</h1>
-          <p className="text-sm text-slate-400">Comprehensive analysis of engagement and activity</p>
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">Free Trial Behavior</h1>
+          <p className="text-sm text-slate-400">Analyze user engagement during trial period and conversion metrics</p>
         </div>
 
         {/* ── Filter Bar ────────────────────────────────────── */}
         <FilterBar onApply={handleApplyFilters} />
 
-        {/* ── Erreur analytics ──────────────────────────────── */}
-        {activityError && (
+        {/* ── Erreur KPIs ───────────────────────────────────── */}
+        {kpiError && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
             <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-            <p className="flex-1 text-sm text-red-200">{activityError}</p>
+            <p className="flex-1 text-sm text-red-200">{kpiError}</p>
             <button
-              onClick={refetchActivity}
+              onClick={refetchKPIs}
               className="flex items-center gap-2 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition"
             >
-              <RotateCcw size={14} /> Réessayer
+              <RotateCcw size={14} /> Retry
             </button>
           </div>
         )}
 
-        {/* ── KPI Cards ─────────────────────────────────────── */}
-        {!activityError && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {activityLoading
-              ? Array.from({ length: 6 }).map((_, i) => <KPISkeleton key={i} />)
+        {/* ── KPI Cards (2x2 Grid) ──────────────────────────── */}
+        {!kpiError && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {kpiLoading
+              ? Array.from({ length: 4 }).map((_, i) => <KPISkeleton key={i} />)
               : kpis ? (
                 <>
-                  <KPICard title="DAU (Today)"       value={kpis.dau_today.toLocaleString()}         subtitle="Actifs aujourd'hui"            icon={Users}         iconColor="#7C3AED" iconBg="bg-purple-500/10"  trend={0} trendLabel="stable" />
-                  <KPICard title="WAU (Last 7 days)"  value={kpis.wau_current_week.toLocaleString()}   subtitle="Actifs 7 derniers jours"       icon={TrendingUp}    iconColor="#3B82F6" iconBg="bg-blue-500/10"    trend={0} trendLabel="stable" />
-                  <KPICard title="MAU (Last 30 days)" value={kpis.mau_current_month.toLocaleString()}  subtitle="Actifs 30 derniers jours"      icon={Calendar}      iconColor="#10B981" iconBg="bg-green-500/10"   trend={0} trendLabel="stable" />
-                  <KPICard title="Stickiness"         value={`${kpis.stickiness_pct.toFixed(1)}%`}    subtitle="DAU / MAU × 100"               icon={Zap}           iconColor="#F59E0B" iconBg="bg-amber-500/10"   trend={0} trendLabel="stable" />
-                  <KPICard title="Inactifs"           value={kpis.inactive_count.toLocaleString()}     subtitle="No activity for 7+ days"       icon={AlertTriangle} iconColor="#EF4444" iconBg="bg-red-500/10"     trend={0} trendLabel="negative" alert={kpis.inactive_count > 100} />
-                  <KPICard title="Durée de vie"       value={`${kpis.avg_lifetime_days.toFixed(0)}j`} subtitle="Average subscription duration" icon={Clock}         iconColor="#8B5CF6" iconBg="bg-violet-500/10"  trend={0} trendLabel="stable" />
+                  <KPICard
+                    title="Total Trials Started"
+                    value={kpis.total_trials.toLocaleString()}
+                    subtitle="Active and past trials"
+                    icon={TrendingUp}
+                    iconColor="#3B82F6"
+                    iconBg="bg-blue-500/10"
+                    trend={0}
+                    trendLabel="stable"
+                  />
+                  <KPICard
+                    title="Conversion Rate"
+                    value={`${kpis.conversion_rate.toFixed(1)}%`}
+                    subtitle="Trial → Paid conversion"
+                    icon={TrendingUp}
+                    iconColor={kpis.conversion_rate < 20 ? "#EF4444" : "#10B981"}
+                    iconBg={kpis.conversion_rate < 20 ? "bg-red-500/10" : "bg-green-500/10"}
+                    trend={kpis.conversion_rate < 20 ? -1 : 0}
+                    trendLabel={kpis.conversion_rate < 20 ? "below target" : "on track"}
+                    alert={kpis.conversion_rate < 20}
+                  />
+                  <KPICard
+                    title="Avg Trial Duration"
+                    value={`${kpis.avg_duration.toFixed(1)}d`}
+                    subtitle="Average days in trial"
+                    icon={Calendar}
+                    iconColor="#8B5CF6"
+                    iconBg="bg-violet-500/10"
+                    trend={0}
+                    trendLabel="stable"
+                  />
+                  <KPICard
+                    title="Day 3 Drop-off Rate"
+                    value={`${kpis.dropoff_j3.toFixed(0)}%`}
+                    subtitle="Users who drop-off by day 3"
+                    icon={AlertTriangle}
+                    iconColor="#F59E0B"
+                    iconBg="bg-amber-500/10"
+                    trend={-1}
+                    trendLabel="warning"
+                    alert={kpis.dropoff_j3 > 50}
+                  />
                 </>
               ) : null
             }
           </div>
         )}
 
-        {/* ── DAU Trend Chart ───────────────────────────────── */}
-        {!activityError && (
-          <div>
-            {activityLoading
-              ? <ChartSkeleton />
-              : activityData?.dau_trend
-                ? <DAUTrendChart data={activityData.dau_trend} />
-                : null
-            }
-          </div>
-        )}
-
-        {/* ── Service Activity & User Growth ────────────────── */}
-        {!activityError && (
+        {/* ── 2x2 Grid: Charts + Table ──────────────────────── */}
+        {!kpiError && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {activityLoading
-              ? <><ChartSkeleton /><ChartSkeleton /></>
-              : (
-                <>
-                  {activityData?.by_service && (
-                    <ServiceActivityTable data={activityData.by_service} />
-                  )}
-                  <UserGrowthChart />
-                </>
-              )
-            }
+
+            {/* Row 1: TrialDropoffChart + SubscriptionDonutChart */}
+            <div>
+              {kpiLoading
+                ? <ChartSkeleton />
+                : <TrialDropoffChart data={[
+                    { label: "Day 1\n(0-24h)", value: 45, fill: "#EF4444" },
+                    { label: "Day 2\n(24-48h)", value: 32, fill: "#F97316" },
+                    { label: "Day 3\n(48-72h)", value: 28, fill: "#FBBF24" },
+                  ]} />
+              }
+            </div>
+
+            <div>
+              {kpiLoading
+                ? <ChartSkeleton />
+                : <SubscriptionDonutChart data={[
+                    { name: "Trial", value: 45, fill: "#3B82F6" },
+                    { name: "Active", value: 120, fill: "#10B981" },
+                    { name: "Cancelled", value: 35, fill: "#EF4444" },
+                  ]} />
+              }
+            </div>
+
+            {/* Row 2: EngagementHealthPanel + TrialUsersTable */}
+            <div>
+              {kpiLoading
+                ? <ChartSkeleton />
+                : <EngagementHealthPanel bars={[
+                    { label: "Trial Completion", value: 42, sublabel: "completed full trial", color: "#3B82F6", target: 50 },
+                    { label: "Day 1 Retention", value: 78, sublabel: "return after signup", color: "#10B981", target: 80 },
+                    { label: "Day 3 Retention", value: 38, sublabel: "active at 72 hours", color: "#F59E0B", target: 50 },
+                  ]} />
+              }
+            </div>
+
+            <div>
+              {trialUsersLoading
+                ? <ChartSkeleton />
+                : (
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+                    <h3 className="text-lg font-bold text-slate-100">Trial Summary Stats</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Total in trial:</span>
+                        <span className="text-slate-100 font-medium">{trialUsers.filter(u => u.status === "active").length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Converted:</span>
+                        <span className="text-emerald-400 font-medium">{trialUsers.filter(u => u.status === "converted").length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Dropped:</span>
+                        <span className="text-red-400 font-medium">{trialUsers.filter(u => u.status === "dropped").length}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+            </div>
+
           </div>
         )}
 
-        {/* ── Activity Heatmap ──────────────────────────────── */}
-        {!activityError && (
-          <div>
-            {activityLoading
-              ? <ChartSkeleton />
-              : activityData?.activity_heatmap
-                ? <ActivityHeatmap data={activityData.activity_heatmap} />
-                : null
-            }
-          </div>
-        )}
-
-        {/* ── Table Utilisateurs ────────────────────────────── */}
+        {/* ── Table Utilisateurs en essai ────────────────────── */}
         <div className="space-y-4">
 
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-100">User List</h2>
+            <h2 className="text-xl font-bold text-slate-100">Trial Users</h2>
             <span className="text-sm text-slate-400">
               {totalCount} user{totalCount !== 1 ? "s" : ""}
             </span>
@@ -332,15 +393,14 @@ export default function UserActivityPage() {
 
             {/* Status filter */}
             <select
-              value={statutFilter}
-              onChange={(e) => { setStatutFilter(e.target.value); setPage(1) }}
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
               className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-slate-100 focus:outline-none focus:border-violet-500"
             >
               <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="trial">Trial</option>
-              <option value="inactive">Inactive</option>
-              <option value="churned">Churned</option>
+              <option value="active">Trial Active</option>
+              <option value="converted">Converted</option>
+              <option value="dropped">Dropped</option>
             </select>
 
             {/* Export dropdown */}
@@ -379,7 +439,7 @@ export default function UserActivityPage() {
 
             {/* Refresh */}
             <button
-              onClick={() => { refetchUsers(); refetchActivity() }}
+              onClick={() => { refetchTrialUsers(); refetchKPIs() }}
               className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded transition"
             >
               <RotateCcw size={14} /> Refresh
@@ -387,12 +447,12 @@ export default function UserActivityPage() {
           </div>
 
           {/* ── Erreur table ──────────────────────────────────── */}
-          {usersError && (
+          {trialUsersError && (
             <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
               <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-              <p className="flex-1 text-sm text-red-200">{usersError}</p>
+              <p className="flex-1 text-sm text-red-200">{trialUsersError}</p>
               <button
-                onClick={refetchUsers}
+                onClick={refetchTrialUsers}
                 className="flex items-center gap-2 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition"
               >
                 <RotateCcw size={14} /> Retry
@@ -408,12 +468,13 @@ export default function UserActivityPage() {
                 <thead className="bg-slate-800 border-b border-slate-700">
                   <tr>
                     {[
-                      { label: "Number",        field: "phone_number"     },
-                      { label: "Status",        field: "status"           },
-                      { label: "Services",      field: null               },
-                      { label: "Registered on", field: "created_at"       },
-                      { label: "Last activity", field: "last_activity_at" },
-                      { label: "Campaign",      field: null               },
+                      { label: "Number",     field: "phone_number"     },
+                      { label: "Service",    field: "service_name"     },
+                      { label: "Trial Start", field: "trial_start_date" },
+                      { label: "Trial End",  field: "trial_end_date"   },
+                      { label: "Status",     field: "status"           },
+                      { label: "Converted",  field: null               },
+                      { label: "Duration",   field: "trial_duration_days" },
                     ].map(({ label, field }) => (
                       <th key={label} className="px-6 py-3 text-left">
                         {field ? (
@@ -432,23 +493,43 @@ export default function UserActivityPage() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-700">
-                  {usersLoading
+                  {trialUsersLoading
                     ? Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => <RowSkeleton key={i} />)
-                    : sortedUsers.length === 0
+                    : sortedTrialUsers.length === 0
                       ? (
                         <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                            <Users size={32} className="mx-auto mb-2 opacity-30" />
-                            No users found
+                          <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                            <AlertTriangle size={32} className="mx-auto mb-2 opacity-30" />
+                            No trial users found
                           </td>
                         </tr>
                       )
-                      : sortedUsers.map((user) => {
-                          const cfg = STATUT_MAP[user.status] ?? STATUT_MAP.inactive
+                      : sortedTrialUsers.map((user) => {
+                          const cfg = TRIAL_STATUS_MAP[user.status] ?? TRIAL_STATUS_MAP.dropped
+                          const duration = user.trial_duration_days ?? 0
+                          const converted = user.status === "converted" ? "Yes" : "No"
+                          const convertedBg = user.status === "converted"
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                            : "bg-slate-700 text-slate-300 border-slate-600"
                           return (
                             <tr key={user.id} className="hover:bg-slate-800/30 transition cursor-pointer">
                               <td className="px-6 py-4 font-mono text-slate-200 text-xs">
                                 {user.phone_number ?? "—"}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">
+                                  {user.service_name || "—"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-slate-400 text-xs">
+                                {user.trial_start_date
+                                  ? new Date(user.trial_start_date).toLocaleDateString("en-GB")
+                                  : "—"}
+                              </td>
+                              <td className="px-6 py-4 text-slate-400 text-xs">
+                                {user.trial_end_date
+                                  ? new Date(user.trial_end_date).toLocaleDateString("en-GB")
+                                  : "—"}
                               </td>
                               <td className="px-6 py-4">
                                 <span className={`inline-block px-3 py-1 rounded text-xs font-medium border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
@@ -456,35 +537,12 @@ export default function UserActivityPage() {
                                 </span>
                               </td>
                               <td className="px-6 py-4">
-                                <div className="flex flex-wrap gap-1">
-                                  {(user.services ?? []).length > 0
-                                    ? (user.services ?? []).map((s, idx) => (
-                                        <span key={s.id ?? idx} className="px-2 py-0.5 bg-slate-700 text-slate-300 text-xs rounded">
-                                          {s.name}
-                                        </span>
-                                      ))
-                                    : <span className="text-slate-500 text-xs">—</span>
-                                  }
-                                </div>
+                                <span className={`inline-block px-3 py-1 rounded text-xs font-medium border ${convertedBg}`}>
+                                  {converted}
+                                </span>
                               </td>
-                              <td className="px-6 py-4 text-slate-400 text-xs">
-                                {user.created_at
-                                  ? new Date(user.created_at).toLocaleDateString("en-GB")
-                                  : "—"}
-                              </td>
-                              <td className="px-6 py-4 text-slate-400 text-xs">
-                                {user.last_activity_at
-                                  ? new Date(user.last_activity_at).toLocaleDateString("en-GB")
-                                  : "—"}
-                              </td>
-                              <td className="px-6 py-4 text-xs">
-                                {user.campaign_name ? (
-                                  <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] max-w-[120px] truncate inline-block">
-                                    {user.campaign_name}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-500">—</span>
-                                )}
+                              <td className="px-6 py-4 text-slate-400 text-xs font-mono">
+                                {duration.toFixed(1)}d
                               </td>
                             </tr>
                           )

@@ -75,7 +75,7 @@ export default function DAUTrendChart({ data }) {
   if (!chartData || chartData.length === 0) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <p className="text-slate-400 text-center py-8">Aucune donnée disponible</p>
+        <p className="text-slate-400 text-center py-8">No data available</p>
       </div>
     )
   }
@@ -84,7 +84,7 @@ export default function DAUTrendChart({ data }) {
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-      <h3 className="text-lg font-semibold text-slate-100 mb-4">Tendance DAU/WAU/MAU</h3>
+      <h3 className="text-lg font-semibold text-slate-100 mb-4">DAU/WAU/MAU Trend</h3>
       <ResponsiveContainer width="100%" height={400}>
         <ComposedChart
           data={chartData}
@@ -147,7 +147,7 @@ export default function DAUTrendChart({ data }) {
                   fill="#7C3AED"
                   fillOpacity={0.08}
                   label={{
-                    value: "📈 Pic",
+                    value: "📈 Peak",
                     position: "top",
                     fill: "#7C3AED",
                     fontSize: 12,

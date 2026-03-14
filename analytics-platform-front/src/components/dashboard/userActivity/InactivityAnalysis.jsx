@@ -80,7 +80,7 @@ export default function InactivityAnalysis({ data, inactive_count }) {
   if (!data || data.length === 0) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <p className="text-slate-400 text-center py-8">Aucune donnée disponible</p>
+        <p className="text-slate-400 text-center py-8">No data available</p>
       </div>
     )
   }
@@ -88,7 +88,7 @@ export default function InactivityAnalysis({ data, inactive_count }) {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-slate-100 mb-6">Analyse d'inactivité</h3>
+        <h3 className="text-lg font-semibold text-slate-100 mb-6">Inactivity Analysis</h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
           {/* Pie Chart */}

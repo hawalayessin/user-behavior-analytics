@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime, date, timedelta, time
+from datetime import datetime, date, timedelta
 from typing import Optional
 import uuid
 
@@ -17,7 +17,6 @@ def get_user_activity(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    # ── Même logique de dates que overview ───────────────────
     end_dt   = end_date   or date.today()
     start_dt = start_date or (end_dt - timedelta(days=30))
 
@@ -34,14 +33,9 @@ def get_user_activity(
         "service_id": valid_service_id,
     }
 
-    # ── Filtres — même pattern que overview ──────────────────
-    # user_activities sans alias  → service_id direct
-    sf_ua = "AND service_id = CAST(:service_id AS uuid)"        if valid_service_id else ""
-    # subscriptions sans alias    → service_id direct
-    sf_sub = "AND service_id = CAST(:service_id AS uuid)"       if valid_service_id else ""
-    # subscriptions s + services srv → srv.id
-    sf_srv = "AND srv.id = CAST(:service_id AS uuid)"           if valid_service_id else ""
-    # inactive — subquery explicite
+    sf_ua       = "AND service_id = CAST(:service_id AS uuid)"  if valid_service_id else ""
+    sf_sub      = "AND service_id = CAST(:service_id AS uuid)"  if valid_service_id else ""
+    sf_srv      = "AND srv.id = CAST(:service_id AS uuid)"      if valid_service_id else ""
     sf_inactive = """
         AND EXISTS (
             SELECT 1 FROM subscriptions sub
@@ -55,22 +49,21 @@ def get_user_activity(
         SELECT
             COUNT(DISTINCT user_id) FILTER (
                 WHERE DATE(activity_datetime) = :end_dt
-            )                                                    AS dau_today,
+            ) AS dau_today,
+
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime
-                      BETWEEN :end_dt - INTERVAL '7 days' AND :end_dt + INTERVAL '1 day'
-            )                                                    AS wau_current_week,
+                WHERE activity_datetime >= CAST(:end_dt AS timestamp) - INTERVAL '7 days'
+                  AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+            ) AS wau_current_week,
+
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime
-                      BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
-            )                                                    AS mau_current_month,
-            COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime
-                      BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
-            )                                                    AS period_active_users
+                WHERE activity_datetime >= CAST(:start_dt AS timestamp)
+                  AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+            ) AS mau_current_month
+
         FROM user_activities
-        WHERE activity_datetime
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+        WHERE activity_datetime >= CAST(:start_dt AS timestamp)
+          AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_ua}
     """), params).fetchone()
 
@@ -79,14 +72,15 @@ def get_user_activity(
     stickiness = round((dau / mau * 100), 1) if mau > 0 else 0.0
 
     # ── 2. Inactive users ─────────────────────────────────────
+    # ✅ CORRIGÉ : inactif = pas d'activité depuis 7j (peu importe status)
     inactive = db.execute(text(f"""
         SELECT COUNT(DISTINCT u.id) AS inactive_count
         FROM users u
         LEFT JOIN user_activities ua
             ON  ua.user_id = u.id
-            AND ua.activity_datetime >= :end_dt - INTERVAL '7 days'
+            AND ua.activity_datetime >= CAST(:end_dt AS timestamp) - INTERVAL '7 days'
         WHERE ua.user_id IS NULL
-          AND u.status = 'inactive'
+          AND u.status NOT IN ('churned', 'cancelled')
         {sf_inactive}
     """), params).fetchone()
 
@@ -98,8 +92,8 @@ def get_user_activity(
             )
         ), 0) AS avg_lifetime_days
         FROM subscriptions
-        WHERE subscription_start_date
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+        WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
+          AND subscription_start_date <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
           AND status IN ('active', 'cancelled', 'expired')
         {sf_sub}
     """), params).fetchone()
@@ -110,14 +104,30 @@ def get_user_activity(
             DATE(activity_datetime) AS date,
             COUNT(DISTINCT user_id) AS dau
         FROM user_activities
-        WHERE activity_datetime
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+        WHERE activity_datetime >= CAST(:start_dt AS timestamp)
+          AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_ua}
         GROUP BY DATE(activity_datetime)
         ORDER BY date ASC
     """), params).fetchall()
 
-    dau_map   = {str(row.date): row.dau for row in dau_rows}
+    dau_map = {str(row.date): row.dau for row in dau_rows}
+
+    # ✅ CORRIGÉ : WAU/MAU rolling depuis DB (distinct users réels)
+    wau_rows = db.execute(text(f"""
+        SELECT
+            DATE(activity_datetime) AS date,
+            COUNT(DISTINCT user_id) AS rolling_count
+        FROM user_activities
+        WHERE activity_datetime >= CAST(:start_dt AS timestamp) - INTERVAL '30 days'
+          AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+        {sf_ua}
+        GROUP BY DATE(activity_datetime)
+        ORDER BY date ASC
+    """), params).fetchall()
+
+    wau_map = {str(row.date): row.rolling_count for row in wau_rows}
+
     all_dates = [
         start_dt + timedelta(days=i)
         for i in range((end_dt - start_dt).days + 1)
@@ -125,9 +135,9 @@ def get_user_activity(
 
     dau_trend = []
     for d in all_dates:
-        ds       = str(d)
-        wau      = sum(dau_map.get(str(d - timedelta(days=j)), 0) for j in range(7))
-        mau_roll = sum(dau_map.get(str(d - timedelta(days=j)), 0) for j in range(30))
+        ds  = str(d)
+        wau = sum(wau_map.get(str(d - timedelta(days=j)), 0) for j in range(7))
+        mau_roll = sum(wau_map.get(str(d - timedelta(days=j)), 0) for j in range(30))
         dau_trend.append({
             "date": ds,
             "dau":  dau_map.get(ds, 0),
@@ -142,8 +152,8 @@ def get_user_activity(
             EXTRACT(HOUR FROM activity_datetime)::int AS hour,
             COUNT(*) AS count
         FROM user_activities
-        WHERE activity_datetime
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+        WHERE activity_datetime >= CAST(:start_dt AS timestamp)
+          AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_ua}
         GROUP BY day, hour
         ORDER BY day, hour
@@ -159,7 +169,8 @@ def get_user_activity(
     heatmap_dict = {(day, h): 0 for day in days_fr for h in range(24)}
     for row in heatmap_rows:
         day_fr = day_map.get(row.day.strip(), row.day.strip())
-        heatmap_dict[(day_fr, row.hour)] = row.count
+        if (day_fr, row.hour) in heatmap_dict:
+            heatmap_dict[(day_fr, row.hour)] = row.count
 
     activity_heatmap = [
         {"day": day, "hour": h, "count": heatmap_dict[(day, h)]}
@@ -170,34 +181,33 @@ def get_user_activity(
     # ── 6. By service ─────────────────────────────────────────
     by_service_rows = db.execute(text(f"""
         SELECT
-            srv.name                                              AS service_name,
-            COUNT(*) FILTER (WHERE s.status = 'active')           AS active_users,
-            COUNT(*) FILTER (WHERE s.status = 'trial')            AS trial_users,
+            srv.name AS service_name,
+            COUNT(*) FILTER (WHERE s.status = 'active')  AS active_users,
+            COUNT(*) FILTER (WHERE s.status = 'trial')   AS trial_users,
             COUNT(*) FILTER (
-                WHERE u.last_activity_at < :end_dt - INTERVAL '7 days'
-                OR u.last_activity_at IS NULL
-            )                                                     AS inactive_7d,
+                WHERE u.last_activity_at < CAST(:end_dt AS timestamp) - INTERVAL '7 days'
+                   OR u.last_activity_at IS NULL
+            ) AS inactive_7d,
             COUNT(*) FILTER (
-                WHERE u.last_activity_at < :end_dt - INTERVAL '30 days'
-                OR u.last_activity_at IS NULL
-            )                                                     AS inactive_30d,
+                WHERE u.last_activity_at < CAST(:end_dt AS timestamp) - INTERVAL '30 days'
+                   OR u.last_activity_at IS NULL
+            ) AS inactive_30d,
             ROUND(AVG(
                 EXTRACT(DAY FROM
-                    COALESCE(s.subscription_end_date, NOW())
-                    - s.subscription_start_date)
-            ), 0)                                                 AS avg_lifetime_days,
+                    COALESCE(s.subscription_end_date, NOW()) - s.subscription_start_date)
+            ), 0) AS avg_lifetime_days,
             ROUND(
                 COUNT(DISTINCT ua_today.user_id) * 100.0
                 / NULLIF(COUNT(DISTINCT s.user_id), 0)
-            , 1)                                                  AS stickiness_pct
+            , 1) AS stickiness_pct
         FROM subscriptions s
         JOIN services srv ON srv.id = s.service_id
         JOIN users u ON u.id = s.user_id
         LEFT JOIN user_activities ua_today
             ON  ua_today.user_id = s.user_id
             AND DATE(ua_today.activity_datetime) = :end_dt
-        WHERE s.subscription_start_date
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+        WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
+          AND s.subscription_start_date <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_srv}
         GROUP BY srv.id, srv.name
         ORDER BY active_users DESC
@@ -220,7 +230,7 @@ def get_user_activity(
             COUNT(*) AS count
         FROM users
         WHERE last_activity_at IS NOT NULL
-          AND status = 'inactive'
+          AND status NOT IN ('churned', 'cancelled')
         GROUP BY bucket
         ORDER BY MIN(EXTRACT(DAY FROM NOW() - last_activity_at))
     """), params).fetchall()

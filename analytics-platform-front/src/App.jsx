@@ -8,6 +8,7 @@ import RootRedirect from './pages/RootRedirect'
 import PlatformUsersPage from './pages/platform-users/PlatformUsersPage'
 import UserActivityPage from './pages/UserActivityPage'
 import SubscribersPage from './pages/SubscribersPage'
+import FreeTrialBehaviorPage from './pages/dashboard/FreeTrialBehaviorPage'
 
 function App() {
   return (
@@ -27,6 +28,10 @@ function App() {
           <Route
             path="/analytics/behaviors"
             element={<PrivateRoute><UserActivityPage /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/trial"
+            element={<PrivateRoute><FreeTrialBehaviorPage /></PrivateRoute>}
           />
           <Route
             path="/management/subscribers"

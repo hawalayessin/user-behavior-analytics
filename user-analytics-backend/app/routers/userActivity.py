@@ -165,17 +165,80 @@ def get_user_activity(
         'Saturday': 'Samedi', 'Sunday': 'Dimanche',
     }
     days_fr = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche']
+    day_to_idx = {name: idx for idx, name in enumerate(days_fr)}
 
-    heatmap_dict = {(day, h): 0 for day in days_fr for h in range(24)}
+    heatmap_dict = {(day_idx, h): 0 for day_idx in range(7) for h in range(24)}
     for row in heatmap_rows:
         day_fr = day_map.get(row.day.strip(), row.day.strip())
-        if (day_fr, row.hour) in heatmap_dict:
-            heatmap_dict[(day_fr, row.hour)] = row.count
+        day_idx = day_to_idx.get(day_fr)
+        if day_idx is None:
+            continue
+        if (day_idx, row.hour) in heatmap_dict:
+            heatmap_dict[(day_idx, row.hour)] = row.count
 
     activity_heatmap = [
-        {"day": day, "hour": h, "count": heatmap_dict[(day, h)]}
-        for day in days_fr
+        {"day": day_idx, "hour": h, "count": heatmap_dict[(day_idx, h)]}
+        for day_idx in range(7)
         for h in range(24)
+    ]
+
+    # ── 5b. User growth (monthly new vs churned) ───────────────
+    sf_user_service = """
+        AND EXISTS (
+            SELECT 1
+            FROM subscriptions sub
+            WHERE sub.user_id = u.id
+              AND sub.service_id = CAST(:service_id AS uuid)
+        )
+    """ if valid_service_id else ""
+
+    sf_unsub_service = "AND un.service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
+
+    user_growth_rows = db.execute(text(f"""
+        WITH months AS (
+            SELECT generate_series(
+                date_trunc('month', CAST(:start_dt AS timestamp))::date,
+                date_trunc('month', CAST(:end_dt AS timestamp))::date,
+                interval '1 month'
+            )::date AS month_start
+        ),
+        new_users AS (
+            SELECT
+                date_trunc('month', u.created_at)::date AS month_start,
+                COUNT(DISTINCT u.id) AS new_count
+            FROM users u
+            WHERE u.created_at >= CAST(:start_dt AS timestamp)
+              AND u.created_at <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+            {sf_user_service}
+            GROUP BY 1
+        ),
+        churned_users AS (
+            SELECT
+                date_trunc('month', un.unsubscription_datetime)::date AS month_start,
+                COUNT(DISTINCT un.user_id) AS churn_count
+            FROM unsubscriptions un
+            WHERE un.unsubscription_datetime >= CAST(:start_dt AS timestamp)
+              AND un.unsubscription_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+            {sf_unsub_service}
+            GROUP BY 1
+        )
+        SELECT
+            m.month_start,
+            COALESCE(nu.new_count, 0)   AS nouveaux,
+            COALESCE(cu.churn_count, 0) AS churnes
+        FROM months m
+        LEFT JOIN new_users nu     ON nu.month_start = m.month_start
+        LEFT JOIN churned_users cu ON cu.month_start = m.month_start
+        ORDER BY m.month_start ASC
+    """), params).fetchall()
+
+    user_growth = [
+        {
+            "month": row.month_start.strftime("%Y-%m"),
+            "nouveaux": int(row.nouveaux or 0),
+            "churnés": int(row.churnes or 0),
+        }
+        for row in user_growth_rows
     ]
 
     # ── 6. By service ─────────────────────────────────────────
@@ -258,6 +321,7 @@ def get_user_activity(
         },
         "dau_trend":        dau_trend,
         "activity_heatmap": activity_heatmap,
+        "user_growth":      user_growth,
         "by_service": [
             {
                 "service_name":      row.service_name,

@@ -14,6 +14,7 @@ from .sms_events import SmsEvent
 from .user_activities import UserActivity
 from .cohorts import Cohort
 from.platform_users import PlatformUser
+from .import_logs import ImportLog
 
 __all__ = [
     "User",
@@ -27,4 +28,5 @@ __all__ = [
     "UserActivity",
     "Cohort",
     "PlatformUser",
+    "ImportLog",
 ]

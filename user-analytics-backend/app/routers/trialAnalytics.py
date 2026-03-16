@@ -343,3 +343,112 @@ def get_trial_users(
         "page":      page,
         "page_size": page_size,
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# GET /analytics/trial/dropoff-by-day — Day1/2/3 buckets
+# ══════════════════════════════════════════════════════════════════
+@router.get("/trial/dropoff-by-day")
+def get_trial_dropoff_by_day(
+    db: Session = Depends(get_db),
+    start_date: Optional[date] = Query(default=None),
+    end_date:   Optional[date] = Query(default=None),
+    service_id: Optional[str]  = Query(default=None),
+):
+    end_dt   = end_date   or date.today()
+    start_dt = start_date or (end_dt - timedelta(days=30))
+
+    valid_service_id = None
+    if service_id:
+        try:
+            valid_service_id = str(uuid.UUID(service_id))
+        except ValueError:
+            valid_service_id = None
+
+    params = {
+        "start_dt":   start_dt,
+        "end_dt":     end_dt,
+        "service_id": valid_service_id,
+    }
+
+    sf = "AND service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
+
+    row = db.execute(text(f"""
+        WITH base AS (
+            SELECT
+                GREATEST(
+                    0,
+                    EXTRACT(DAY FROM COALESCE(subscription_end_date, NOW()) - subscription_start_date)
+                )::int AS duration_days
+            FROM subscriptions
+            WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
+              AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+              AND subscription_start_date <= NOW()
+              AND status IN ('cancelled', 'expired')
+              AND subscription_end_date IS NOT NULL
+            {sf}
+        )
+        SELECT
+            COUNT(*) FILTER (WHERE duration_days <= 1)                      AS day1,
+            COUNT(*) FILTER (WHERE duration_days > 1 AND duration_days <= 2) AS day2,
+            COUNT(*) FILTER (WHERE duration_days > 2 AND duration_days <= 3) AS day3
+        FROM base
+    """), params).fetchone()
+
+    return {
+        "day1": int(row.day1 or 0),
+        "day2": int(row.day2 or 0),
+        "day3": int(row.day3 or 0),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# GET /analytics/churn/breakdown — voluntary vs technical
+# ══════════════════════════════════════════════════════════════════
+@router.get("/churn/breakdown")
+def get_churn_breakdown(
+    db: Session = Depends(get_db),
+    start_date: Optional[date] = Query(default=None),
+    end_date:   Optional[date] = Query(default=None),
+    service_id: Optional[str]  = Query(default=None),
+):
+    end_dt   = end_date   or date.today()
+    start_dt = start_date or (end_dt - timedelta(days=30))
+
+    valid_service_id = None
+    if service_id:
+        try:
+            valid_service_id = str(uuid.UUID(service_id))
+        except ValueError:
+            valid_service_id = None
+
+    params = {
+        "start_dt":   start_dt,
+        "end_dt":     end_dt,
+        "service_id": valid_service_id,
+    }
+
+    sf = "AND u.service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
+
+    churn = db.execute(text(f"""
+        SELECT
+            COUNT(*)                                                         AS total_unsubs,
+            COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY')               AS voluntary,
+            COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL')               AS technical,
+            ROUND(COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') * 100.0
+                / NULLIF(COUNT(*), 0), 1)                                    AS voluntary_pct,
+            ROUND(COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') * 100.0
+                / NULLIF(COUNT(*), 0), 1)                                    AS technical_pct
+        FROM unsubscriptions u
+        WHERE u.unsubscription_datetime >= CAST(:start_dt AS timestamp)
+          AND u.unsubscription_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+        {sf}
+    """), params).fetchone()
+
+    return {
+        "total": int(churn.total_unsubs or 0),
+        "voluntary_pct": float(churn.voluntary_pct or 0),
+        "technical_pct": float(churn.technical_pct or 0),
+        "voluntary": int(churn.voluntary or 0),
+        "technical": int(churn.technical or 0),
+    }

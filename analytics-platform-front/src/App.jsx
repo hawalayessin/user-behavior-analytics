@@ -9,6 +9,10 @@ import PlatformUsersPage from './pages/platform-users/PlatformUsersPage'
 import UserActivityPage from './pages/UserActivityPage'
 import SubscribersPage from './pages/SubscribersPage'
 import FreeTrialBehaviorPage from './pages/dashboard/FreeTrialBehaviorPage'
+import RetentionPage from './pages/dashboard/RetentionPage'
+import ImportDataPage from './pages/admin/ImportDataPage'
+import CampaignImpactPage from './pages/dashboard/CampaignImpactPage'
+import ManagementPage from './pages/admin/ManagementPage'
 
 function App() {
   return (
@@ -34,12 +38,28 @@ function App() {
             element={<PrivateRoute><FreeTrialBehaviorPage /></PrivateRoute>}
           />
           <Route
+            path="/analytics/retention"
+            element={<PrivateRoute><RetentionPage /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/campaigns"
+            element={<PrivateRoute><CampaignImpactPage /></PrivateRoute>}
+          />
+          <Route
             path="/management/subscribers"
             element={<PrivateRoute><SubscribersPage /></PrivateRoute>}
           />
           <Route
             path="/admin/users"
             element={<AdminRoute><PlatformUsersPage /></AdminRoute>}
+          />
+          <Route
+            path="/admin/import"
+            element={<AdminRoute><ImportDataPage /></AdminRoute>}
+          />
+          <Route
+            path="/admin/management"
+            element={<AdminRoute><ManagementPage /></AdminRoute>}
           />
           <Route path="*" element={<RootRedirect />} />
         </Routes>

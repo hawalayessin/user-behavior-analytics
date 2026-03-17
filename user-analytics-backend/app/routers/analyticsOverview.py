@@ -205,8 +205,26 @@ def get_overview(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    # If no dates are provided, use the full available range from DB (no implicit "last 30 days").
+    if start_date is None and end_date is None:
+        # Anchor range on subscription_start_date (main driver for most dashboard metrics).
+        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
+        minmax = db.execute(
+            text(f"""
+                SELECT
+                    MIN(DATE(subscription_start_date)) AS min_d,
+                    MAX(DATE(subscription_start_date)) AS max_d
+                FROM subscriptions
+                {sf_minmax}
+            """),
+            {"service_id": service_id},
+        ).fetchone()
+
+        end_dt = (minmax.max_d or date.today())
+        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
+    else:
+        end_dt   = end_date   or date.today()
+        start_dt = start_date or (end_dt - timedelta(days=30))
 
     params = {"start_dt": start_dt, "end_dt": end_dt, "service_id": service_id}
 

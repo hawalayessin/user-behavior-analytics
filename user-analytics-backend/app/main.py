@@ -11,6 +11,8 @@ from app.routers import userActivity
 from app.routers import trialAnalytics 
 from app.routers import retention
 from app.routers import admin_import
+from app.routers import campaign_impact
+from app.routers import management
 
 app = FastAPI(
     title="User Analytics Platform",
@@ -43,6 +45,8 @@ app.include_router(userActivity.router)
 app.include_router(trialAnalytics.router) 
 app.include_router(retention.router)
 app.include_router(admin_import.router)
+app.include_router(campaign_impact.router)
+app.include_router(management.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

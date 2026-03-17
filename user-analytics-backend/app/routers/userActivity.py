@@ -17,8 +17,31 @@ def get_user_activity(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    # If no dates are provided, use the full available range from DB (by service if provided).
+    # To avoid generating an enormous time series, we cap the returned trend range to 365 days.
+    MAX_TREND_DAYS = 365
+
+    if start_date is None and end_date is None:
+        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
+        minmax = db.execute(
+            text(f"""
+                SELECT
+                    MIN(DATE(activity_datetime)) AS min_d,
+                    MAX(DATE(activity_datetime)) AS max_d
+                FROM user_activities
+                {sf_minmax}
+            """),
+            {"service_id": service_id},
+        ).fetchone()
+
+        end_dt = (minmax.max_d or date.today())
+        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
+
+        if (end_dt - start_dt).days > MAX_TREND_DAYS:
+            start_dt = end_dt - timedelta(days=MAX_TREND_DAYS)
+    else:
+        end_dt   = end_date   or date.today()
+        start_dt = start_date or (end_dt - timedelta(days=30))
 
     valid_service_id = None
     if service_id:

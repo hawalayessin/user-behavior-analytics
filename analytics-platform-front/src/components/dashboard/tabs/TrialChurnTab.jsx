@@ -2,12 +2,32 @@ import PropTypes from "prop-types"
 import ChurnPieChart     from "../ChurnPieChart"
 import TrialDropoffChart from "../TrialDropoffChart"
 import { useDashboardMetrics } from "../../../hooks/useDashboardMetrics"
+import { useTrialDropoffByDay } from "../../../hooks/useTrialDropoffByDay"
+import { useChurnBreakdown } from "../../../hooks/useChurnBreakdown"
 
-export default function TrialChurnTab({ data }) {
+export default function TrialChurnTab({ data, filters }) {
   const metrics = useDashboardMetrics(data)
   if (!metrics) return null
 
   const { churn, subscriptions } = data
+
+  const { data: dropoff } = useTrialDropoffByDay(filters)
+  const { data: churnBreakdown } = useChurnBreakdown(filters)
+
+  const dropoffBarData = dropoff
+    ? [
+        { label: "Jour 1\n0–24h",     value: dropoff.day1 ?? 0, fill: "#6366F1" },
+        { label: "Jour 2\n24–48h",    value: dropoff.day2 ?? 0, fill: "#F59E0B" },
+        { label: "Jour 3\n48–72h ⚠", value: dropoff.day3 ?? 0, fill: "#EF4444" },
+      ]
+    : metrics.dropoffBarData
+
+  const churnPieData = churnBreakdown
+    ? [
+        { name: "Volontaire", value: churnBreakdown.voluntary_pct ?? 0, fill: "#EF4444" },
+        { name: "Technique",  value: churnBreakdown.technical_pct ?? 0, fill: "#F59E0B" },
+      ]
+    : metrics.churnPieData
 
   return (
     <div className="space-y-6">
@@ -27,12 +47,8 @@ export default function TrialChurnTab({ data }) {
 
       {/* Churn Pie + Trial Dropoff */}
       <div className="flex gap-4">
-        <ChurnPieChart
-          data={metrics.churnPieData}
-          churn={churn}
-          isVoluntaryDominant={metrics.isVoluntaryDominant}
-        />
-        <TrialDropoffChart data={metrics.dropoffBarData} />
+        <ChurnPieChart data={churnPieData} />
+        <TrialDropoffChart data={dropoffBarData} />
       </div>
 
       {/* Critical zone alert */}

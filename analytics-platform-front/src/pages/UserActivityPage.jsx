@@ -24,11 +24,8 @@ const STATUT_MAP = {
 
 const ITEMS_PER_PAGE = 8
 
-function getDateRange(daysBack) {
-  const today = new Date()
-  const start = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000)
-  const fmt   = (d) => d.toISOString().split("T")[0]
-  return { start_date: fmt(start), end_date: fmt(today), service_id: null }
+function getDefaultFilters() {
+  return { start_date: null, end_date: null, service_id: null }
 }
 
 const KPISkeleton   = () => <div className="w-full h-32 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
@@ -45,7 +42,7 @@ const RowSkeleton   = () => (
 
 export default function UserActivityPage() {
 
-  const [filters,      setFilters]      = useState(getDateRange(7))
+  const [filters,      setFilters]      = useState(getDefaultFilters())
   const [searchInput,  setSearchInput]  = useState("")
   const [search,       setSearch]       = useState("")
   const [statutFilter, setStatutFilter] = useState("")
@@ -286,7 +283,7 @@ export default function UserActivityPage() {
                   {activityData?.by_service && (
                     <ServiceActivityTable data={activityData.by_service} />
                   )}
-                  <UserGrowthChart />
+                  <UserGrowthChart data={activityData?.user_growth ?? []} />
                 </>
               )
             }

@@ -9,14 +9,9 @@ import EngagementTab                        from "../../components/dashboard/tab
 import RevenueTab                           from "../../components/dashboard/tabs/RevenueTab"
 import TrialChurnTab                        from "../../components/dashboard/tabs/TrialChurnTab"
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function formatDate(d) {
-  return d.toISOString().split("T")[0]
-}
-
 const DEFAULT_FILTERS = {
-  start_date: formatDate(new Date(Date.now() - 7 * 864e5)),
-  end_date:   formatDate(new Date()),
+  start_date: null,
+  end_date:   null,
   service_id: null,
 }
 
@@ -68,33 +63,31 @@ export default function DashboardPage() {
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
 
-        const params = new URLSearchParams()
+      const params = new URLSearchParams()
 
-        // ✅ Toujours envoyer les dates
-        if (filters.start_date) params.append("start_date", filters.start_date)
-        if (filters.end_date)   params.append("end_date",   filters.end_date)
-        if (filters.service_id) params.append("service_id", filters.service_id)
+      if (filters.start_date) params.append("start_date", filters.start_date)
+      if (filters.end_date)   params.append("end_date",   filters.end_date)
+      if (filters.service_id) params.append("service_id", filters.service_id)
 
-        const res = await api.get(`/analytics/overview?${params}`)
-        setData(res.data)
-      } catch (err) {
-        console.error("[DashboardPage] fetch error:", err?.response?.data ?? err)
-        setError("Impossible de charger les données.")
-      } finally {
-        setLoading(false)
-      }
+      const qs = params.toString()
+      const res = await api.get(`/analytics/overview${qs ? `?${qs}` : ""}`)
+      setData(res.data)
+    } catch (err) {
+      console.error("[DashboardPage] fetch error:", err?.response?.data ?? err)
+      setError("Impossible de charger les données.")
+    } finally {
+      setLoading(false)
     }
+  }, [filters.end_date, filters.service_id, filters.start_date])
 
+  useEffect(() => {
     fetchData()
-
-  // ✅ Déclencher le re-fetch sur chaque changement de filtre
-  }, [filters.start_date, filters.end_date, filters.service_id])
+  }, [fetchData])
 
   return (
     <AppLayout pageTitle="Analytics Overview" hasNotifications showExportButton>

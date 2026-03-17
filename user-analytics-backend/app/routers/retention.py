@@ -16,7 +16,19 @@ router = APIRouter(prefix="/analytics", tags=["Retention"])
 def _parse_date_range(
     start_date: Optional[date],
     end_date: Optional[date],
+    *,
+    db: Session,
 ) -> tuple[date, date]:
+    # If no dates are provided, use full available cohort range (no implicit "last 90 days").
+    if start_date is None and end_date is None:
+        minmax = (
+            db.query(func.min(Cohort.cohort_date).label("min_d"), func.max(Cohort.cohort_date).label("max_d"))
+            .one()
+        )
+        end_dt = minmax.max_d or date.today()
+        start_dt = minmax.min_d or (end_dt - timedelta(days=90))
+        return start_dt, end_dt
+
     end_dt = end_date or date.today()
     start_dt = start_date or (end_dt - timedelta(days=90))
     return start_dt, end_dt
@@ -29,7 +41,7 @@ def get_retention_kpis(
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
-    start_dt, end_dt = _parse_date_range(start_date, end_date)
+    start_dt, end_dt = _parse_date_range(start_date, end_date, db=db)
 
     query = (
         db.query(
@@ -125,7 +137,7 @@ def get_retention_curve(
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
-    start_dt, end_dt = _parse_date_range(start_date, end_date)
+    start_dt, end_dt = _parse_date_range(start_date, end_date, db=db)
 
     query = (
         db.query(

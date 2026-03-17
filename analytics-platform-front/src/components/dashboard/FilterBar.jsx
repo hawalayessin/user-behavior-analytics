@@ -10,16 +10,18 @@ function formatDate(d) {
 function computeDates(period, customStart, customEnd) {
   const today = new Date()
   switch (period) {
+    case "all":     return { start: null, end: null }
     case "today":   return { start: formatDate(today), end: formatDate(today) }
     case "7days":   return { start: formatDate(new Date(today - 7  * 864e5)), end: formatDate(today) }
     case "30days":  return { start: formatDate(new Date(today - 30 * 864e5)), end: formatDate(today) }
     case "3months": return { start: formatDate(new Date(today - 90 * 864e5)), end: formatDate(today) }
     case "custom":  return { start: customStart, end: customEnd }
-    default:        return { start: formatDate(new Date(today - 7  * 864e5)), end: formatDate(today) }
+    default:        return { start: null, end: null }
   }
 }
 
 const PERIOD_OPTIONS = [
+  { value: "all",     label: "All time" },
   { value: "today",   label: "Today" },
   { value: "7days",   label: "Last 7 days" },
   { value: "30days",  label: "Last 30 days" },
@@ -82,10 +84,10 @@ GlobalStatBadge.propTypes = {
 }
 
 // ── FilterBar ─────────────────────────────────────────────────────────────────
-export default function FilterBar({ onApply }) {
+export default function FilterBar({ onApply, defaultPeriod = "all" }) {
   const today = formatDate(new Date())
 
-  const [period,      setPeriod]      = useState("7days")
+  const [period,      setPeriod]      = useState(defaultPeriod)
   const [serviceId,   setServiceId]   = useState(null)
   const [customStart, setCustomStart] = useState(formatDate(new Date(Date.now() - 7 * 864e5)))
   const [customEnd,   setCustomEnd]   = useState(today)
@@ -124,11 +126,11 @@ export default function FilterBar({ onApply }) {
   }
 
   const handleReset = () => {
-    setPeriod("7days")
+    setPeriod(defaultPeriod)
     setServiceId(null)
     setOpenPeriod(false)
     setOpenService(false)
-    const { start, end } = computeDates("7days", null, null)
+    const { start, end } = computeDates(defaultPeriod, null, null)
     onApply({ start_date: start, end_date: end, service_id: null })
   }
 
@@ -236,4 +238,5 @@ export default function FilterBar({ onApply }) {
 
 FilterBar.propTypes = {
   onApply: PropTypes.func.isRequired,
+  defaultPeriod: PropTypes.oneOf(["all", "today", "7days", "30days", "3months", "custom"]),
 }

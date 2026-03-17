@@ -4,11 +4,14 @@ import PropTypes from "prop-types"
 const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 
 function getColorForCount(count, maxCount) {
-  if (count === 0) return "#1A1D27"
-  if (count < 100) return "#4C1D95"
-  if (count < 300) return "#7C3AED"
-  if (count < maxCount) return "#A855F7"
-  return "#E879F9"
+  // Palette aligned with the rest of charts (indigo/violet accent)
+  if (count === 0) return "#0B1220"      // near bg
+  const r = Math.max(0, Math.min(1, count / (maxCount || 1)))
+  if (r < 0.25) return "#312E81"        // indigo-900
+  if (r < 0.5)  return "#4F46E5"        // indigo-600
+  if (r < 0.75) return "#7C3AED"        // violet-600
+  if (r < 0.95) return "#A855F7"        // purple-500
+  return "#C084FC"                      // purple-300
 }
 
 function detectPeakInsight(data) {

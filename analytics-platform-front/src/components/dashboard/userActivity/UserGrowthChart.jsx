@@ -39,23 +39,24 @@ function CustomTooltip({ active, payload }) {
   )
 }
 
-export default function UserGrowthChart() {
+export default function UserGrowthChart({ data }) {
+  const chartData = data?.length ? data : GROWTH_DATA
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <h3 className="text-lg font-semibold text-slate-100 mb-4">User Growth</h3>
       <ResponsiveContainer width="100%" height={350}>
         <BarChart
-          data={GROWTH_DATA}
+          data={chartData}
           margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
         >
           <defs>
             <linearGradient id="colorNouveaux" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10B981" stopOpacity={1} />
-              <stop offset="95%" stopColor="#10B981" stopOpacity={0.8} />
+              <stop offset="5%" stopColor="#22C55E" stopOpacity={1} />
+              <stop offset="95%" stopColor="#16A34A" stopOpacity={0.85} />
             </linearGradient>
             <linearGradient id="colorChurnés" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#EF4444" stopOpacity={1} />
-              <stop offset="95%" stopColor="#EF4444" stopOpacity={0.8} />
+              <stop offset="5%" stopColor="#F43F5E" stopOpacity={1} />
+              <stop offset="95%" stopColor="#E11D48" stopOpacity={0.85} />
             </linearGradient>
           </defs>
 
@@ -79,6 +80,9 @@ export default function UserGrowthChart() {
             wrapperStyle={{ paddingTop: "15px" }}
             contentStyle={{ backgroundColor: "transparent", border: "none" }}
             iconType="square"
+            formatter={(value) => (
+              <span style={{ color: "#CBD5E1" }}>{value}</span>
+            )}
           />
 
           <Bar
@@ -86,6 +90,8 @@ export default function UserGrowthChart() {
             fill="url(#colorNouveaux)"
             name="New"
             radius={[8, 8, 0, 0]}
+            stroke="#22C55E"
+            strokeOpacity={0.35}
           />
 
           <Bar
@@ -93,6 +99,8 @@ export default function UserGrowthChart() {
             fill="url(#colorChurnés)"
             name="Churned"
             radius={[8, 8, 0, 0]}
+            stroke="#F43F5E"
+            strokeOpacity={0.35}
           />
         </BarChart>
       </ResponsiveContainer>

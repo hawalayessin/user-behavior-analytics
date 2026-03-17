@@ -20,8 +20,23 @@ def get_trial_kpis(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    if start_date is None and end_date is None:
+        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
+        minmax = db.execute(
+            text(f"""
+                SELECT
+                    MIN(DATE(subscription_start_date)) AS min_d,
+                    MAX(DATE(subscription_start_date)) AS max_d
+                FROM subscriptions
+                {sf_minmax}
+            """),
+            {"service_id": service_id},
+        ).fetchone()
+        end_dt = (minmax.max_d or date.today())
+        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
+    else:
+        end_dt   = end_date   or date.today()
+        start_dt = start_date or (end_dt - timedelta(days=30))
 
     valid_service_id = None
     if service_id:
@@ -355,8 +370,23 @@ def get_trial_dropoff_by_day(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    if start_date is None and end_date is None:
+        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
+        minmax = db.execute(
+            text(f"""
+                SELECT
+                    MIN(DATE(subscription_start_date)) AS min_d,
+                    MAX(DATE(subscription_start_date)) AS max_d
+                FROM subscriptions
+                {sf_minmax}
+            """),
+            {"service_id": service_id},
+        ).fetchone()
+        end_dt = (minmax.max_d or date.today())
+        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
+    else:
+        end_dt   = end_date   or date.today()
+        start_dt = start_date or (end_dt - timedelta(days=30))
 
     valid_service_id = None
     if service_id:
@@ -412,8 +442,23 @@ def get_churn_breakdown(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    if start_date is None and end_date is None:
+        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
+        minmax = db.execute(
+            text(f"""
+                SELECT
+                    MIN(DATE(unsubscription_datetime)) AS min_d,
+                    MAX(DATE(unsubscription_datetime)) AS max_d
+                FROM unsubscriptions
+                {sf_minmax}
+            """),
+            {"service_id": service_id},
+        ).fetchone()
+        end_dt = (minmax.max_d or date.today())
+        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
+    else:
+        end_dt   = end_date   or date.today()
+        start_dt = start_date or (end_dt - timedelta(days=30))
 
     valid_service_id = None
     if service_id:

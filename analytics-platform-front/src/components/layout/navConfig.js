@@ -15,6 +15,8 @@ import {
   Settings,
 } from 'lucide-react'
 
+import { Squares2X2Icon } from "@heroicons/react/24/outline"
+
 export const navigationConfig = [
   {
     section: 'ANALYTICS',
@@ -38,6 +40,11 @@ export const navigationConfig = [
         label: 'Retention',
         icon: TrendingUp,
         route: '/analytics/retention',
+      },
+      {
+        label: 'Campaign Impact',
+        icon: Megaphone,
+        route: '/analytics/campaigns',
       },
       {
         label: 'Churn Analysis',
@@ -70,16 +77,6 @@ export const navigationConfig = [
     section: 'MANAGEMENT',
     items: [
       {
-        label: 'Services',
-        icon: Layers,
-        route: '/management/services',
-      },
-      {
-        label: 'Campaigns',
-        icon: Megaphone,
-        route: '/management/campaigns',
-      },
-      {
         label: 'Subscribers',
         icon: Users,
         route: '/management/subscribers',
@@ -94,6 +91,11 @@ export const navigationConfig = [
         label: 'Import Data',
         icon: Upload,
         route: '/admin/import',
+      },
+      {
+        label: 'Management',
+        icon: Squares2X2Icon,
+        route: '/admin/management',
       },
       {
         label: 'Platform Users',

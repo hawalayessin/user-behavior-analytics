@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import PropTypes from "prop-types"
 import { X } from "lucide-react"
 import api from "../../services/api"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 export default function EditUserModal({ user, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -62,8 +63,7 @@ export default function EditUserModal({ user, onClose, onSuccess }) {
       await api.put(`/platform-users/${user.id}`, updateData)
       onSuccess()
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || "Failed to update user"
-      setError(errorMsg)
+      setError(getApiErrorMessage(err, "Failed to update user"))
     } finally {
       setLoading(false)
     }

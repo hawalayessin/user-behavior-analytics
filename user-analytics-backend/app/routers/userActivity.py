@@ -299,19 +299,19 @@ def get_user_activity(
         ORDER BY active_users DESC
     """), params).fetchall()
 
-    # ── 7. Inactivity buckets ─────────────────────────────────
+    # ── 7. Inactivity buckets (EN labels) ──────────────────────
     buckets_rows = db.execute(text("""
         SELECT
             CASE
                 WHEN EXTRACT(DAY FROM NOW() - last_activity_at) BETWEEN 1 AND 7
-                    THEN '1-7 jours'
+                    THEN '1-7 days'
                 WHEN EXTRACT(DAY FROM NOW() - last_activity_at) BETWEEN 8 AND 14
-                    THEN '8-14 jours'
+                    THEN '8-14 days'
                 WHEN EXTRACT(DAY FROM NOW() - last_activity_at) BETWEEN 15 AND 30
-                    THEN '15-30 jours'
+                    THEN '15-30 days'
                 WHEN EXTRACT(DAY FROM NOW() - last_activity_at) > 30
-                    THEN '+30 jours'
-                ELSE 'Inconnu'
+                    THEN '30+ days'
+                ELSE 'Unknown'
             END AS bucket,
             COUNT(*) AS count
         FROM users
@@ -321,7 +321,7 @@ def get_user_activity(
         ORDER BY MIN(EXTRACT(DAY FROM NOW() - last_activity_at))
     """), params).fetchall()
 
-    bucket_order = ['1-7 jours', '8-14 jours', '15-30 jours', '+30 jours']
+    bucket_order = ['1-7 days', '8-14 days', '15-30 days', '30+ days']
     bucket_map_d = {row.bucket: row.count for row in buckets_rows}
     inactivity_buckets = [
         {"bucket": b, "count": bucket_map_d.get(b, 0)}

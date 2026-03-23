@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import PropTypes from "prop-types"
 import { X } from "lucide-react"
+import { getApiErrorMessage } from "../../../utils/apiError"
 
 export default function ServiceModal({ open, mode, initialValue, onClose, onSave }) {
   const [name, setName] = useState("")
@@ -57,11 +58,7 @@ export default function ServiceModal({ open, mode, initialValue, onClose, onSave
       await onSave(payload)
       onClose()
     } catch (err) {
-      const msg =
-        err?.response?.data?.detail ??
-        err?.message ??
-        "Save failed"
-      setFormError(String(msg))
+      setFormError(getApiErrorMessage(err, "Save failed"))
     } finally {
       setSaving(false)
     }
@@ -169,4 +166,3 @@ ServiceModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onSave: PropTypes.func.isRequired,
 }
-

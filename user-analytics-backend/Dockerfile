@@ -2,45 +2,27 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Dépendances système minimales
+# Dépendances système pour PostgreSQL
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
 
-# Installer les dépendances Python (sans utiliser requirements.txt, qui a un encodage Windows)
-RUN pip install --no-cache-dir \
-    alembic==1.18.4 \
-    annotated-doc==0.0.4 \
-    annotated-types==0.7.0 \
-    anyio==4.12.1 \
-    click==8.3.1 \
-    colorama==0.4.6 \
-    fastapi \
-    greenlet==3.3.1 \
-    h11==0.16.0 \
-    idna==3.11 \
-    Mako==1.3.10 \
-    MarkupSafe==3.0.3 \
-    psycopg2-binary \
-    "pydantic[email]" \
-    pydantic_core==2.41.5 \
-    pydantic-settings \
-    python-dotenv==1.2.1 \
-    SQLAlchemy==2.0.46 \
-    sqlalchemy \
-    starlette==0.52.1 \
-    typing-inspection==0.4.2 \
-    typing_extensions==4.15.0 \
-    "uvicorn[standard]" \
-    "passlib[bcrypt]" \
-    "python-jose[cryptography]" \
-    python-multipart
+# Installer dépendances Python à partir de requirements.txt
+COPY requirements.txt .
+# Certains éditeurs Windows sauvegardent en UTF-16 (caractères \x00).
+# On convertit en UTF-8 au build pour que pip puisse lire le fichier.
+RUN python -c "import pathlib; p=pathlib.Path('requirements.txt'); b=p.read_bytes(); \
+  enc='utf-16' if b[:2] in (b'\\xff\\xfe', b'\\xfe\\xff') or b'\\x00' in b[:200] else 'utf-8'; \
+  txt=b.decode(enc, errors='ignore'); pathlib.Path('requirements.utf8.txt').write_text(txt, encoding='utf-8')" \
+  && pip install --no-cache-dir -r requirements.utf8.txt
 
-# Copier le code source
+# Copier le code de l'API
 COPY . .
+
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# ⚠️ PAS de --reload en Docker
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

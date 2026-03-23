@@ -89,10 +89,14 @@ export default function FreeTrialBehaviorPage() {
   const kpis = useMemo(() => {
     if (!kpiData) return null
     return {
-      total_trials:     kpiData.total_trials     ?? 0,
-      conversion_rate:  kpiData.conversion_rate  ?? 0,
-      avg_duration:     kpiData.avg_duration     ?? 0,
-      dropoff_j3:       kpiData.dropoff_j3       ?? 0,
+      total_trials:      kpiData.total_trials      ?? 0,
+      conversion_rate:   kpiData.conversion_rate   ?? 0,
+      avg_duration:      kpiData.avg_duration      ?? 0,
+      dropoff_j3:        kpiData.dropoff_j3        ?? 0,
+      trial_only_users:  kpiData.trial_only_users  ?? 0,
+      trial_only_rate:   kpiData.trial_only_rate   ?? 0,
+      active_trials:     kpiData.active_trials     ?? 0,
+      cancelled_trials:  kpiData.cancelled_trials  ?? 0,
     }
   }, [kpiData])
 
@@ -243,9 +247,9 @@ export default function FreeTrialBehaviorPage() {
 
         {/* ── KPI Cards (2x2 Grid) ──────────────────────────── */}
         {!kpiError && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {kpiLoading
-              ? Array.from({ length: 4 }).map((_, i) => <KPISkeleton key={i} />)
+              ? Array.from({ length: 5 }).map((_, i) => <KPISkeleton key={i} />)
               : kpis ? (
                 <>
                   <KPICard
@@ -289,6 +293,17 @@ export default function FreeTrialBehaviorPage() {
                     trend={-1}
                     trendLabel="warning"
                     alert={kpis.dropoff_j3 > 50}
+                  />
+                  <KPICard
+                    title="Trial-only Users"
+                    value={kpis.trial_only_users.toLocaleString()}
+                    subtitle={`Never converted • ${kpis.trial_only_rate.toFixed(1)}% of trial users`}
+                    icon={TrendingDown}
+                    iconColor="#F97316"
+                    iconBg="bg-orange-500/10"
+                    trend={-1}
+                    trendLabel="risk"
+                    alert={kpis.trial_only_rate > 30}
                   />
                 </>
               ) : null

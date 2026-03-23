@@ -2,6 +2,7 @@ import React, { useState } from "react"
 import PropTypes from "prop-types"
 import { AlertTriangle, X } from "lucide-react"
 import api from "../../services/api"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 export default function ConfirmDeleteModal({ user, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false)
@@ -13,8 +14,7 @@ export default function ConfirmDeleteModal({ user, onClose, onSuccess }) {
       await api.delete(`/platform-users/${user.id}`)
       onSuccess()
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || "Failed to delete user"
-      setError(errorMsg)
+      setError(getApiErrorMessage(err, "Failed to delete user"))
       setLoading(false)
     }
   }

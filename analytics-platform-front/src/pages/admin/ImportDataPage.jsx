@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react"
 import { AlertCircle, Database, FileText, Upload, X, CheckCircle2, Download, Eye } from "lucide-react"
 import AppLayout from "../../components/layout/AppLayout"
 import useImportData from "../../hooks/useImportData"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 const MAX_CSV_MB = 20
 const MAX_SQL_MB = 50
@@ -267,7 +268,7 @@ export default function ImportDataPage() {
       setStaged(report)
       setValidationModalOpen(true)
     } catch (err) {
-      setResult({ success: false, detail: err.response?.data?.detail ?? err.message })
+      setResult({ success: false, detail: getApiErrorMessage(err, "Import failed") })
     }
   }
 
@@ -278,7 +279,7 @@ export default function ImportDataPage() {
       const res = await importDatabaseSql({ file, mode })
       setResult(res)
     } catch (err) {
-      setResult({ success: false, detail: err.response?.data?.detail ?? err.message })
+      setResult({ success: false, detail: getApiErrorMessage(err, "SQL import failed") })
     }
   }
 
@@ -586,7 +587,7 @@ export default function ImportDataPage() {
               setStaged(null)
               setFile(null)
             } catch (e) {
-              setResult({ success: false, detail: e.response?.data?.detail ?? e.message })
+              setResult({ success: false, detail: getApiErrorMessage(e, "Confirm failed") })
             }
           }}
         />
@@ -594,4 +595,3 @@ export default function ImportDataPage() {
     </AppLayout>
   )
 }
-

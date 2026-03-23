@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import api from "../services/api"
+import { getApiErrorMessage } from "../utils/apiError"
 
 export default function useImportData() {
   const [loading, setLoading] = useState(false)
@@ -12,7 +13,7 @@ export default function useImportData() {
     try {
       const res = await api.get("/admin/import/history")
       setHistory(res.data?.history ?? [])
-    } catch (e) {
+    } catch {
       setHistory([])
     } finally {
       setHistoryLoading(false)
@@ -38,8 +39,7 @@ export default function useImportData() {
       await refreshHistory()
       return res.data
     } catch (e) {
-      const detail = e?.response?.data?.detail ?? e?.response?.data ?? e?.message ?? "Import failed"
-      setError(detail)
+      setError(getApiErrorMessage(e, "Import failed"))
       await refreshHistory()
       throw e
     } finally {
@@ -60,8 +60,7 @@ export default function useImportData() {
       await refreshHistory()
       return res.data
     } catch (e) {
-      const detail = e?.response?.data?.detail ?? e?.response?.data ?? e?.message ?? "Confirm failed"
-      setError(detail)
+      setError(getApiErrorMessage(e, "Confirm failed"))
       await refreshHistory()
       throw e
     } finally {
@@ -83,8 +82,7 @@ export default function useImportData() {
       await refreshHistory()
       return res.data
     } catch (e) {
-      const detail = e?.response?.data?.detail ?? e?.response?.data ?? e?.message ?? "SQL import failed"
-      setError(detail)
+      setError(getApiErrorMessage(e, "SQL import failed"))
       await refreshHistory()
       throw e
     } finally {
@@ -117,4 +115,3 @@ export default function useImportData() {
     downloadTemplate,
   }
 }
-

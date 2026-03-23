@@ -16,10 +16,10 @@ import {
 } from "lucide-react"
 
 const STATUT_MAP = {
-  active:   { label: "Actif",   bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/30" },
-  trial:    { label: "Essai",   bg: "bg-blue-500/20",    text: "text-blue-300",    border: "border-blue-500/30"    },
-  inactive: { label: "Inactif", bg: "bg-amber-500/20",   text: "text-amber-300",   border: "border-amber-500/30"   },
-  churned:  { label: "Churné",  bg: "bg-red-500/20",     text: "text-red-300",     border: "border-red-500/30"     },
+  active:   { label: "Active",   bg: "bg-emerald-500/20", text: "text-emerald-300", border: "border-emerald-500/30" },
+  trial:    { label: "Trial",    bg: "bg-blue-500/20",    text: "text-blue-300",    border: "border-blue-500/30"    },
+  inactive: { label: "Inactive", bg: "bg-amber-500/20",   text: "text-amber-300",   border: "border-amber-500/30"   },
+  churned:  { label: "Churned",  bg: "bg-red-500/20",     text: "text-red-300",     border: "border-red-500/30"     },
 }
 
 const ITEMS_PER_PAGE = 8
@@ -249,12 +249,12 @@ export default function UserActivityPage() {
               ? Array.from({ length: 6 }).map((_, i) => <KPISkeleton key={i} />)
               : kpis ? (
                 <>
-                  <KPICard title="DAU (Today)"       value={kpis.dau_today.toLocaleString()}         subtitle="Actifs aujourd'hui"            icon={Users}         iconColor="#7C3AED" iconBg="bg-purple-500/10"  trend={0} trendLabel="stable" />
-                  <KPICard title="WAU (Last 7 days)"  value={kpis.wau_current_week.toLocaleString()}   subtitle="Actifs 7 derniers jours"       icon={TrendingUp}    iconColor="#3B82F6" iconBg="bg-blue-500/10"    trend={0} trendLabel="stable" />
-                  <KPICard title="MAU (Last 30 days)" value={kpis.mau_current_month.toLocaleString()}  subtitle="Actifs 30 derniers jours"      icon={Calendar}      iconColor="#10B981" iconBg="bg-green-500/10"   trend={0} trendLabel="stable" />
+                  <KPICard title="DAU (Today)"       value={kpis.dau_today.toLocaleString()}         subtitle="Active users today"            icon={Users}         iconColor="#7C3AED" iconBg="bg-purple-500/10"  trend={0} trendLabel="stable" />
+                  <KPICard title="WAU (Last 7 days)"  value={kpis.wau_current_week.toLocaleString()}   subtitle="Active users in last 7 days"   icon={TrendingUp}    iconColor="#3B82F6" iconBg="bg-blue-500/10"    trend={0} trendLabel="stable" />
+                  <KPICard title="MAU (Last 30 days)" value={kpis.mau_current_month.toLocaleString()}  subtitle="Active users in last 30 days"  icon={Calendar}      iconColor="#10B981" iconBg="bg-green-500/10"   trend={0} trendLabel="stable" />
                   <KPICard title="Stickiness"         value={`${kpis.stickiness_pct.toFixed(1)}%`}    subtitle="DAU / MAU × 100"               icon={Zap}           iconColor="#F59E0B" iconBg="bg-amber-500/10"   trend={0} trendLabel="stable" />
-                  <KPICard title="Inactifs"           value={kpis.inactive_count.toLocaleString()}     subtitle="No activity for 7+ days"       icon={AlertTriangle} iconColor="#EF4444" iconBg="bg-red-500/10"     trend={0} trendLabel="negative" alert={kpis.inactive_count > 100} />
-                  <KPICard title="Durée de vie"       value={`${kpis.avg_lifetime_days.toFixed(0)}j`} subtitle="Average subscription duration" icon={Clock}         iconColor="#8B5CF6" iconBg="bg-violet-500/10"  trend={0} trendLabel="stable" />
+                  <KPICard title="Inactive users"     value={kpis.inactive_count.toLocaleString()}     subtitle="No activity for 7+ days"       icon={AlertTriangle} iconColor="#EF4444" iconBg="bg-red-500/10"     trend={0} trendLabel="negative" alert={kpis.inactive_count > 100} />
+                  <KPICard title="Lifetime"           value={`${kpis.avg_lifetime_days.toFixed(0)}d`} subtitle="Average subscription duration" icon={Clock}         iconColor="#8B5CF6" iconBg="bg-violet-500/10"  trend={0} trendLabel="stable" />
                 </>
               ) : null
             }

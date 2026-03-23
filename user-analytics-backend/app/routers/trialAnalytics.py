@@ -62,7 +62,7 @@ def get_trial_kpis(
         {sf}
     """), params).scalar() or 0
 
-    # ── 2. Conversion Rate (trial → active) ────────────────────
+    # ── 2. Conversion & status breakdown ───────────────────────
     conversion_data = db.execute(text(f"""
         SELECT
             COUNT(*)                                         AS total_all,
@@ -123,11 +123,41 @@ def get_trial_kpis(
     total_count    = dropoff_data.total_count      or 0
     dropoff_j3     = round((dropoff_count / total_count * 100), 1) if total_count > 0 else 0.0
 
+    # ── 5. Trial-only users (never converted to active) ────────
+    trial_only = db.execute(text(f"""
+        WITH trial_users AS (
+            SELECT DISTINCT user_id
+            FROM subscriptions
+            WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
+              AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+              {sf}
+        ),
+        has_active AS (
+            SELECT DISTINCT user_id
+            FROM subscriptions
+            WHERE status = 'active'
+              {sf}
+        )
+        SELECT
+          COUNT(*) AS trial_only_users,
+          COUNT(*) * 100.0 / NULLIF((SELECT COUNT(*) FROM trial_users), 0) AS trial_only_rate
+        FROM trial_users tu
+        LEFT JOIN has_active ha ON ha.user_id = tu.user_id
+        WHERE ha.user_id IS NULL
+    """), params).fetchone()
+
+    trial_only_users = int(trial_only.trial_only_users or 0)
+    trial_only_rate = float(trial_only.trial_only_rate or 0.0)
+
     return {
-        "total_trials":    int(total_trials),
-        "conversion_rate": float(conversion_rate),
-        "avg_duration":    float(avg_duration),
-        "dropoff_j3":      float(dropoff_j3),
+        "total_trials":      int(total_trials),
+        "conversion_rate":   float(conversion_rate),
+        "avg_duration":      float(avg_duration),
+        "dropoff_j3":        float(dropoff_j3),
+        "trial_only_users":  trial_only_users,
+        "trial_only_rate":   trial_only_rate,
+        "active_trials":     int(conversion_data.trial_subs or 0),
+        "cancelled_trials":  int(conversion_data.cancelled_subs or 0),
     }
 
 

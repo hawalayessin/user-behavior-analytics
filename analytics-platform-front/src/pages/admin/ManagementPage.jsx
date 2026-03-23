@@ -4,6 +4,7 @@ import { AlertCircle, Plus, Search, RotateCcw } from "lucide-react"
 import AppLayout from "../../components/layout/AppLayout"
 import { useToast } from "../../hooks/useToast"
 import { useManagement } from "../../hooks/useManagement"
+import { getApiErrorMessage } from "../../utils/apiError"
 
 import ServiceTable from "../../components/admin/management/ServiceTable"
 import CampaignTable from "../../components/admin/management/CampaignTable"
@@ -115,8 +116,7 @@ export default function ManagementPage() {
       setDeleteOpen(false)
       setDeleteContext(null)
     } catch (err) {
-      const msg = err.response?.data?.detail ?? err.message ?? "Delete failed"
-      showToast(String(msg), "error")
+      showToast(getApiErrorMessage(err, "Delete failed"), "error")
     } finally {
       setDeleteLoading(false)
     }
@@ -242,8 +242,7 @@ export default function ManagementPage() {
                 showToast("Service updated successfully", "success")
               }
             } catch (err) {
-              const msg = err.response?.data?.detail ?? err.message ?? "Save failed"
-              showToast(String(msg), "error")
+              showToast(getApiErrorMessage(err, "Save failed"), "error")
               // Let the modal display the error without throwing
             }
           }}
@@ -265,8 +264,7 @@ export default function ManagementPage() {
                 showToast("Campaign updated successfully", "success")
               }
             } catch (err) {
-              const msg = err.response?.data?.detail ?? err.message ?? "Save failed"
-              showToast(String(msg), "error")
+              showToast(getApiErrorMessage(err, "Save failed"), "error")
               // Let the modal display the error without throwing
             }
           }}
@@ -290,4 +288,3 @@ export default function ManagementPage() {
     </AppLayout>
   )
 }
-

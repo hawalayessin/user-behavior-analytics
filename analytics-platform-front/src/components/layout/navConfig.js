@@ -31,21 +31,23 @@ export const navigationConfig = [
         icon: Activity,
         route: '/analytics/behaviors',
       },
+     
       {
         label: ' Free Trial Behavior',
         icon: FlaskConical,
         route: '/analytics/trial',
       },
       {
-        label: 'Retention',
-        icon: TrendingUp,
-        route: '/analytics/retention',
-      },
-      {
         label: 'Campaign Impact',
         icon: Megaphone,
         route: '/analytics/campaigns',
       },
+      {
+        label: 'Retention',
+        icon: TrendingUp,
+        route: '/analytics/retention',
+      },
+    
       {
         label: 'Churn Analysis',
         icon: UserMinus,

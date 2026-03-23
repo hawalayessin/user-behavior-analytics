@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
+from datetime import datetime, timezone
+
 from app.core.database import engine, Base
 import app.models  # ensure models are registered on Base.metadata
 from app.routers import users
@@ -12,7 +15,13 @@ from app.routers import trialAnalytics
 from app.routers import retention
 from app.routers import admin_import
 from app.routers import campaign_impact
+from app.routers import churn_analysis
 from app.routers import management
+from app.routers import ml_churn
+
+from app.core.database import SessionLocal
+from app.core.security import hash_password
+from app.models.platform_users import PlatformUser
 
 app = FastAPI(
     title="User Analytics Platform",
@@ -36,6 +45,34 @@ def on_startup():
     # Ensure tables exist for fresh environments (e.g. Docker)
     Base.metadata.create_all(bind=engine)
 
+    # Optional: create an initial admin user for dev/demo environments.
+    admin_email = os.getenv("ADMIN_EMAIL")
+    admin_password = os.getenv("ADMIN_PASSWORD")
+    admin_full_name = os.getenv("ADMIN_FULL_NAME", "Administrator")
+    admin_role = os.getenv("ADMIN_ROLE", "admin")
+
+    if admin_email and admin_password:
+        db = SessionLocal()
+        try:
+            existing = (
+                db.query(PlatformUser)
+                .filter(PlatformUser.email == admin_email)
+                .first()
+            )
+            if not existing:
+                user = PlatformUser(
+                    email=admin_email,
+                    password_hash=hash_password(admin_password),
+                    full_name=admin_full_name,
+                    role=admin_role,
+                    is_active=True,
+                    created_at=datetime.now(timezone.utc),
+                )
+                db.add(user)
+                db.commit()
+        finally:
+            db.close()
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(analyticsOverview.router)
@@ -46,7 +83,9 @@ app.include_router(trialAnalytics.router)
 app.include_router(retention.router)
 app.include_router(admin_import.router)
 app.include_router(campaign_impact.router)
+app.include_router(churn_analysis.router)
 app.include_router(management.router)
+app.include_router(ml_churn.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

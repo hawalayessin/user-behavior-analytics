@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import api from "../services/api"
+import { getApiErrorMessage } from "../utils/apiError"
 
 export function useManagement() {
   const [services, setServices] = useState([])
@@ -18,7 +19,7 @@ export function useManagement() {
       setServices(sv.data ?? [])
       setCampaigns(cp.data ?? [])
     } catch (err) {
-      setError(err.response?.data?.detail ?? err.message ?? "Failed to load management data")
+      setError(getApiErrorMessage(err, "Failed to load management data"))
     } finally {
       setLoading(false)
     }
@@ -74,4 +75,3 @@ export function useManagement() {
     deleteCampaign,
   }
 }
-

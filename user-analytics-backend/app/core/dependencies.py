@@ -3,6 +3,8 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+import uuid
+
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.platform_users import PlatformUser
@@ -32,7 +34,12 @@ def get_current_user(
         raise credentials_exception
 
     # 2. Récupérer l'user en DB
-    user = db.query(PlatformUser).filter(PlatformUser.id == user_id).first()
+    try:
+        user_uuid = uuid.UUID(str(user_id))
+    except (ValueError, TypeError):
+        raise credentials_exception
+
+    user = db.query(PlatformUser).filter(PlatformUser.id == user_uuid).first()
     if user is None:
         raise credentials_exception
 

@@ -12,6 +12,8 @@ import FreeTrialBehaviorPage from './pages/dashboard/FreeTrialBehaviorPage'
 import RetentionPage from './pages/dashboard/RetentionPage'
 import ImportDataPage from './pages/admin/ImportDataPage'
 import CampaignImpactPage from './pages/dashboard/CampaignImpactPage'
+import ChurnAnalysisPage from './pages/dashboard/ChurnAnalysisPage'
+import AIChurnInsights from './pages/dashboard/AIChurnInsights'
 import ManagementPage from './pages/admin/ManagementPage'
 
 function App() {
@@ -44,6 +46,18 @@ function App() {
           <Route
             path="/analytics/campaigns"
             element={<PrivateRoute><CampaignImpactPage /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/churn"
+            element={<PrivateRoute><ChurnAnalysisPage /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/churn-prediction"
+            element={<PrivateRoute><AIChurnInsights /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/segmentation"
+            element={<PrivateRoute><div className="min-h-screen text-slate-200 p-10">Segmentation (coming soon)</div></PrivateRoute>}
           />
           <Route
             path="/management/subscribers"

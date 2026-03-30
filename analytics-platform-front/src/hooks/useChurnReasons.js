@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react"
-import api from "../services/api"
+import { getWithCache } from "../services/api"
 
 export function useChurnReasons({ start_date, end_date, service_id, churn_type = "ALL" } = {}) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ force = false } = {}) => {
     setLoading(true)
     setError(null)
     try {
@@ -16,8 +16,8 @@ export function useChurnReasons({ start_date, end_date, service_id, churn_type =
       if (service_id) params.set("service_id", service_id)
       if (churn_type && churn_type !== "ALL") params.set("churn_type", churn_type)
       const qs = params.toString()
-      const res = await api.get(`/analytics/churn/reasons${qs ? `?${qs}` : ""}`)
-      setData(res.data)
+      const payload = await getWithCache(`/analytics/churn/reasons${qs ? `?${qs}` : ""}`, { force })
+      setData(payload)
     } catch (err) {
       setError(err.response?.data?.detail ?? err.message ?? "Error loading data")
       setData(null)
@@ -30,6 +30,6 @@ export function useChurnReasons({ start_date, end_date, service_id, churn_type =
     fetchData()
   }, [fetchData])
 
-  return { data, loading, error, refetch: fetchData }
+  return { data, loading, error, refetch: () => fetchData({ force: true }) }
 }
 

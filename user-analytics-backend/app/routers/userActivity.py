@@ -6,6 +6,8 @@ from typing import Optional
 import uuid
 
 from app.core.database import get_db
+from app.core.date_ranges import resolve_date_range
+from app.utils.temporal import get_data_anchor
 
 router = APIRouter(prefix="/analytics", tags=["User Activity"])
 
@@ -21,27 +23,11 @@ def get_user_activity(
     # To avoid generating an enormous time series, we cap the returned trend range to 365 days.
     MAX_TREND_DAYS = 365
 
-    if start_date is None and end_date is None:
-        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        minmax = db.execute(
-            text(f"""
-                SELECT
-                    MIN(DATE(activity_datetime)) AS min_d,
-                    MAX(DATE(activity_datetime)) AS max_d
-                FROM user_activities
-                {sf_minmax}
-            """),
-            {"service_id": service_id},
-        ).fetchone()
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="usage")
+    if (end_dt - start_dt).days > MAX_TREND_DAYS:
+        start_dt = end_dt - timedelta(days=MAX_TREND_DAYS)
 
-        end_dt = (minmax.max_d or date.today())
-        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
-
-        if (end_dt - start_dt).days > MAX_TREND_DAYS:
-            start_dt = end_dt - timedelta(days=MAX_TREND_DAYS)
-    else:
-        end_dt   = end_date   or date.today()
-        start_dt = start_date or (end_dt - timedelta(days=30))
+    subscription_anchor_dt = get_data_anchor(db, source="subscription")
 
     valid_service_id = None
     if service_id:
@@ -54,6 +40,7 @@ def get_user_activity(
         "start_dt":   start_dt,
         "end_dt":     end_dt,
         "service_id": valid_service_id,
+        "subscription_anchor_dt": subscription_anchor_dt,
     }
 
     sf_ua       = "AND service_id = CAST(:service_id AS uuid)"  if valid_service_id else ""
@@ -111,7 +98,7 @@ def get_user_activity(
     lifetime = db.execute(text(f"""
         SELECT ROUND(AVG(
             EXTRACT(DAY FROM
-                COALESCE(subscription_end_date, NOW()) - subscription_start_date
+                COALESCE(subscription_end_date, CAST(:subscription_anchor_dt AS timestamp)) - subscription_start_date
             )
         ), 0) AS avg_lifetime_days
         FROM subscriptions
@@ -280,7 +267,7 @@ def get_user_activity(
             ) AS inactive_30d,
             ROUND(AVG(
                 EXTRACT(DAY FROM
-                    COALESCE(s.subscription_end_date, NOW()) - s.subscription_start_date)
+                    COALESCE(s.subscription_end_date, CAST(:subscription_anchor_dt AS timestamp)) - s.subscription_start_date)
             ), 0) AS avg_lifetime_days,
             ROUND(
                 COUNT(DISTINCT ua_today.user_id) * 100.0
@@ -303,13 +290,13 @@ def get_user_activity(
     buckets_rows = db.execute(text("""
         SELECT
             CASE
-                WHEN EXTRACT(DAY FROM NOW() - last_activity_at) BETWEEN 1 AND 7
+                WHEN EXTRACT(DAY FROM CAST(:end_dt AS timestamp) - last_activity_at) BETWEEN 1 AND 7
                     THEN '1-7 days'
-                WHEN EXTRACT(DAY FROM NOW() - last_activity_at) BETWEEN 8 AND 14
+                WHEN EXTRACT(DAY FROM CAST(:end_dt AS timestamp) - last_activity_at) BETWEEN 8 AND 14
                     THEN '8-14 days'
-                WHEN EXTRACT(DAY FROM NOW() - last_activity_at) BETWEEN 15 AND 30
+                WHEN EXTRACT(DAY FROM CAST(:end_dt AS timestamp) - last_activity_at) BETWEEN 15 AND 30
                     THEN '15-30 days'
-                WHEN EXTRACT(DAY FROM NOW() - last_activity_at) > 30
+                WHEN EXTRACT(DAY FROM CAST(:end_dt AS timestamp) - last_activity_at) > 30
                     THEN '30+ days'
                 ELSE 'Unknown'
             END AS bucket,
@@ -318,7 +305,7 @@ def get_user_activity(
         WHERE last_activity_at IS NOT NULL
           AND status NOT IN ('churned', 'cancelled')
         GROUP BY bucket
-        ORDER BY MIN(EXTRACT(DAY FROM NOW() - last_activity_at))
+        ORDER BY MIN(EXTRACT(DAY FROM CAST(:end_dt AS timestamp) - last_activity_at))
     """), params).fetchall()
 
     bucket_order = ['1-7 days', '8-14 days', '15-30 days', '30+ days']

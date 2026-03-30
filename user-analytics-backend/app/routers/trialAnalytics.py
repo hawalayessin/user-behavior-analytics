@@ -6,6 +6,8 @@ from typing import Optional
 import uuid
 
 from app.core.database import get_db
+from app.core.date_ranges import resolve_date_range
+from app.utils.temporal import get_data_anchor
 
 router = APIRouter(prefix="/analytics", tags=["Trial Analytics"])
 
@@ -20,23 +22,8 @@ def get_trial_kpis(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    if start_date is None and end_date is None:
-        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        minmax = db.execute(
-            text(f"""
-                SELECT
-                    MIN(DATE(subscription_start_date)) AS min_d,
-                    MAX(DATE(subscription_start_date)) AS max_d
-                FROM subscriptions
-                {sf_minmax}
-            """),
-            {"service_id": service_id},
-        ).fetchone()
-        end_dt = (minmax.max_d or date.today())
-        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
-    else:
-        end_dt   = end_date   or date.today()
-        start_dt = start_date or (end_dt - timedelta(days=30))
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+    anchor_dt = get_data_anchor(db, source="subscription")
 
     valid_service_id = None
     if service_id:
@@ -49,6 +36,7 @@ def get_trial_kpis(
         "start_dt":   start_dt,
         "end_dt":     end_dt,
         "service_id": valid_service_id,
+        "anchor_dt":  anchor_dt,
     }
 
     sf = "AND service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
@@ -88,7 +76,7 @@ def get_trial_kpis(
                     GREATEST(
                         0,
                         EXTRACT(DAY FROM
-                            COALESCE(subscription_end_date, NOW()) - subscription_start_date
+                            COALESCE(subscription_end_date, CAST(:anchor_dt AS timestamp)) - subscription_start_date
                         )
                     )
                 )::numeric,
@@ -97,7 +85,7 @@ def get_trial_kpis(
         FROM subscriptions
         WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
           AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-          AND subscription_start_date <= NOW()
+                    AND subscription_start_date <= CAST(:anchor_dt AS timestamp)
         {sf}
     """), params).scalar() or 0.0
 
@@ -108,14 +96,14 @@ def get_trial_kpis(
             COUNT(*) FILTER (
                 WHERE status IN ('cancelled', 'expired')
                   AND GREATEST(0, EXTRACT(DAY FROM
-                        COALESCE(subscription_end_date, NOW()) - subscription_start_date
+                                                COALESCE(subscription_end_date, CAST(:anchor_dt AS timestamp)) - subscription_start_date
                       )) <= 3
             ) AS dropoff_by_day3,
             COUNT(*) AS total_count
         FROM subscriptions
         WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
           AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-          AND subscription_start_date <= NOW()
+                    AND subscription_start_date <= CAST(:anchor_dt AS timestamp)
         {sf}
     """), params).fetchone()
 
@@ -171,8 +159,7 @@ def get_trial_timeline(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
 
     valid_service_id = None
     if service_id:
@@ -225,8 +212,7 @@ def get_trial_by_service(
     start_date: Optional[date] = Query(default=None),
     end_date:   Optional[date] = Query(default=None),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
 
     params = {
         "start_dt": start_dt,
@@ -281,8 +267,8 @@ def get_trial_users(
     page_size:  int            = Query(default=8,  ge=1, le=200),
     export:     bool           = Query(default=False),
 ):
-    end_dt   = end_date   or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=30))
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+    anchor_dt = get_data_anchor(db, source="subscription")
 
     valid_service_id = None
     if service_id:
@@ -312,6 +298,7 @@ def get_trial_users(
         "end_dt":     end_dt,
         "service_id": valid_service_id,
         "search":     f"%{search}%" if search else None,
+        "anchor_dt":  anchor_dt,
     }
 
     if not export:
@@ -331,7 +318,7 @@ def get_trial_users(
             GREATEST(0,
                 ROUND(
                     EXTRACT(DAY FROM
-                        COALESCE(sub.subscription_end_date, NOW()) - sub.subscription_start_date
+                        COALESCE(sub.subscription_end_date, CAST(:anchor_dt AS timestamp)) - sub.subscription_start_date
                     )::numeric,
                 1
                 )
@@ -346,7 +333,7 @@ def get_trial_users(
 
         WHERE sub.subscription_start_date >= CAST(:start_dt AS timestamp)
           AND sub.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-          AND sub.subscription_start_date <= NOW()
+                    AND sub.subscription_start_date <= CAST(:anchor_dt AS timestamp)
           {service_sql}
           {status_filter_sql}
           {search_sql}
@@ -364,7 +351,7 @@ def get_trial_users(
         JOIN services s ON s.id = sub.service_id
         WHERE sub.subscription_start_date >= CAST(:start_dt AS timestamp)
           AND sub.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-          AND sub.subscription_start_date <= NOW()
+                    AND sub.subscription_start_date <= CAST(:anchor_dt AS timestamp)
           {service_sql}
           {status_filter_sql}
           {search_sql}
@@ -400,23 +387,8 @@ def get_trial_dropoff_by_day(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    if start_date is None and end_date is None:
-        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        minmax = db.execute(
-            text(f"""
-                SELECT
-                    MIN(DATE(subscription_start_date)) AS min_d,
-                    MAX(DATE(subscription_start_date)) AS max_d
-                FROM subscriptions
-                {sf_minmax}
-            """),
-            {"service_id": service_id},
-        ).fetchone()
-        end_dt = (minmax.max_d or date.today())
-        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
-    else:
-        end_dt   = end_date   or date.today()
-        start_dt = start_date or (end_dt - timedelta(days=30))
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+    anchor_dt = get_data_anchor(db, source="subscription")
 
     valid_service_id = None
     if service_id:
@@ -429,6 +401,7 @@ def get_trial_dropoff_by_day(
         "start_dt":   start_dt,
         "end_dt":     end_dt,
         "service_id": valid_service_id,
+        "anchor_dt":  anchor_dt,
     }
 
     sf = "AND service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
@@ -438,12 +411,12 @@ def get_trial_dropoff_by_day(
             SELECT
                 GREATEST(
                     0,
-                    EXTRACT(DAY FROM COALESCE(subscription_end_date, NOW()) - subscription_start_date)
+                                        EXTRACT(DAY FROM COALESCE(subscription_end_date, CAST(:anchor_dt AS timestamp)) - subscription_start_date)
                 )::int AS duration_days
             FROM subscriptions
             WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
               AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-              AND subscription_start_date <= NOW()
+                            AND subscription_start_date <= CAST(:anchor_dt AS timestamp)
               AND status IN ('cancelled', 'expired')
               AND subscription_end_date IS NOT NULL
             {sf}
@@ -472,23 +445,7 @@ def get_churn_breakdown(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    if start_date is None and end_date is None:
-        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        minmax = db.execute(
-            text(f"""
-                SELECT
-                    MIN(DATE(unsubscription_datetime)) AS min_d,
-                    MAX(DATE(unsubscription_datetime)) AS max_d
-                FROM unsubscriptions
-                {sf_minmax}
-            """),
-            {"service_id": service_id},
-        ).fetchone()
-        end_dt = (minmax.max_d or date.today())
-        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
-    else:
-        end_dt   = end_date   or date.today()
-        start_dt = start_date or (end_dt - timedelta(days=30))
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="churn")
 
     valid_service_id = None
     if service_id:

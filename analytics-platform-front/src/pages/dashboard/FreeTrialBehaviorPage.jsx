@@ -9,6 +9,7 @@ import SubscriptionDonutChart from "../../components/dashboard/SubscriptionDonut
 import EngagementHealthPanel from "../../components/dashboard/EngagementHealthPanel"
 import { useTrialKPIs }     from "../../hooks/useTrialKPIs"
 import { useTrialUsers }    from "../../hooks/useTrialUsers"
+import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters"
 import {
   TrendingDown, TrendingUp, Calendar,
   AlertTriangle, Clock,
@@ -23,7 +24,7 @@ const TRIAL_STATUS_MAP = {
 const ITEMS_PER_PAGE = 8
 
 function getDefaultFilters() {
-  return { start_date: null, end_date: null, service_id: null }
+  return { ...DEFAULT_ANALYTICS_FILTERS }
 }
 
 const KPISkeleton   = () => <div className="w-full h-32 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />

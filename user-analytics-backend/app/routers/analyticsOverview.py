@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime, timezone, date, timedelta
+from datetime import date
 from typing import Optional
 
 from app.core.database import get_db
+from app.core.date_ranges import resolve_date_range
+from app.utils.temporal import (
+    get_data_anchor,
+    get_day_window,
+    get_default_window,
+    get_month_window,
+    get_week_window,
+)
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
@@ -17,7 +25,29 @@ def get_summary(
     db:         Session = Depends(get_db),
     service_id: Optional[str] = Query(default=None),
 ):
-    params  = {"service_id": service_id}
+    summary_anchor = get_data_anchor(db, source="analytics")
+    last30_start, last30_end = get_default_window(db, days=30, source="analytics")
+    usage_month_start, usage_month_end = get_month_window(db, source="usage")
+    usage_week_start, usage_week_end = get_week_window(db, source="usage")
+    usage_day_start, usage_day_end = get_day_window(db, source="usage")
+    billing_month_start, billing_month_end = get_month_window(db, source="billing")
+    churn_month_start, churn_month_end = get_month_window(db, source="churn")
+
+    params  = {
+        "service_id": service_id,
+        "last30_start_dt": last30_start,
+        "last30_end_dt": last30_end,
+        "usage_month_start_dt": usage_month_start,
+        "usage_month_end_dt": usage_month_end,
+        "usage_week_start_dt": usage_week_start,
+        "usage_week_end_dt": usage_week_end,
+        "usage_day_start_dt": usage_day_start,
+        "usage_day_end_dt": usage_day_end,
+        "billing_month_start_dt": billing_month_start,
+        "billing_month_end_dt": billing_month_end,
+        "churn_month_start_dt": churn_month_start,
+        "churn_month_end_dt": churn_month_end,
+    }
     sf_subs = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_churn= "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_rev  = "AND srv.id = CAST(:service_id AS uuid)"       if service_id else ""
@@ -28,7 +58,7 @@ def get_summary(
             COUNT(*)                                                          AS total_users,
             COUNT(*) FILTER (WHERE status = 'active')                         AS active_users,
             COUNT(*) FILTER (WHERE status = 'inactive')                       AS inactive_users,
-            COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')  AS new_last_30_days
+            COUNT(*) FILTER (WHERE created_at BETWEEN :last30_start_dt AND :last30_end_dt) AS new_last_30_days
         FROM users
     """), params).fetchone()
 
@@ -55,28 +85,49 @@ def get_summary(
     """), params).fetchone()
 
     churn = db.execute(text(f"""
+        WITH churn_rows AS (
+          SELECT
+            s.id AS subscription_id,
+            s.service_id,
+            COALESCE(u.unsubscription_datetime, s.subscription_end_date) AS churn_dt,
+            COALESCE(
+              u.churn_type,
+              CASE
+                WHEN s.status = 'cancelled' THEN 'VOLUNTARY'
+                WHEN s.status = 'expired'   THEN 'TECHNICAL'
+                ELSE NULL
+              END
+            ) AS churn_type,
+            COALESCE(
+              u.days_since_subscription,
+              EXTRACT(DAY FROM (COALESCE(u.unsubscription_datetime, s.subscription_end_date) - s.subscription_start_date))::int
+            ) AS days_since_subscription
+          FROM subscriptions s
+          LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
+          WHERE COALESCE(u.unsubscription_datetime, s.subscription_end_date) IS NOT NULL
+            AND s.status IN ('cancelled', 'expired')
+            {sf_churn}
+        )
         SELECT
             COUNT(*)                                                         AS total_unsubs,
-            COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY')               AS voluntary,
-            COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL')               AS technical,
-            ROUND(COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') * 100.0
+            COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY')                 AS voluntary,
+            COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL')                 AS technical,
+            ROUND(COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY') * 100.0
                 / NULLIF(COUNT(*), 0), 1)                                    AS voluntary_pct,
-            ROUND(COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') * 100.0
+            ROUND(COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL') * 100.0
                 / NULLIF(COUNT(*), 0), 1)                                    AS technical_pct,
-            COUNT(*) FILTER (WHERE u.days_since_subscription = 1)            AS dropoff_day1,
-            COUNT(*) FILTER (WHERE u.days_since_subscription = 2)            AS dropoff_day2,
-            COUNT(*) FILTER (WHERE u.days_since_subscription = 3)            AS dropoff_day3,
+            COUNT(*) FILTER (WHERE days_since_subscription = 1)              AS dropoff_day1,
+            COUNT(*) FILTER (WHERE days_since_subscription = 2)              AS dropoff_day2,
+            COUNT(*) FILTER (WHERE days_since_subscription = 3)              AS dropoff_day3,
             ROUND(
                 COUNT(*) FILTER (
-                    WHERE u.unsubscription_datetime >= NOW() - INTERVAL '30 days'
+                    WHERE churn_dt BETWEEN :churn_month_start_dt AND :churn_month_end_dt
                 ) * 100.0
                 / NULLIF((
                     SELECT COUNT(*) FROM subscriptions WHERE status = 'active'
                 ), 0), 2
             )                                                                AS churn_rate_month_pct
-        FROM unsubscriptions u
-        JOIN subscriptions s ON s.id = u.subscription_id
-        WHERE 1=1 {sf_churn}
+        FROM churn_rows
     """), params).fetchone()
 
     revenue = db.execute(text(f"""
@@ -88,15 +139,15 @@ def get_summary(
                 / NULLIF(COUNT(*), 0), 1)                                     AS failed_pct,
             ROUND(SUM(st.price) FILTER (
                 WHERE be.status = 'SUCCESS'
-                AND be.event_datetime >= NOW() - INTERVAL '30 days'
+                AND be.event_datetime BETWEEN :billing_month_start_dt AND :billing_month_end_dt
             ), 2)                                                              AS mrr,
             ROUND(
                 SUM(st.price) FILTER (
                     WHERE be.status = 'SUCCESS'
-                    AND be.event_datetime >= NOW() - INTERVAL '30 days'
+                    AND be.event_datetime BETWEEN :billing_month_start_dt AND :billing_month_end_dt
                 ) / NULLIF(COUNT(DISTINCT be.user_id) FILTER (
                     WHERE be.status = 'SUCCESS'
-                    AND be.event_datetime >= NOW() - INTERVAL '30 days'
+                    AND be.event_datetime BETWEEN :billing_month_start_dt AND :billing_month_end_dt
                 ), 0), 2
             )                                                                  AS arpu_current_month
         FROM billing_events be
@@ -109,13 +160,13 @@ def get_summary(
     engagement = db.execute(text(f"""
         SELECT
             COUNT(DISTINCT user_id) FILTER (
-                WHERE DATE(activity_datetime) = CURRENT_DATE
+                WHERE activity_datetime BETWEEN :usage_day_start_dt AND :usage_day_end_dt
             )                                                    AS dau_today,
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime >= NOW() - INTERVAL '30 days'
+                WHERE activity_datetime BETWEEN :usage_month_start_dt AND :usage_month_end_dt
             )                                                    AS mau_current_month,
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime >= NOW() - INTERVAL '7 days'
+                WHERE activity_datetime BETWEEN :usage_week_start_dt AND :usage_week_end_dt
             )                                                    AS wau_current_week
         FROM user_activities
         WHERE 1=1 {sf_eng}
@@ -141,7 +192,7 @@ def get_summary(
     """), params).fetchall()
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": summary_anchor.isoformat(),
         "users": {
             "total":            users.total_users,
             "active":           users.active_users,
@@ -205,28 +256,24 @@ def get_overview(
     end_date:   Optional[date] = Query(default=None),
     service_id: Optional[str]  = Query(default=None),
 ):
-    # If no dates are provided, use the full available range from DB (no implicit "last 30 days").
-    if start_date is None and end_date is None:
-        # Anchor range on subscription_start_date (main driver for most dashboard metrics).
-        sf_minmax = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        minmax = db.execute(
-            text(f"""
-                SELECT
-                    MIN(DATE(subscription_start_date)) AS min_d,
-                    MAX(DATE(subscription_start_date)) AS max_d
-                FROM subscriptions
-                {sf_minmax}
-            """),
-            {"service_id": service_id},
-        ).fetchone()
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="analytics")
 
-        end_dt = (minmax.max_d or date.today())
-        start_dt = (minmax.min_d or (end_dt - timedelta(days=30)))
-    else:
-        end_dt   = end_date   or date.today()
-        start_dt = start_date or (end_dt - timedelta(days=30))
+    usage_day_start, usage_day_end = get_day_window(db, source="usage")
+    usage_week_start, usage_week_end = get_week_window(db, source="usage")
+    usage_month_start, usage_month_end = get_month_window(db, source="usage")
+    data_anchor = get_data_anchor(db, source="billing")
 
-    params = {"start_dt": start_dt, "end_dt": end_dt, "service_id": service_id}
+    params = {
+        "start_dt": start_dt,
+        "end_dt": end_dt,
+        "service_id": service_id,
+        "usage_day_start_dt": usage_day_start,
+        "usage_day_end_dt": usage_day_end,
+        "usage_week_start_dt": usage_week_start,
+        "usage_week_end_dt": usage_week_end,
+        "usage_month_start_dt": usage_month_start,
+        "usage_month_end_dt": usage_month_end,
+    }
 
     sf_subs  = "AND srv.id = CAST(:service_id AS uuid)"       if service_id else ""
     sf_churn = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
@@ -271,30 +318,50 @@ def get_overview(
     """), params).fetchone()
 
     churn = db.execute(text(f"""
+        WITH churn_rows AS (
+          SELECT
+            s.id AS subscription_id,
+            s.service_id,
+            COALESCE(u.unsubscription_datetime, s.subscription_end_date) AS churn_dt,
+            COALESCE(
+              u.churn_type,
+              CASE
+                WHEN s.status = 'cancelled' THEN 'VOLUNTARY'
+                WHEN s.status = 'expired'   THEN 'TECHNICAL'
+                ELSE NULL
+              END
+            ) AS churn_type,
+            COALESCE(
+              u.days_since_subscription,
+              EXTRACT(DAY FROM (COALESCE(u.unsubscription_datetime, s.subscription_end_date) - s.subscription_start_date))::int
+            ) AS days_since_subscription
+          FROM subscriptions s
+          LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
+          WHERE COALESCE(u.unsubscription_datetime, s.subscription_end_date) IS NOT NULL
+            AND s.status IN ('cancelled', 'expired')
+            AND COALESCE(u.unsubscription_datetime, s.subscription_end_date) BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+            {sf_churn}
+        )
         SELECT
             COUNT(*)                                                         AS total_unsubs,
-            COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY')               AS voluntary,
-            COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL')               AS technical,
-            ROUND(COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') * 100.0
+            COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY')                 AS voluntary,
+            COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL')                 AS technical,
+            ROUND(COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY') * 100.0
                 / NULLIF(COUNT(*), 0), 1)                                    AS voluntary_pct,
-            ROUND(COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') * 100.0
+            ROUND(COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL') * 100.0
                 / NULLIF(COUNT(*), 0), 1)                                    AS technical_pct,
-            COUNT(*) FILTER (WHERE u.days_since_subscription = 1)            AS dropoff_day1,
-            COUNT(*) FILTER (WHERE u.days_since_subscription = 2)            AS dropoff_day2,
-            COUNT(*) FILTER (WHERE u.days_since_subscription = 3)            AS dropoff_day3,
+            COUNT(*) FILTER (WHERE days_since_subscription = 1)              AS dropoff_day1,
+            COUNT(*) FILTER (WHERE days_since_subscription = 2)              AS dropoff_day2,
+            COUNT(*) FILTER (WHERE days_since_subscription = 3)              AS dropoff_day3,
             ROUND(
                 COUNT(*) FILTER (
-                    WHERE u.unsubscription_datetime BETWEEN :start_dt AND :end_dt
+                    WHERE churn_dt BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
                 ) * 100.0
                 / NULLIF((
                     SELECT COUNT(*) FROM subscriptions WHERE status = 'active'
                 ), 0), 2
             )                                                                AS churn_rate_month_pct
-        FROM unsubscriptions u
-        JOIN subscriptions s ON s.id = u.subscription_id
-        WHERE u.unsubscription_datetime
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
-        {sf_churn}
+        FROM churn_rows
     """), params).fetchone()
 
     revenue = db.execute(text(f"""
@@ -329,20 +396,16 @@ def get_overview(
     engagement = db.execute(text(f"""
         SELECT
             COUNT(DISTINCT user_id) FILTER (
-                WHERE DATE(activity_datetime) = :end_dt
+                WHERE activity_datetime BETWEEN :usage_day_start_dt AND :usage_day_end_dt
             )                                                    AS dau_today,
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime
-                      BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+                WHERE activity_datetime BETWEEN :usage_month_start_dt AND :usage_month_end_dt
             )                                                    AS mau_current_month,
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime
-                      BETWEEN :end_dt - INTERVAL '7 days'
-                          AND :end_dt + INTERVAL '1 day'
+                WHERE activity_datetime BETWEEN :usage_week_start_dt AND :usage_week_end_dt
             )                                                    AS wau_current_week
         FROM user_activities
-        WHERE activity_datetime
-              BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+        WHERE activity_datetime BETWEEN :usage_month_start_dt AND :usage_month_end_dt
         {sf_eng}
     """), params).fetchone()
 
@@ -368,7 +431,8 @@ def get_overview(
     """), params).fetchall()
 
     return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": data_anchor.isoformat(),
+        "data_anchor": data_anchor.strftime("%Y-%m-%d"),
         "filters_applied": {
             "start_date": start_dt.isoformat(),
             "end_date":   end_dt.isoformat(),

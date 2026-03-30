@@ -23,7 +23,7 @@ export function useChurnPredictionMetrics() {
 
   useEffect(() => {
     fetchData()
-  }, [fetchData])
+  }, [])  // Fixed: empty dependency array to fetch only on mount
 
   return { data, loading, error, refetch: fetchData }
 }

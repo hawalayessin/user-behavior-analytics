@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.date_ranges import DATA_START_DATE, resolve_date_range
 from app.models.cohorts import Cohort
 from app.models.services import Service
 
@@ -19,25 +20,14 @@ def _parse_date_range(
     *,
     db: Session,
 ) -> tuple[date, date]:
-    # If no dates are provided, use full available cohort range (no implicit "last 90 days").
-    if start_date is None and end_date is None:
-        minmax = (
-            db.query(func.min(Cohort.cohort_date).label("min_d"), func.max(Cohort.cohort_date).label("max_d"))
-            .one()
-        )
-        end_dt = minmax.max_d or date.today()
-        start_dt = minmax.min_d or (end_dt - timedelta(days=90))
-        return start_dt, end_dt
-
-    end_dt = end_date or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=90))
-    return start_dt, end_dt
+    _ = db
+    return resolve_date_range(start_date, end_date)
 
 
 @router.get("/retention/kpis")
 def get_retention_kpis(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -133,7 +123,7 @@ def get_retention_heatmap(
 @router.get("/retention/curve")
 def get_retention_curve(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):

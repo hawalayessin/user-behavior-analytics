@@ -4,7 +4,7 @@ import {
   FlaskConical,
   TrendingUp,
   UserMinus,
-  DollarSign,
+  GitBranch,
   BrainCircuit,
   PieChart,
   Layers,
@@ -31,7 +31,7 @@ export const navigationConfig = [
         icon: Activity,
         route: '/analytics/behaviors',
       },
-     
+
       {
         label: ' Free Trial Behavior',
         icon: FlaskConical,
@@ -47,16 +47,16 @@ export const navigationConfig = [
         icon: TrendingUp,
         route: '/analytics/retention',
       },
-    
+
       {
         label: 'Churn Analysis',
         icon: UserMinus,
         route: '/analytics/churn',
       },
       {
-        label: 'Revenue',
-        icon: DollarSign,
-        route: '/analytics/revenue',
+        label: 'Cross-Service',
+        icon: GitBranch,
+        route: '/analytics/cross-service',
       },
     ],
   },

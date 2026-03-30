@@ -313,7 +313,15 @@ def list_campaigns(
               c.target_size,
               COUNT(s.id) AS total_subs
             FROM campaigns c
-            LEFT JOIN subscriptions s ON s.campaign_id = c.id
+            LEFT JOIN subscriptions s ON (
+                s.campaign_id = c.id
+                OR (
+                    s.service_id = c.service_id
+                    AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                )
+            )
             LEFT JOIN services sv ON sv.id = c.service_id
             GROUP BY c.id, c.name, c.service_id, sv.name, c.send_datetime, c.target_size
             ORDER BY c.send_datetime DESC

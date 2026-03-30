@@ -14,6 +14,7 @@ import { useRetentionKPIs } from "../../hooks/useRetentionKPIs"
 import { useRetentionHeatmap } from "../../hooks/useRetentionHeatmap"
 import { useRetentionCurve } from "../../hooks/useRetentionCurve"
 import { useCohortsTable } from "../../hooks/useCohortsTable"
+import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters"
 
 const KPISkeleton   = () => <div className="w-full h-32 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
 const ChartSkeleton = () => <div className="w-full h-80 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
@@ -35,15 +36,8 @@ const HEALTH_BADGE = {
 
 const ITEMS_PER_PAGE = 10
 
-function getDateRange(daysBack) {
-  const today = new Date()
-  const start = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000)
-  const fmt   = (d) => d.toISOString().split("T")[0]
-  return { start_date: fmt(start), end_date: fmt(today), service_id: null }
-}
-
 export default function RetentionPage() {
-  const [filters, setFilters]     = useState(getDateRange(90))
+  const [filters, setFilters]     = useState(DEFAULT_ANALYTICS_FILTERS)
   const [page, setPage]          = useState(1)
   const [searchInput, setSearchInput] = useState("")
   const [search, setSearch]           = useState("")
@@ -233,7 +227,7 @@ export default function RetentionPage() {
           </p>
         </div>
 
-        <FilterBar onApply={handleApplyFilters} defaultPeriod="3months" />
+        <FilterBar onApply={handleApplyFilters} defaultPeriod="all" />
 
         {(kpiError || heatmapError || curveError || cohortsError) && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">

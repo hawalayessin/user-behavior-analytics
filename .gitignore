@@ -1,28 +1,39 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-*.pyd
-.env
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
 venv/
-.env.*
+.venv/
+env/
 
-# VSCode
-.vscode/
+# Environnement
+.env
+*.env.local
 
 # Logs
+logs/
 *.log
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Alembic cache
-alembic/__pycache__/
-
-# Node (si frontend plus tard)
+# Node
 node_modules/
 dist/
+build/
 
-# Secrets
-*.sqlite3
+# Data
+*.csv
+*.xlsx
+__pycache__

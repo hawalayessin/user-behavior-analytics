@@ -14,6 +14,7 @@ import ImportDataPage from './pages/admin/ImportDataPage'
 import CampaignImpactPage from './pages/dashboard/CampaignImpactPage'
 import ChurnAnalysisPage from './pages/dashboard/ChurnAnalysisPage'
 import AIChurnInsights from './pages/dashboard/AIChurnInsights'
+import CrossServiceBehaviorPage from './pages/dashboard/CrossServiceBehaviorPage'
 import ManagementPage from './pages/admin/ManagementPage'
 
 function App() {
@@ -54,6 +55,10 @@ function App() {
           <Route
             path="/analytics/churn-prediction"
             element={<PrivateRoute><AIChurnInsights /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/cross-service"
+            element={<PrivateRoute><CrossServiceBehaviorPage /></PrivateRoute>}
           />
           <Route
             path="/analytics/segmentation"

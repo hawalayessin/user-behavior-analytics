@@ -5,15 +5,9 @@ import AppLayout from "../../components/layout/AppLayout"
 import FilterBar from "../../components/dashboard/FilterBar"
 import KPICard from "../../components/dashboard/KPICard"
 
-import CampaignPerformanceChart from "../../components/dashboard/campaign/CampaignPerformanceChart"
-import CampaignVsOrganicChart from "../../components/dashboard/campaign/CampaignVsOrganicChart"
-import ServiceCampaignComparison from "../../components/dashboard/campaign/ServiceCampaignComparison"
-import CampaignFunnelChart from "../../components/dashboard/campaign/CampaignFunnelChart"
-
-import { useCampaignKPIs } from "../../hooks/useCampaignKPIs"
-import { useCampaignPerformance } from "../../hooks/useCampaignPerformance"
-import { useCampaignComparison } from "../../hooks/useCampaignComparison"
-import { useCampaignTimeline } from "../../hooks/useCampaignTimeline"
+// Use new dashboard hook instead of multiple hooks
+import { useCampaignImpactDashboard, useCampaignList } from "../../hooks/useCampaignImpactDashboard"
+import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters"
 
 function SkeletonCard() {
   return <div className="w-full h-28 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
@@ -23,72 +17,94 @@ function SkeletonBlock({ h = "h-80" }) {
   return <div className={`w-full ${h} bg-slate-800 animate-pulse rounded-xl border border-slate-700`} />
 }
 
-function buildCSV(rows) {
-  const headers = ["Campaign Name", "Service", "Send Date", "Target", "Subs", "Conv%", "D7%", "Health"]
-  const body = rows.map((r) => ([
-    r.name ?? "—",
-    r.service_name ?? "—",
-    r.send_date ?? "—",
-    String(r.target_size ?? 0),
-    String(r.total_subs ?? 0),
-    String(Number(r.conv_rate ?? 0).toFixed(2)),
-    String(Number(r.avg_d7 ?? 0).toFixed(2)),
-    r.health ?? "—",
-  ]))
-  const escape = (v) => `"${String(v).replace(/"/g, '""')}"`
-  return [headers, ...body].map((row) => row.map(escape).join(",")).join("\n")
-}
-
-function healthForConv(conv) {
-  const v = Number(conv ?? 0)
-  if (v >= 15) return { label: "good", cls: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" }
-  if (v >= 8) return { label: "warning", cls: "bg-yellow-500/20  text-yellow-400  border-yellow-500/30" }
-  return { label: "critical", cls: "bg-red-500/20     text-red-400     border-red-500/30" }
-}
-
 export default function CampaignImpactPage() {
-  const [filters, setFilters] = useState({ start_date: null, end_date: null, service_id: null })
+  const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS)
   const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState(null)
+  const [typeFilter, setTypeFilter] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [toast, setToast] = useState(null)
 
-  const { data: kpis, loading: kpisLoading, error: kpisError, refetch: refetchKPIs } = useCampaignKPIs(filters)
-  const { data: perf, loading: perfLoading, error: perfError, refetch: refetchPerf } = useCampaignPerformance(filters)
-  const { data: comp, loading: compLoading, error: compError, refetch: refetchComp } = useCampaignComparison(filters)
-  const { data: tl, loading: tlLoading, error: tlError, refetch: refetchTl } = useCampaignTimeline(filters)
+  // Use new dashboard hook with filters (single endpoint, cached)
+  const { data: dashboard, isLoading: dashLoading, error: dashError, refetch: refetchDashboard } = useCampaignImpactDashboard(filters)
+  
+  // Use campaign list for table (paginated, filtered)
+  const { data: listData, isLoading: listLoading, error: listError, refetch: refetchList } = useCampaignList({
+    status: statusFilter,
+    campaign_type: typeFilter,
+    start_date: filters?.start_date ?? null,
+    end_date: filters?.end_date ?? null,
+    service_id: filters?.service_id ?? null,
+    page,
+    limit: 10,
+  })
 
-  const performanceRows = perf?.data ?? []
-  const comparisonRows = comp?.data ?? []
-  const timelineRows = tl?.data ?? []
+  // Extract data from dashboard
+  const kpis = dashboard?.kpis ?? {}
+  const byTypeData = dashboard?.charts?.by_type ?? []
+  const monthlyTrendRaw = dashboard?.charts?.monthly_trend ?? []
+  const topCampaigns = dashboard?.charts?.top_campaigns ?? []
+
+  // Aggregate monthly trend by month (sum across campaign types)
+  const monthlyTrend = useMemo(() => {
+    const aggregated = {}
+    monthlyTrendRaw.forEach((item) => {
+      if (!aggregated[item.month]) {
+        aggregated[item.month] = {
+          month: item.month,
+          campaign_count: 0,
+          targeted: 0,
+          subscriptions: 0,
+          first_charges: 0,
+          conversion_rate: 0,
+        }
+      }
+      aggregated[item.month].campaign_count += item.campaign_count || 0
+      aggregated[item.month].targeted += item.targeted || 0
+      aggregated[item.month].subscriptions += item.subscriptions || 0
+      aggregated[item.month].first_charges += item.first_charges || 0
+    })
+    
+    // Recalculate conversion rate for aggregated data
+    const result = Object.values(aggregated).map((agg) => ({
+      ...agg,
+      conversion_rate: agg.targeted > 0 ? (agg.subscriptions / agg.targeted) * 100 : 0,
+    }))
+    
+    return result
+  }, [monthlyTrendRaw])
+
+  // Extract data from list
+  const campaignRows = listData?.campaigns ?? []
+  const pageInfo = listData ? { total: listData.total, pages: listData.pages, page: listData.page } : { total: 0, pages: 0, page: 1 }
 
   const rowsWithHealth = useMemo(() => {
-    return performanceRows.map((r) => {
-      const h = healthForConv(r.conv_rate)
-      return { ...r, health: h.label, _healthCls: h.cls }
+    return campaignRows.map((r) => {
+      const conv = Number(r.conversion_rate ?? 0)
+      let health = { label: "critical", cls: "bg-red-500/20 text-red-400 border-red-500/30" }
+      if (conv >= 15) health = { label: "good", cls: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" }
+      else if (conv >= 8) health = { label: "warning", cls: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" }
+      return { ...r, health: health.label, _healthCls: health.cls }
     })
-  }, [performanceRows])
-
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(rowsWithHealth.length / PAGE_SIZE))
-  const paged = rowsWithHealth.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  }, [campaignRows])
 
   const selectedCampaign = useMemo(() => {
-    const byId = rowsWithHealth.find((r) => r.campaign_id === selectedId)
+    const byId = rowsWithHealth.find((r) => r.id === selectedId)
     if (byId) return byId
-    const topBySubs = rowsWithHealth.slice().sort((a, b) => (b.total_subs ?? 0) - (a.total_subs ?? 0))[0]
+    const topBySubs = rowsWithHealth.slice().sort((a, b) => (b.subscriptions_acquired ?? 0) - (a.subscriptions_acquired ?? 0))[0]
     return topBySubs ?? null
   }, [rowsWithHealth, selectedId])
 
   // Default selection = top campaign (when data arrives)
   useEffect(() => {
     if (!selectedId && rowsWithHealth.length) {
-      const top = rowsWithHealth.slice().sort((a, b) => (b.total_subs ?? 0) - (a.total_subs ?? 0))[0]
-      if (top?.campaign_id) setSelectedId(top.campaign_id)
+      const top = rowsWithHealth.slice().sort((a, b) => (b.subscriptions_acquired ?? 0) - (a.subscriptions_acquired ?? 0))[0]
+      if (top?.id) setSelectedId(top.id)
     }
   }, [rowsWithHealth, selectedId])
 
-  const anyError = kpisError || perfError || compError || tlError
-  const anyLoading = kpisLoading || perfLoading || compLoading || tlLoading
+  const anyError = dashError || listError
+  const anyLoading = dashLoading || listLoading
 
   const showToast = (msg) => {
     setToast(msg)
@@ -96,8 +112,22 @@ export default function CampaignImpactPage() {
   }
 
   const exportCSV = () => {
-    const csv = buildCSV(rowsWithHealth)
-    if (!csv || !rowsWithHealth.length) return showToast("⚠️ No data to export")
+    const headers = ["Campaign Name", "Type", "Status", "Send Date", "Target", "Subs", "Conv%", "1st Charge%", "Health"]
+    const body = rowsWithHealth.map((r) => ([
+      r.name ?? "—",
+      r.campaign_type ?? "—",
+      r.status ?? "—",
+      r.send_datetime ? new Date(r.send_datetime).toLocaleDateString("en-GB") : "—",
+      String(r.target_size ?? 0),
+      String(r.subscriptions_acquired ?? 0),
+      String(Number(r.conversion_rate ?? 0).toFixed(2)),
+      String(Number(r.first_charge_rate ?? 0).toFixed(2)),
+      r.health ?? "—",
+    ]))
+    const escape = (v) => `"${String(v).replace(/"/g, '""')}"`
+    const csv = [headers, ...body].map((row) => row.map(escape).join(",")).join("\n")
+
+    if (!csv || !rowsWithHealth.length) return showToast("No data to export")
 
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -106,24 +136,25 @@ export default function CampaignImpactPage() {
     a.download = `campaign_impact_${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    showToast(`✅ ${rowsWithHealth.length} rows exported`)
+    showToast(`${rowsWithHealth.length} rows exported`)
   }
 
   const retryAll = () => {
-    refetchKPIs()
-    refetchPerf()
-    refetchComp()
-    refetchTl()
+    refetchDashboard()
+    refetchList()
   }
 
   return (
     <AppLayout pageTitle="Campaign Impact Analysis">
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-100 mb-2">Campaign Impact Analysis</h1>
-            <p className="text-sm text-slate-400">Efficacité des campagnes SMS par service</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">Campaign Impact Analysis</h1>
+          <p className="text-sm text-slate-400">Track campaign performance and subscription conversions</p>
+        </div>
+
+        <FilterBar onApply={(f) => setFilters(f)} defaultPeriod="all" />
+
+        <div className="flex items-center justify-end">
           <button
             onClick={exportCSV}
             className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg transition"
@@ -133,7 +164,30 @@ export default function CampaignImpactPage() {
           </button>
         </div>
 
-        <FilterBar onApply={(f) => { setFilters(f); setPage(1) }} />
+        <div className="flex gap-4">
+          <select
+            value={statusFilter ?? "all"}
+            onChange={(e) => { setStatusFilter(e.target.value === "all" ? null : e.target.value); setPage(1) }}
+            className="px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-slate-200 rounded-lg"
+          >
+            <option value="all">All Status</option>
+            <option value="completed">Completed</option>
+            <option value="sent">Sent</option>
+            <option value="scheduled">Scheduled</option>
+          </select>
+          
+          <select
+            value={typeFilter ?? "all"}
+            onChange={(e) => { setTypeFilter(e.target.value === "all" ? null : e.target.value); setPage(1) }}
+            className="px-3 py-2 text-sm bg-slate-800 border border-slate-700 text-slate-200 rounded-lg"
+          >
+            <option value="all">All Types</option>
+            <option value="welcome">Welcome</option>
+            <option value="promotion">Promotion</option>
+            <option value="retention">Retention</option>
+            <option value="reactivation">Reactivation</option>
+          </select>
+        </div>
 
         {anyError && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -149,15 +203,15 @@ export default function CampaignImpactPage() {
         )}
 
         {/* KPI row */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {anyLoading ? (
-            Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {dashLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           ) : (
             <>
               <KPICard
                 title="Total Campaigns"
-                value={(kpis?.total_campaigns ?? 0).toLocaleString()}
-                subtitle="Campaigns in range"
+                value={(kpis.total_campaigns ?? 0).toLocaleString()}
+                subtitle="Campaigns sent"
                 icon={RotateCcw}
                 iconColor="#6366F1"
                 iconBg="bg-violet-500/10"
@@ -165,9 +219,9 @@ export default function CampaignImpactPage() {
                 trendLabel="stable"
               />
               <KPICard
-                title="Total Subs"
-                value={(kpis?.total_subs_from_campaigns ?? 0).toLocaleString()}
-                subtitle="From campaign subscriptions"
+                title="Total Targeted"
+                value={(kpis.total_targeted ?? 0).toLocaleString()}
+                subtitle="Target audience size"
                 icon={RotateCcw}
                 iconColor="#10B981"
                 iconBg="bg-emerald-500/10"
@@ -175,9 +229,9 @@ export default function CampaignImpactPage() {
                 trendLabel="stable"
               />
               <KPICard
-                title="Avg Conv Rate"
-                value={`${Number(kpis?.avg_conversion_rate ?? 0).toFixed(2)}%`}
-                subtitle="Avg subs / targets"
+                title="Subscriptions"
+                value={(kpis.total_subscriptions ?? 0).toLocaleString()}
+                subtitle="From campaigns"
                 icon={RotateCcw}
                 iconColor="#3B82F6"
                 iconBg="bg-blue-500/10"
@@ -185,50 +239,99 @@ export default function CampaignImpactPage() {
                 trendLabel="stable"
               />
               <KPICard
-                title="Avg D7 Retention"
-                value={`${Number(kpis?.avg_retention_d7 ?? 0).toFixed(2)}%`}
-                subtitle="Cohorts joined by month"
+                title="Conversion Rate"
+                value={`${Number(kpis.conversion_rate ?? 0).toFixed(2)}%`}
+                subtitle="Subs / Target"
                 icon={RotateCcw}
                 iconColor="#F59E0B"
                 iconBg="bg-amber-500/10"
                 trend={0}
                 trendLabel="stable"
               />
-              <KPICard
-                title="Top Campaign"
-                value={kpis?.top_campaign_name ?? "—"}
-                subtitle={`${(kpis?.top_campaign_subs ?? 0).toLocaleString()} subs`}
-                icon={RotateCcw}
-                iconColor="#EF4444"
-                iconBg="bg-red-500/10"
-                trend={0}
-                trendLabel="top"
-              />
             </>
           )}
         </div>
 
-        {/* Charts row */}
+        {/* Charts row - Type breakdown and monthly trend */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {perfLoading ? <SkeletonBlock /> : <CampaignPerformanceChart data={rowsWithHealth} />}
-          {tlLoading ? <SkeletonBlock /> : <CampaignVsOrganicChart data={timelineRows} />}
+          {dashLoading ? (
+            <SkeletonBlock />
+          ) : (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+              <h3 className="text-lg font-bold text-slate-100 mb-4">Impact by Type</h3>
+              <div className="space-y-2">
+                {byTypeData.map((item) => (
+                  <div key={item.type} className="flex items-center justify-between p-3 bg-slate-900/50 rounded border border-slate-700/30">
+                    <div>
+                      <p className="font-medium text-slate-200 capitalize">{item.type}</p>
+                      <p className="text-xs text-slate-400">{item.campaign_count} campaign(s)</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-slate-100">{Number(item.conversion_rate ?? 0).toFixed(2)}%</p>
+                      <p className="text-xs text-slate-400">{(item.subscriptions ?? 0).toLocaleString()} subs</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {dashLoading ? (
+            <SkeletonBlock />
+          ) : (
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+              <h3 className="text-lg font-bold text-slate-100 mb-4">Monthly Trend</h3>
+              <div className="space-y-2">
+                {monthlyTrend.slice(0, 5).map((item) => (
+                  <div key={item.month} className="flex items-center justify-between p-3 bg-slate-900/50 rounded border border-slate-700/30">
+                    <div>
+                      <p className="font-medium text-slate-200">{item.month}</p>
+                      <p className="text-xs text-slate-400">{item.campaign_count} campaigns</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-slate-100">{Number(item.conversion_rate ?? 0).toFixed(2)}%</p>
+                      <p className="text-xs text-slate-400">{(item.subscriptions ?? 0).toLocaleString()} subs</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Comparison + Funnel */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {compLoading ? <SkeletonBlock /> : <ServiceCampaignComparison data={comparisonRows} />}
-          {perfLoading ? <SkeletonBlock /> : <CampaignFunnelChart campaign={selectedCampaign} />}
-        </div>
+        {/* Top Campaigns */}
+        {!dashLoading && topCampaigns.length > 0 && (
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-slate-100 mb-4">Top Campaigns</h3>
+            <div className="space-y-2">
+              {topCampaigns.map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-4 p-3 bg-slate-900/50 rounded border border-slate-700/30">
+                  <span className="w-8 h-8 flex items-center justify-center bg-slate-700 rounded-full text-slate-200 font-bold">
+                    #{idx + 1}
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-medium text-slate-200">{item.name}</p>
+                    <p className="text-xs text-slate-400">{item.type}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-slate-100">{Number(item.conversion_rate ?? 0).toFixed(2)}%</p>
+                    <p className="text-xs text-slate-400">{(item.subscriptions ?? 0).toLocaleString()} subs</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-        {/* Details table */}
+        {/* Campaign Details Table */}
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-bold text-slate-100">Campaign Details</h3>
-              <p className="text-sm text-slate-400">Click a row to update funnel</p>
+              <p className="text-sm text-slate-400">Filterable campaign list with metrics</p>
             </div>
             <span className="text-sm text-slate-400">
-              {rowsWithHealth.length} campaign{rowsWithHealth.length !== 1 ? "s" : ""}
+              {pageInfo.total} campaign{pageInfo.total !== 1 ? "s" : ""}
             </span>
           </div>
 
@@ -236,7 +339,7 @@ export default function CampaignImpactPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-800 border-b border-slate-700">
                 <tr>
-                  {["Name", "Date", "Service", "Ciblés", "Subs", "Conv%", "D7%", "Health"].map((h) => (
+                  {["Name", "Type", "Status", "Date", "Target", "Subs", "Conv%", "1st Charge%", "Health"].map((h) => (
                     <th key={h} className="px-5 py-3 text-left text-slate-300 font-semibold">
                       {h}
                     </th>
@@ -244,38 +347,39 @@ export default function CampaignImpactPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700">
-                {perfLoading ? (
-                  Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                {listLoading ? (
+                  Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i}>
-                      <td colSpan={8} className="px-5 py-4">
+                      <td colSpan={9} className="px-5 py-4">
                         <div className="h-4 w-2/3 bg-slate-700 animate-pulse rounded" />
                       </td>
                     </tr>
                   ))
-                ) : paged.length === 0 ? (
+                ) : rowsWithHealth.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center text-slate-500">
+                    <td colSpan={9} className="px-6 py-10 text-center text-slate-500">
                       No campaigns found
                     </td>
                   </tr>
                 ) : (
-                  paged.map((r) => (
+                  rowsWithHealth.map((r) => (
                     <tr
-                      key={r.campaign_id}
+                      key={r.id}
                       className={`hover:bg-slate-800/30 transition cursor-pointer ${
-                        selectedId === r.campaign_id ? "bg-violet-500/10" : ""
+                        selectedId === r.id ? "bg-violet-500/10" : ""
                       }`}
-                      onClick={() => setSelectedId(r.campaign_id)}
+                      onClick={() => setSelectedId(r.id)}
                     >
                       <td className="px-5 py-4 text-slate-100 font-medium">{r.name}</td>
+                      <td className="px-5 py-4 text-slate-300 text-xs capitalize">{r.campaign_type}</td>
+                      <td className="px-5 py-4 text-slate-300 text-xs capitalize">{r.status}</td>
                       <td className="px-5 py-4 text-slate-400 text-xs">
-                        {r.send_date ? new Date(r.send_date).toLocaleDateString("en-GB") : "—"}
+                        {r.send_datetime ? new Date(r.send_datetime).toLocaleDateString("en-GB") : "—"}
                       </td>
-                      <td className="px-5 py-4 text-slate-300 text-xs">{r.service_name}</td>
                       <td className="px-5 py-4 text-slate-200 text-xs font-mono">{(r.target_size ?? 0).toLocaleString()}</td>
-                      <td className="px-5 py-4 text-slate-200 text-xs font-mono">{(r.total_subs ?? 0).toLocaleString()}</td>
-                      <td className="px-5 py-4 text-slate-200 text-xs font-mono">{Number(r.conv_rate ?? 0).toFixed(2)}%</td>
-                      <td className="px-5 py-4 text-slate-200 text-xs font-mono">{Number(r.avg_d7 ?? 0).toFixed(2)}%</td>
+                      <td className="px-5 py-4 text-slate-200 text-xs font-mono">{(r.subscriptions_acquired ?? 0).toLocaleString()}</td>
+                      <td className="px-5 py-4 text-slate-200 text-xs font-mono">{Number(r.conversion_rate ?? 0).toFixed(2)}%</td>
+                      <td className="px-5 py-4 text-slate-200 text-xs font-mono">{Number(r.first_charge_rate ?? 0).toFixed(2)}%</td>
                       <td className="px-5 py-4">
                         <span className={`inline-block px-3 py-1 rounded text-xs font-medium border capitalize ${r._healthCls}`}>
                           {r.health}
@@ -290,34 +394,34 @@ export default function CampaignImpactPage() {
 
           <div className="flex items-center justify-between">
             <span className="text-sm text-slate-400">
-              Page {page} / {totalPages}
+              Page {pageInfo.page} / {pageInfo.pages}
             </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(1)}
-                disabled={page === 1}
+                disabled={pageInfo.page === 1}
                 className="px-2 py-1 text-xs hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
               >
                 «
               </button>
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
+                disabled={pageInfo.page === 1}
                 className="px-3 py-1 text-sm hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
               >
                 ←
               </button>
-              <span className="px-3 py-1 text-sm text-slate-100 bg-slate-700 rounded font-medium">{page}</span>
+              <span className="px-3 py-1 text-sm text-slate-100 bg-slate-700 rounded font-medium">{pageInfo.page}</span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(pageInfo.pages, p + 1))}
+                disabled={pageInfo.page === pageInfo.pages}
                 className="px-3 py-1 text-sm hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
               >
                 →
               </button>
               <button
-                onClick={() => setPage(totalPages)}
-                disabled={page === totalPages}
+                onClick={() => setPage(pageInfo.pages)}
+                disabled={pageInfo.page === pageInfo.pages}
                 className="px-2 py-1 text-xs hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
               >
                 »

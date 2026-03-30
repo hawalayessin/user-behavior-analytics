@@ -65,7 +65,8 @@ class ChurnPredictor:
     # SQL Feature Engineering
     # -----------------------------
     def _read_sql_to_df(self, db_session: Session, query: str, params: dict[str, Any] | None = None) -> pd.DataFrame:
-        return pd.read_sql(query, db_session.bind, params=params or {})
+        from sqlalchemy import text
+        return pd.read_sql(text(query), db_session.bind, params=params or {})
 
     def _base_features_sql(self) -> str:
         """
@@ -179,13 +180,32 @@ class ChurnPredictor:
         ) first_charge ON TRUE
         """
 
-    def _active_scoring_features_sql(self) -> str:
+    def _active_scoring_features_sql(
+        self,
+        service_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> str:
         """
         Build subscription-level dataset for active scoring.
         Granularity: (subscription_id)
         Includes user phone + service name for UI top lists.
         """
-        return """
+        where_clauses = ["s.subscription_end_date IS NULL", "s.status IN ('active', 'trial')"]
+        params = {}
+        if service_id:
+            where_clauses.append("s.service_id = CAST(:service_id AS uuid)")
+            params["service_id"] = service_id
+        if start_date:
+            where_clauses.append("s.subscription_start_date >= :start_date")
+            params["start_date"] = start_date
+        if end_date:
+            where_clauses.append("s.subscription_start_date <= :end_date")
+            params["end_date"] = end_date
+
+        where_str = " AND ".join(where_clauses)
+
+        return f"""
         WITH base AS (
           SELECT
             s.id AS subscription_id,
@@ -212,8 +232,7 @@ class ChurnPredictor:
             ON co.service_id = s.service_id
            AND co.cohort_date = date_trunc('month', s.subscription_start_date)::date
           LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
-          WHERE s.subscription_end_date IS NULL
-            AND s.status IN ('active', 'trial')
+          WHERE {where_str}
         )
         SELECT
           b.user_id,
@@ -286,7 +305,7 @@ class ChurnPredictor:
             AND be.status = 'SUCCESS'
             AND be.event_datetime <= b.ref_time
         ) first_charge ON TRUE
-        """
+        """, params
 
     # -----------------------------
     # Train / Predict
@@ -373,11 +392,17 @@ class ChurnPredictor:
         *,
         threshold: float = 0.4,
         store_predictions: bool = False,
+        service_id: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> ChurnPredictionResult:
         if not self.load():
             raise FileNotFoundError("Model not trained yet. Call /ml/churn/train first.")
 
-        df = self._read_sql_to_df(db_session, self._active_scoring_features_sql())
+        query, params = self._active_scoring_features_sql(
+            service_id=service_id, start_date=start_date, end_date=end_date
+        )
+        df = self._read_sql_to_df(db_session, query, params=params)
         if df.empty:
             return ChurnPredictionResult(df=pd.DataFrame(), distribution={"Low": 0, "Medium": 0, "High": 0})
 

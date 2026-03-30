@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { AlertCircle, RotateCcw } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -40,8 +40,11 @@ export default function ChurnPredictionDashboard() {
   const [topN, setTopN] = useState(10)
   const [threshold, setThreshold] = useState(0.4)
 
+  // Memoize options to prevent unnecessary hook re-triggers
+  const scoresOptions = useMemo(() => ({ top: topN, threshold }), [topN, threshold])
+
   const metrics = useChurnPredictionMetrics()
-  const scores = useChurnPredictionScores({ top: topN, threshold })
+  const scores = useChurnPredictionScores(scoresOptions)
   const trainHook = useChurnPredictionTrain()
 
   const anyError = metrics.error || scores.error

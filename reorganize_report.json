@@ -1,0 +1,107 @@
+{
+  "ts": "2026-03-28T10:54:07.747649+00:00",
+  "root": "C:/Users/Yessine-PC/Desktop/pfev0",
+  "mode": "dry-run",
+  "report": {
+    "created_dirs": [
+      "user-analytics-backend/app/api/v1",
+      "user-analytics-backend/app/repositories",
+      "user-analytics-backend/app/utils",
+      "user-analytics-backend/scripts/etl",
+      "user-analytics-backend/scripts/seeder",
+      "user-analytics-backend/scripts/sql",
+      "user-analytics-backend/tests/unit",
+      "user-analytics-backend/tests/integration",
+      "user-analytics-backend/logs",
+      "user-analytics-backend/app/api",
+      "user-analytics-backend/tests"
+    ],
+    "created_files": [
+      "user-analytics-backend/app/__init__.py",
+      "user-analytics-backend/app/api/__init__.py",
+      "user-analytics-backend/app/api/v1/__init__.py",
+      "user-analytics-backend/app/repositories/__init__.py",
+      "user-analytics-backend/app/core/__init__.py",
+      "user-analytics-backend/app/utils/__init__.py",
+      "user-analytics-backend/scripts/etl/__init__.py",
+      "user-analytics-backend/scripts/seeder/__init__.py",
+      "user-analytics-backend/tests/__init__.py",
+      "user-analytics-backend/logs/.gitkeep",
+      "user-analytics-backend/.env.example",
+      "user-analytics-backend/Makefile",
+      "user-analytics-backend/pyproject.toml",
+      "user-analytics-backend/README.md",
+      "analytics-platform-front/.env.example"
+    ],
+    "moved_files": [
+      {
+        "from": "user-analytics-backend/etl_prod_to_analytics.py",
+        "to": "user-analytics-backend/scripts/etl/etl_prod_to_analytics.py"
+      },
+      {
+        "from": "user-analytics-backend/fix_services_mapping.py",
+        "to": "user-analytics-backend/scripts/etl/fix_services_mapping.py"
+      },
+      {
+        "from": "user-analytics-backend/seed_missing_data.py",
+        "to": "user-analytics-backend/scripts/seeder/seed_missing_data.py"
+      },
+      {
+        "from": "user-analytics-backend/recalcul_cohorts.py",
+        "to": "user-analytics-backend/scripts/etl/recalcul_cohorts.py"
+      },
+      {
+        "from": "user-analytics-backend/verify_services_mapping.sql",
+        "to": "user-analytics-backend/scripts/sql/diagnostics.sql"
+      }
+    ],
+    "deleted_paths": [
+      "user-analytics-backend/script_fix_services_mapping.py",
+      "analytics-platform-front/dist",
+      "analytics-platform-front/node_modules",
+      "user-analytics-backend/alembic/__pycache__",
+      "user-analytics-backend/app/__pycache__",
+      "user-analytics-backend/ml_models/__pycache__",
+      "user-analytics-backend/scripts/__pycache__",
+      "user-analytics-backend/alembic/versions/__pycache__",
+      "user-analytics-backend/app/core/__pycache__",
+      "user-analytics-backend/app/models/__pycache__",
+      "user-analytics-backend/app/routers/__pycache__",
+      "user-analytics-backend/app/schemas/__pycache__",
+      "user-analytics-backend/app/seeds/__pycache__",
+      "user-analytics-backend/app/services/__pycache__",
+      "user-analytics-backend/app/seeds/generators/__pycache__"
+    ],
+    "updated_files": [
+      ".gitignore"
+    ],
+    "backed_up_files": [
+      ".gitignore.bak.20260328_115407"
+    ],
+    "skipped": [
+      {
+        "path": "user-analytics-backend/app/services/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": ".env",
+        "reason": "protected-env"
+      },
+      {
+        "path": "user-analytics-backend/.env",
+        "reason": "protected-env"
+      }
+    ],
+    "errors": [],
+    "summary": {
+      "created_dirs": 11,
+      "created_files": 15,
+      "moved_files": 5,
+      "deleted_paths": 15,
+      "updated_files": 1,
+      "backed_up_files": 1,
+      "skipped": 3,
+      "errors": 0
+    }
+  }
+}

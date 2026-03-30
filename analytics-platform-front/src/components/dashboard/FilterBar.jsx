@@ -1,36 +1,52 @@
-import { useState, useEffect } from "react"
-import { ChevronDown, Users, CreditCard } from "lucide-react"
-import PropTypes from "prop-types"
-import api from "../../services/api"
+import { useState, useEffect } from "react";
+import { ChevronDown, Users, CreditCard } from "lucide-react";
+import PropTypes from "prop-types";
+import api from "../../services/api";
 
 function formatDate(d) {
-  return d.toISOString().split("T")[0]
+  return d.toISOString().split("T")[0];
 }
 
 function computeDates(period, customStart, customEnd) {
-  const today = new Date()
+  const today = new Date();
   switch (period) {
-    case "all":     return { start: null, end: null }
-    case "today":   return { start: formatDate(today), end: formatDate(today) }
-    case "7days":   return { start: formatDate(new Date(today - 7  * 864e5)), end: formatDate(today) }
-    case "30days":  return { start: formatDate(new Date(today - 30 * 864e5)), end: formatDate(today) }
-    case "3months": return { start: formatDate(new Date(today - 90 * 864e5)), end: formatDate(today) }
-    case "custom":  return { start: customStart, end: customEnd }
-    default:        return { start: null, end: null }
+    case "all":
+      return { start: null, end: null };
+    case "today":
+      return { start: formatDate(today), end: formatDate(today) };
+    case "7days":
+      return {
+        start: formatDate(new Date(today - 7 * 864e5)),
+        end: formatDate(today),
+      };
+    case "30days":
+      return {
+        start: formatDate(new Date(today - 30 * 864e5)),
+        end: formatDate(today),
+      };
+    case "3months":
+      return {
+        start: formatDate(new Date(today - 90 * 864e5)),
+        end: formatDate(today),
+      };
+    case "custom":
+      return { start: customStart, end: customEnd };
+    default:
+      return { start: null, end: null };
   }
 }
 
 const PERIOD_OPTIONS = [
-  { value: "all",     label: "All time" },
-  { value: "today",   label: "Today" },
-  { value: "7days",   label: "Last 7 days" },
-  { value: "30days",  label: "Last 30 days" },
+  { value: "all", label: "All time" },
+  { value: "today", label: "Today" },
+  { value: "7days", label: "Last 7 days" },
+  { value: "30days", label: "Last 30 days" },
   { value: "3months", label: "Last 3 months" },
-  { value: "custom",  label: "Custom range" },
-]
+  { value: "custom", label: "Custom range" },
+];
 
 function Dropdown({ options, value, onChange, isOpen, onToggle }) {
-  const selected = options.find((o) => o.value === value)
+  const selected = options.find((o) => o.value === value);
   return (
     <div className="relative">
       <button
@@ -38,7 +54,10 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
         className="flex items-center gap-2 px-4 py-2 bg-[#1A1D27] border border-slate-700 rounded-full text-sm text-slate-300 hover:bg-slate-800 transition-all"
       >
         <span>{selected?.label ?? "Select"}</span>
-        <ChevronDown size={14} className={`text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={14}
+          className={`text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
       </button>
       {isOpen && (
         <div className="absolute top-full mt-2 min-w-[200px] bg-[#1A1D27] border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
@@ -47,7 +66,9 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
               key={String(opt.value)}
               onClick={() => onChange(opt.value)}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                value === opt.value ? "bg-violet-700 text-white" : "text-slate-300 hover:bg-slate-800"
+                value === opt.value
+                  ? "bg-violet-700 text-white"
+                  : "text-slate-300 hover:bg-slate-800"
               }`}
             >
               {opt.label}
@@ -56,7 +77,7 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ── Badge stat global ──────────────────────────────────────────────────────────
@@ -73,73 +94,78 @@ function GlobalStatBadge({ icon: Icon, iconColor, label, value, loading }) {
         </span>
       )}
     </div>
-  )
+  );
 }
 GlobalStatBadge.propTypes = {
-  icon:      PropTypes.elementType.isRequired,
+  icon: PropTypes.elementType.isRequired,
   iconColor: PropTypes.string.isRequired,
-  label:     PropTypes.string.isRequired,
-  value:     PropTypes.number,
-  loading:   PropTypes.bool,
-}
+  label: PropTypes.string.isRequired,
+  value: PropTypes.number,
+  loading: PropTypes.bool,
+};
 
 // ── FilterBar ─────────────────────────────────────────────────────────────────
 export default function FilterBar({ onApply, defaultPeriod = "all" }) {
-  const today = formatDate(new Date())
+  const today = formatDate(new Date());
 
-  const [period,      setPeriod]      = useState(defaultPeriod)
-  const [serviceId,   setServiceId]   = useState(null)
-  const [customStart, setCustomStart] = useState(formatDate(new Date(Date.now() - 7 * 864e5)))
-  const [customEnd,   setCustomEnd]   = useState(today)
-  const [openPeriod,  setOpenPeriod]  = useState(false)
-  const [openService, setOpenService] = useState(false)
-  const [services,    setServices]    = useState([])
+  const [period, setPeriod] = useState(defaultPeriod);
+  const [serviceId, setServiceId] = useState(null);
+  const [customStart, setCustomStart] = useState(
+    formatDate(new Date(Date.now() - 7 * 864e5)),
+  );
+  const [customEnd, setCustomEnd] = useState(today);
+  const [openPeriod, setOpenPeriod] = useState(false);
+  const [openService, setOpenService] = useState(false);
+  const [services, setServices] = useState([]);
 
   // ── Stats globales (sans filtre) ──
-  const [globalStats,        setGlobalStats]        = useState(null)
-  const [globalStatsLoading, setGlobalStatsLoading] = useState(true)
+  const [globalStats, setGlobalStats] = useState(null);
+  const [globalStatsLoading, setGlobalStatsLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/services")
+    api
+      .get("/services")
       .then((res) => setServices(res.data ?? []))
-      .catch(() => setServices([]))
-  }, [])
+      .catch(() => setServices([]));
+  }, []);
 
   // Appel unique au montage — pas de dépendance sur les filtres
   useEffect(() => {
-    api.get("/analytics/summary")
+    api
+      .get("/analytics/summary")
       .then((res) => setGlobalStats(res.data))
       .catch(() => setGlobalStats(null))
-      .finally(() => setGlobalStatsLoading(false))
-  }, [])
+      .finally(() => setGlobalStatsLoading(false));
+  }, []);
 
   const serviceOptions = [
     { value: null, label: "All services" },
     ...services.map((s) => ({ value: s.id, label: s.name })),
-  ]
+  ];
 
   const handleApply = () => {
-    const { start, end } = computeDates(period, customStart, customEnd)
-    setOpenPeriod(false)
-    setOpenService(false)
-    onApply({ start_date: start, end_date: end, service_id: serviceId })
-  }
+    const { start, end } = computeDates(period, customStart, customEnd);
+    setOpenPeriod(false);
+    setOpenService(false);
+    onApply({ start_date: start, end_date: end, service_id: serviceId });
+  };
 
   const handleReset = () => {
-    setPeriod(defaultPeriod)
-    setServiceId(null)
-    setOpenPeriod(false)
-    setOpenService(false)
-    const { start, end } = computeDates(defaultPeriod, null, null)
-    onApply({ start_date: start, end_date: end, service_id: null })
-  }
+    setPeriod(defaultPeriod);
+    setServiceId(null);
+    setOpenPeriod(false);
+    setOpenService(false);
+    const { start, end } = computeDates(defaultPeriod, null, null);
+    onApply({ start_date: start, end_date: end, service_id: null });
+  };
 
   return (
     <div className="space-y-3">
-
       {/* ── Ligne 1 : badges stats globales ── */}
       <div className="flex flex-wrap items-center gap-2 px-1">
-        <span className="text-xs text-slate-500 font-medium mr-1">All-time totals:</span>
+        <span className="text-xs text-slate-500 font-medium mr-1">
+          All-time totals:
+        </span>
         <GlobalStatBadge
           icon={Users}
           iconColor="#6366F1"
@@ -179,9 +205,15 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
         <Dropdown
           options={PERIOD_OPTIONS}
           value={period}
-          onChange={(v) => { setPeriod(v); setOpenPeriod(false) }}
+          onChange={(v) => {
+            setPeriod(v);
+            setOpenPeriod(false);
+          }}
           isOpen={openPeriod}
-          onToggle={() => { setOpenPeriod((p) => !p); setOpenService(false) }}
+          onToggle={() => {
+            setOpenPeriod((p) => !p);
+            setOpenService(false);
+          }}
         />
 
         {/* Custom date range */}
@@ -210,9 +242,15 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
         <Dropdown
           options={serviceOptions}
           value={serviceId}
-          onChange={(v) => { setServiceId(v); setOpenService(false) }}
+          onChange={(v) => {
+            setServiceId(v);
+            setOpenService(false);
+          }}
           isOpen={openService}
-          onToggle={() => { setOpenService((p) => !p); setOpenPeriod(false) }}
+          onToggle={() => {
+            setOpenService((p) => !p);
+            setOpenPeriod(false);
+          }}
         />
 
         {/* Apply */}
@@ -231,12 +269,18 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
           Reset
         </button>
       </div>
-
     </div>
-  )
+  );
 }
 
 FilterBar.propTypes = {
   onApply: PropTypes.func.isRequired,
-  defaultPeriod: PropTypes.oneOf(["all", "today", "7days", "30days", "3months", "custom"]),
-}
+  defaultPeriod: PropTypes.oneOf([
+    "all",
+    "today",
+    "7days",
+    "30days",
+    "3months",
+    "custom",
+  ]),
+};

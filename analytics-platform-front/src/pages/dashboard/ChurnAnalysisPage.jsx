@@ -1,20 +1,23 @@
-import { useMemo, useState } from "react"
+import React, { useState } from "react"
 import { AlertCircle, RotateCcw } from "lucide-react"
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts"
 
 import AppLayout from "../../components/layout/AppLayout"
 import FilterBar from "../../components/dashboard/FilterBar"
 import KPICard from "../../components/dashboard/KPICard"
+import { useChurnDashboard } from "../../hooks/useChurnDashboard"
+import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters"
 
-import { useChurnKPIs } from "../../hooks/useChurnKPIs"
-import { useChurnCurve } from "../../hooks/useChurnCurve"
-import { useTimeToChurn } from "../../hooks/useTimeToChurn"
-import { useChurnReasons } from "../../hooks/useChurnReasons"
-import { useRiskSegments } from "../../hooks/useRiskSegments"
-
-import ChurnCurveChart from "../../components/dashboard/churn/ChurnCurveChart"
-import TimeToChurnChart from "../../components/dashboard/churn/TimeToChurnChart"
-import ChurnReasonsChart from "../../components/dashboard/churn/ChurnReasonsChart"
-import RiskSegmentsPanel from "../../components/dashboard/churn/RiskSegmentsPanel"
+const COLORS = {
+  churn:    "#a12c7b",
+  new:      "#01696f",
+  neutral:  "#7a7974",
+  warning:  "#964219",
+  palette:  ["#01696f", "#a12c7b", "#964219", "#7a7974"],
+}
 
 const KPISkeleton = () => (
   <div className="w-full h-28 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
@@ -24,69 +27,33 @@ const ChartSkeleton = () => (
 )
 
 export default function ChurnAnalysisPage() {
-  const [filters, setFilters] = useState({ start_date: null, end_date: null, service_id: null })
-  const [churnType, setChurnType] = useState("ALL")
+  const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS)
 
-  const kpis = useChurnKPIs(filters)
-  const curve = useChurnCurve(filters)
-  const ttc = useTimeToChurn({ ...filters, churn_type: churnType })
-  const reasons = useChurnReasons({ ...filters, churn_type: churnType })
-  const segments = useRiskSegments(filters)
+  const { data, isLoading, error, refetch } = useChurnDashboard(filters)
 
-  const anyError = kpis.error || curve.error || ttc.error || reasons.error || segments.error
-  const retryAll = () => {
-    kpis.refetch()
-    curve.refetch()
-    ttc.refetch()
-    reasons.refetch()
-    segments.refetch()
-  }
-
-  const kpiCards = useMemo(() => {
-    const d = kpis.data
-    if (!d) return null
-    return {
-      global_churn_rate: Number(d.global_churn_rate ?? 0),
-      avg_lifetime_days: Number(d.avg_lifetime_days ?? 0),
-      first_bill_churn_rate: Number(d.first_bill_churn_rate ?? 0),
-      trial_churn_pct: Number(d.trial_churn_pct ?? 0),
-      paid_churn_pct: Number(d.paid_churn_pct ?? 0),
-      voluntary_pct: Number(d.voluntary_pct ?? 0),
-      technical_pct: Number(d.technical_pct ?? 0),
-    }
-  }, [kpis.data])
+  const dashboard = data || {}
+  const { kpis, charts, meta } = dashboard
 
   return (
-    <AppLayout pageTitle="Churn & Risk Analysis">
+    <AppLayout pageTitle="Churn Analysis">
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">Churn & Risk Analysis</h1>
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">Churn Analysis</h1>
           <p className="text-sm text-slate-400">
-            Understand why users leave and which segments are at risk
+            {meta
+              ? `Period: ${ meta.period_start?.slice(0, 10)} → ${ meta.period_end?.slice(0, 10)}`
+              : "Understand why users leave"}
           </p>
         </div>
 
-        <FilterBar onApply={(f) => setFilters(f)} defaultPeriod="3months" />
+        <FilterBar onApply={(f) => setFilters(f)} defaultPeriod="all" />
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium">Churn type:</span>
-          <select
-            value={churnType}
-            onChange={(e) => setChurnType(e.target.value)}
-            className="px-3 py-2 text-xs bg-[#1A1D27] border border-slate-700 rounded-lg text-slate-200 focus:outline-none"
-          >
-            <option value="ALL">All</option>
-            <option value="VOLUNTARY">Voluntary</option>
-            <option value="TECHNICAL">Technical</option>
-          </select>
-        </div>
-
-        {anyError && (
+        {error && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
             <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-            <p className="flex-1 text-sm text-red-200">{anyError}</p>
+            <p className="flex-1 text-sm text-red-200">{error?.message || error}</p>
             <button
-              onClick={retryAll}
+              onClick={() => refetch()}
               className="flex items-center gap-2 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition"
             >
               <RotateCcw size={14} /> Retry
@@ -94,94 +61,200 @@ export default function ChurnAnalysisPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {kpis.loading ? (
-            Array.from({ length: 5 }).map((_, i) => <KPISkeleton key={i} />)
-          ) : (
-            kpiCards && (
-              <>
-                <KPICard
-                  title="Global Churn Rate"
-                  value={`${kpiCards.global_churn_rate.toFixed(2)}%`}
-                  subtitle="Churned / active at start"
-                  icon={RotateCcw}
-                  iconColor="#F97316"
-                  iconBg="bg-orange-500/10"
-                  trend={0}
-                  trendLabel="stable"
-                />
-                <KPICard
-                  title="Avg Lifetime (days)"
-                  value={kpiCards.avg_lifetime_days.toFixed(1)}
-                  subtitle="Among churned users"
-                  icon={RotateCcw}
-                  iconColor="#6366F1"
-                  iconBg="bg-violet-500/10"
-                  trend={0}
-                  trendLabel="stable"
-                />
-                <KPICard
-                  title="Trial vs Paid"
-                  value={`${kpiCards.trial_churn_pct.toFixed(1)}%`}
-                  subtitle={`Paid: ${kpiCards.paid_churn_pct.toFixed(1)}%`}
-                  icon={RotateCcw}
-                  iconColor="#10B981"
-                  iconBg="bg-emerald-500/10"
-                  trend={0}
-                  trendLabel="mix"
-                />
-                <KPICard
-                  title="First-Bill Churn"
-                  value={`${kpiCards.first_bill_churn_rate.toFixed(1)}%`}
-                  subtitle="Churn within 7 days after 1st charge"
-                  icon={RotateCcw}
-                  iconColor="#EF4444"
-                  iconBg="bg-red-500/10"
-                  trend={0}
-                  trendLabel="stable"
-                />
-                <KPICard
-                  title="Voluntary vs Technical"
-                  value={`${kpiCards.voluntary_pct.toFixed(1)}%`}
-                  subtitle={`Technical: ${kpiCards.technical_pct.toFixed(1)}%`}
-                  icon={RotateCcw}
-                  iconColor="#F59E0B"
-                  iconBg="bg-amber-500/10"
-                  trend={0}
-                  trendLabel="mix"
-                />
-              </>
-            )
-          )}
+        {/* KPI Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {isLoading
+            ? Array.from({ length: 4 }).map((_, i) => <KPISkeleton key={i} />)
+            : kpis && (
+                <>
+                  <KPICard
+                    title="Global Churn Rate"
+                    value={`${ kpis.global_churn_rate?.rate ?? 0}%`}
+                    subtitle={`${ kpis.global_churn_rate?.churned || 0} / ${ kpis.global_churn_rate?.total || 0}`}
+                    icon={RotateCcw}
+                    iconColor="#a12c7b"
+                    iconBg="bg-red-500/10"
+                  />
+                  <KPICard
+                    title="Monthly Churn"
+                    value={`${ kpis.monthly_churn_rate?.rate ?? 0}%`}
+                    subtitle={`${ kpis.monthly_churn_rate?.churned || 0} in period`}
+                    icon={RotateCcw}
+                    iconColor="#964219"
+                    iconBg="bg-orange-500/10"
+                  />
+                  <KPICard
+                    title="Avg Lifetime"
+                    value={`${ kpis.avg_lifetime_days?.avg_days ?? 0}d`}
+                    subtitle={`Min: ${ kpis.avg_lifetime_days?.min_days || 0}d`}
+                    icon={RotateCcw}
+                    iconColor="#01696f"
+                    iconBg="bg-teal-500/10"
+                  />
+                  <KPICard
+                    title="Voluntary Churn"
+                    value={`${ kpis.churn_breakdown?.voluntary?.rate ?? 0}%`}
+                    subtitle={`Tech: ${ kpis.churn_breakdown?.technical?.rate || 0}%`}
+                    icon={RotateCcw}
+                    iconColor="#7a7974"
+                    iconBg="bg-slate-500/10"
+                  />
+                </>
+              )}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-          <div className="xl:col-span-3">
-            {curve.loading ? <ChartSkeleton /> : <ChurnCurveChart data={curve.data ?? []} />}
-          </div>
-          <div className="xl:col-span-2">
-            {reasons.loading ? (
+        {/* Charts Grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Trend Chart */}
+          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+            <h2 className="text-sm font-semibold text-slate-100 mb-4">Daily Churn vs New</h2>
+            {isLoading ? (
               <ChartSkeleton />
             ) : (
-              <ChurnReasonsChart
-                data={reasons.data ?? []}
-                churnType={churnType}
-                onChangeType={setChurnType}
-              />
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={charts?.daily_trend || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="new_subs"
+                    stroke={COLORS.new}
+                    name="New"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="churned"
+                    stroke={COLORS.churn}
+                    name="Churned"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Voluntary vs Technical */}
+          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+            <h2 className="text-sm font-semibold text-slate-100 mb-4">Churn Type</h2>
+            {isLoading ? (
+              <ChartSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: "Voluntary", value: kpis?.churn_breakdown?.voluntary?.count || 0 },
+                      { name: "Technical", value: kpis?.churn_breakdown?.technical?.count || 0 },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    dataKey="value"
+                    label={({ name, percent }) => `${ name} ${ (percent * 100).toFixed(1)}%`}
+                  >
+                    <Cell fill={COLORS.churn} />
+                    <Cell fill={COLORS.warning} />
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-          <div className="xl:col-span-3">
-            {ttc.loading ? <ChartSkeleton /> : <TimeToChurnChart data={ttc.data ?? []} />}
+        {/* Services & Distribution */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* By Service */}
+          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+            <h2 className="text-sm font-semibold text-slate-100 mb-4">Churn by Service</h2>
+            {isLoading ? (
+              <ChartSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart
+                  data={charts?.by_service || []}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="service_name" type="category" tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="churned" fill={COLORS.churn} name="Churned" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
-          <div className="xl:col-span-2">
-            {segments.loading ? <ChartSkeleton /> : <RiskSegmentsPanel data={segments.data ?? []} />}
+
+          {/* Distribution */}
+          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+            <h2 className="text-sm font-semibold text-slate-100 mb-4">Lifetime Distribution</h2>
+            {isLoading ? (
+              <ChartSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={charts?.lifetime_distribution || []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill={COLORS.new} name="Count" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* Retention Table */}
+        <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+          <h2 className="text-sm font-semibold text-slate-100 mb-4">Retention by Cohort</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-700">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400">Cohort</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">Users</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">D+7</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">D+14</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">D+30</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(charts?.retention_cohort || []).map((row, i) => (
+                  <tr key={i} className="border-b border-slate-700/50 hover:bg-slate-800/30">
+                    <td className="py-3 px-4 text-slate-300">{row.cohort}</td>
+                    <td className="text-right py-3 px-4 text-slate-300">
+                      {(row.total || 0).toLocaleString()}
+                    </td>
+                    <td className="text-right py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${ row.d7_rate >= 50 ? "bg-green-500/20 text-green-300" : row.d7_rate >= 25 ? "bg-yellow-500/20 text-yellow-300" : "bg-red-500/20 text-red-300"}`}>
+                        {row.d7_rate}%
+                      </span>
+                    </td>
+                    <td className="text-right py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${ row.d14_rate >= 50 ? "bg-green-500/20 text-green-300" : row.d14_rate >= 25 ? "bg-yellow-500/20 text-yellow-300" : "bg-red-500/20 text-red-300"}`}>
+                        {row.d14_rate}%
+                      </span>
+                    </td>
+                    <td className="text-right py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${ row.d30_rate >= 50 ? "bg-green-500/20 text-green-300" : row.d30_rate >= 25 ? "bg-yellow-500/20 text-yellow-300" : "bg-red-500/20 text-red-300"}`}>
+                        {row.d30_rate}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </AppLayout>
   )
 }
-

@@ -1,0 +1,131 @@
+{
+  "ts": "2026-03-28T10:56:06.045723+00:00",
+  "root": "C:/Users/Yessine-PC/Desktop/pfev0",
+  "mode": "apply",
+  "report": {
+    "created_dirs": [],
+    "created_files": [
+      "user-analytics-backend/.env.example",
+      "user-analytics-backend/Makefile",
+      "user-analytics-backend/pyproject.toml",
+      "user-analytics-backend/README.md",
+      "analytics-platform-front/.env.example"
+    ],
+    "moved_files": [],
+    "deleted_paths": [
+      "analytics-platform-front/node_modules",
+      "user-analytics-backend/alembic/__pycache__",
+      "user-analytics-backend/app/__pycache__",
+      "user-analytics-backend/ml_models/__pycache__",
+      "user-analytics-backend/scripts/__pycache__",
+      "user-analytics-backend/alembic/versions/__pycache__",
+      "user-analytics-backend/app/core/__pycache__",
+      "user-analytics-backend/app/models/__pycache__",
+      "user-analytics-backend/app/routers/__pycache__",
+      "user-analytics-backend/app/schemas/__pycache__",
+      "user-analytics-backend/app/seeds/__pycache__",
+      "user-analytics-backend/app/services/__pycache__",
+      "user-analytics-backend/app/seeds/generators/__pycache__"
+    ],
+    "updated_files": [
+      ".gitignore"
+    ],
+    "backed_up_files": [
+      ".gitignore.bak.20260328_115606"
+    ],
+    "skipped": [
+      {
+        "path": "user-analytics-backend/app/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/app/api/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/app/api/v1/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/app/services/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/app/repositories/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/app/core/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/app/utils/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/scripts/etl/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/scripts/seeder/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/tests/__init__.py",
+        "reason": "unchanged"
+      },
+      {
+        "path": "user-analytics-backend/logs/.gitkeep",
+        "reason": "unchanged"
+      },
+      {
+        "path": ".env",
+        "reason": "protected-env"
+      },
+      {
+        "path": "user-analytics-backend/.env",
+        "reason": "protected-env"
+      }
+    ],
+    "errors": [
+      {
+        "path": "analytics-platform-front/node_modules/@rollup/rollup-win32-x64-msvc/rollup.win32-x64-msvc.node",
+        "error": "[WinError 5] Access is denied: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules\\\\@rollup\\\\rollup-win32-x64-msvc\\\\rollup.win32-x64-msvc.node'"
+      },
+      {
+        "path": "analytics-platform-front/node_modules/@rollup/rollup-win32-x64-msvc",
+        "error": "[WinError 145] The directory is not empty: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules\\\\@rollup\\\\rollup-win32-x64-msvc'"
+      },
+      {
+        "path": "analytics-platform-front/node_modules/@rollup",
+        "error": "[WinError 145] The directory is not empty: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules\\\\@rollup'"
+      },
+      {
+        "path": "analytics-platform-front/node_modules/@esbuild/win32-x64/esbuild.exe",
+        "error": "[WinError 5] Access is denied: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules\\\\@esbuild\\\\win32-x64\\\\esbuild.exe'"
+      },
+      {
+        "path": "analytics-platform-front/node_modules/@esbuild/win32-x64",
+        "error": "[WinError 145] The directory is not empty: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules\\\\@esbuild\\\\win32-x64'"
+      },
+      {
+        "path": "analytics-platform-front/node_modules/@esbuild",
+        "error": "[WinError 145] The directory is not empty: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules\\\\@esbuild'"
+      },
+      {
+        "path": "analytics-platform-front/node_modules",
+        "error": "[WinError 145] The directory is not empty: 'C:\\\\Users\\\\Yessine-PC\\\\Desktop\\\\pfev0\\\\analytics-platform-front\\\\node_modules'"
+      }
+    ],
+    "summary": {
+      "created_dirs": 0,
+      "created_files": 5,
+      "moved_files": 0,
+      "deleted_paths": 13,
+      "updated_files": 1,
+      "backed_up_files": 1,
+      "skipped": 13,
+      "errors": 7
+    }
+  }
+}

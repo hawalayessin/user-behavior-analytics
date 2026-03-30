@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts"
+import ChartContainer from "./ChartContainer"
 
 function Card({ title, subtitle, children, right }) {
   return (
@@ -51,7 +52,7 @@ export default function ChurnReasonsChart({ data = [], churnType = "ALL", onChan
         </select>
       }
     >
-      <div className="h-80 w-full min-w-0">
+      <ChartContainer className="h-80 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%" minWidth="0" minHeight="0">
           <BarChart
             layout="vertical"
@@ -75,7 +76,7 @@ export default function ChurnReasonsChart({ data = [], churnType = "ALL", onChan
             <Bar dataKey="count" fill="#F97316" radius={[8, 8, 8, 8]} />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </ChartContainer>
     </Card>
   )
 }

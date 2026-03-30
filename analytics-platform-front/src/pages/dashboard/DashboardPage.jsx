@@ -8,12 +8,9 @@ import OverviewTab                          from "../../components/dashboard/tab
 import EngagementTab                        from "../../components/dashboard/tabs/EngagementTab"
 import RevenueTab                           from "../../components/dashboard/tabs/RevenueTab"
 import TrialChurnTab                        from "../../components/dashboard/tabs/TrialChurnTab"
+import { DEFAULT_ANALYTICS_FILTERS }        from "../../constants/dateFilters"
 
-const DEFAULT_FILTERS = {
-  start_date: null,
-  end_date:   null,
-  service_id: null,
-}
+const DEFAULT_FILTERS = DEFAULT_ANALYTICS_FILTERS
 
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 function SkeletonBlock({ className }) {

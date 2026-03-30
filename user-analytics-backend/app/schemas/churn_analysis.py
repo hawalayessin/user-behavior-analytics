@@ -10,6 +10,7 @@ ChurnType = Literal["VOLUNTARY", "TECHNICAL"]
 
 class ChurnKPIsResponse(BaseModel):
     global_churn_rate: float = Field(..., ge=0)
+    monthly_churn_rate: float = Field(0, ge=0)
     avg_lifetime_days: float = Field(..., ge=0)
     first_bill_churn_rate: float = Field(..., ge=0)
     voluntary_pct: float = Field(..., ge=0, le=100)

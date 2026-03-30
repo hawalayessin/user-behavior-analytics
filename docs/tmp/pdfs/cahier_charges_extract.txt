@@ -1,0 +1,273 @@
+
+
+=== PAGE 1 ===
+Project 1: User Behavior Analytics &
+Insights Platform
+1. Purpose & Vision
+This project aims to build a centralized analytics and dashboard platform that provides clear,
+actionable insights into how users interact with our digital services (SMS-based services,
+subscriptions, trials, campaigns, etc.).
+The core objective is not just reporting numbers, but understanding user behavior,
+identifying drop-off reasons, measuring campaign impact, and enabling better business and
+product decisions.
+This project will be used by:
+● Product & marketing teams to improve services and campaigns
+● Technical teams to detect friction points
+● Management to track performance and growth
+It is intentionally designed to be suitable for:
+● A data analyst (data modeling, KPIs, insights)
+● Light AI usage (prediction, clustering, anomaly detection)
+● Some development work (dashboard, APIs, data pipelines)
+2. Business Questions the Project Must Answer
+The platform should answer questions such as:
+2.1 User Activity & Engagement
+● How many users are currently active per service?
+● How many users are inactive, and since when?
+● Daily / weekly / monthly active users (DAU, WAU, MAU)
+● Average lifetime of a user per service
+2.2 Free Trial Behavior
+
+=== PAGE 2 ===
+● How many users start a free trial?
+● How many convert to paid subscription?
+● At which day do users usually drop (Day 1, Day 2, Day 3)?
+● Common behavior patterns of users who stop after the free trial
+2.3 Subscription & Revenue Flow (High-level)
+● New subscriptions per day/week/month
+● Churn rate (users who unsubscribe)
+● Retention rate (Day 7, Day 14, Day 30)
+● Re-subscription behavior (users who come back later)
+2.4 Campaign Impact (SMS Bulk Campaigns)
+● After an SMS campaign:
+○ How many new users subscribed?
+○ How many are still active after X days?
+○ Conversion rate per campaign
+● Compare campaigns against each other
+● Identify the most effective campaign patterns
+2.5 Cross-Service Behavior
+● Do users subscribe to multiple services?
+● Which services are commonly used together?
+● Migration paths (Service A → Service B)
+3. Service Business Model (Important Context)
+All services follow the same business model, which must be clearly understood and reflected
+in the analysis:
+● Free trial → Automatic renewal
+● Free trial duration:
+○ Default: 3 days for all services
+○ Can be extended temporarily during special events or promotions
+● After the free trial ends:
+○ The user is charged automatically based on the service plan
+○ Billing cycle can be daily or weekly, depending on the service
+● Fixed price per service (no dynamic pricing)
+● Users can unsubscribe:
+○ During the free trial
+
+=== PAGE 3 ===
+○ After the free trial
+● A user cannot receive another free trial for the same service once the trial period has
+ended
+This business logic must be respected when calculating KPIs, churn, retention, and conversion
+rates.
+4. Data Sources (Initial Scope)
+The analyst should expect to work with data such as:
+● Users table (user_id, phone, creation date, status)
+● Services table (service_id, name, billing type, price)
+● Subscriptions (start_date, end_date, trial_flag)
+● Unsubscription events (date, reason if available)
+● SMS events (MO, MT, delivery status)
+● Campaign logs (campaign_id, send_date, target size)
+● Billing / charging events (success, failure, retries)
+The intern is not required to design production databases, but must understand
+relations, constraints, and propose improvements.
+4. Key Metrics & KPIs
+The dashboard should clearly expose:
+● Active users per service
+● Trial → Paid conversion rate
+● Drop-off rate during free trial
+● Retention curve (cohort-based)
+● Churn rate
+● Campaign ROI (subscriptions / messages sent)
+● Average user lifetime
+Optional advanced KPIs:
+● User engagement score
+● Service health score
+
+=== PAGE 4 ===
+5. Dashboard Requirements
+5.1 Functional Requirements
+● Filter by:
+○ Date range
+○ Service
+○ Campaign
+● Interactive charts (click, hover, drill-down)
+● Export data (CSV or Excel)
+5.2 Suggested Visualizations
+● Line charts (growth, churn, retention)
+● Bar charts (campaign performance)
+● Funnel charts (trial → subscription)
+● Cohort heatmaps (retention over time)
+● Pie or stacked charts (service distribution)
+5.3 Tools (Flexible)
+The intern can propose and justify:
+● Power BI / Metabase / Superset / custom web dashboard
+● Python (Pandas, SQLAlchemy)
+● SQL for data extraction
+5.4 Report Generation (New Requirement)
+The platform should support on-demand report generation based on user-selected criteria.
+Functional Description
+● Generate a report by:
+○ Date range selection
+○ Single service or all services combined
+● Reports should summarize:
+○ Key KPIs
+○ User behavior insights
+○ Trial → paid conversion
+○ Churn and retention
+
+=== PAGE 5 ===
+○ Campaign impact (if applicable)
+Format
+● PDF or downloadable document (preferred)
+● Clear structure suitable for management review
+Scope Notes
+● Generating reports for all services is allowed, but:
+○ Performance considerations must be discussed
+○ The intern should explain data aggregation choices
+● A simplified or aggregated version is acceptable if data volume is large
+Evaluation Focus
+● Ability to translate dashboards into a decision-ready report
+● Clarity, structure, and relevance of insights
+5.5 Sample Report Structure (Guideline)
+The following structure is provided as a reference example. Interns may adapt to it, but the
+same level of clarity and depth is expected.
+1. Executive Summary (1 page)
+● Service name(s)
+● Report period
+● Key findings (3–5 bullet points)
+● Overall service health (Good / Medium / At Risk)
+2. Service Overview
+● Business model reminder (free trial → renew)
+● Pricing and billing cycle (daily / weekly)
+● Total users, active users, inactive users
+3. User Acquisition & Campaign Impact
+● New users during the period
+● Subscriptions coming from campaigns
+● Conversion rate per campaign (if applicable)
+
+=== PAGE 6 ===
+● Short interpretation of results
+4. Free Trial Analysis
+● Number of users entering free trial
+● Trial → paid conversion rate
+● Drop-off distribution by day (Day 1 / Day 2 / Day 3+)
+● Comparison with previous periods (if possible)
+5. Retention & Churn Analysis
+● Retention after first charge
+● Churn timing (when users unsubscribe)
+● Average subscription duration
+● Identification of high-risk user groups
+6. Behavioral Insights
+● Typical user behavior patterns
+● Differences between retained vs churned users
+● Notable anomalies or trends
+7. AI / Advanced Analytics (If Implemented)
+● Model or method used
+● Purpose (prediction, clustering, detection)
+● Key results and interpretation
+8. Recommendations & Justification
+● Actionable recommendations
+● Supporting data or charts
+● Expected business impact
+9. Limitations & Assumptions
+● Data gaps
+● Quality concerns
+● Assumptions made during analysis
+10. Conclusion
+● Final assessment of the service
+● Priority actions for improvement
+
+=== PAGE 7 ===
+6. AI & Advanced Analytics (Important Part)
+The intern is encouraged to add AI-driven insights, such as:
+6.1 User Segmentation (Clustering)
+● Group users by behavior:
+○ Heavy users
+○ Trial-only users
+○ Churn-risk users
+6.2 Churn Prediction
+● Predict which users are likely to unsubscribe
+● Highlight risk factors (low activity, failed billing, etc.)
+6.3 Campaign Optimization
+● Predict campaign success based on past data
+● Identify best send times or message patterns
+6.4 Anomaly Detection
+● Detect sudden drops or spikes in activity
+● Alert when behavior deviates from normal
+AI does not need to be production-grade, but the logic and reasoning must be
+clear.
+7. Deliverables Expected from the Intern
+The following deliverables are mandatory. Submissions missing any of these sections are
+considered incomplete.
+1. Project understanding document
+○ Written in the intern’s own words
+○ Explains the business model (trial → renew → unsubscribe)
+2. Data model & schema explanation
+○ Tables used
+○ Relationships
+
+=== PAGE 8 ===
+○ Key assumptions and limitations
+3. KPI definitions and formulas
+○ Clear explanation of how each metric is calculated
+○ Justification of why each KPI matters
+4. Dashboard or dashboard prototype
+○ Visualizes the most important KPIs
+○ Supports filtering and comparison
+5. Behavioral Analysis & Findings
+○ Identification of key user behavior patterns
+○ Free trial drop-off analysis
+○ Unsubscription timing analysis
+○ Campaign quality analysis (not only volume)
+6. Recommendations (Mandatory Section)
+○ At least 5 concrete, actionable recommendations
+○ Each recommendation must:
+■ Be based on data findings
+■ Clearly state the expected impact (retention, conversion, churn, revenue)
+7. Justification & Evidence
+○ Each recommendation must be justified using:
+■ Metrics
+■ Charts
+■ Cohort analysis or comparisons
+○ No recommendation without evidence
+8. AI or Advanced Analytics Feature
+○ At least one of the following:
+■ Churn prediction
+■ User segmentation
+■ Campaign performance prediction
+■ Anomaly detection
+○ Model choice and logic must be explained
+9. Business Impact Summary
+○ One-page summary answering:
+■ What should the company change?
+■ Why?
+■ What is the expected benefit?
+8. Evaluation Criteria
+The intern will be evaluated on:
+● Understanding of business needs
+● Data analysis quality
+
+=== PAGE 9 ===
+● Clarity of KPIs
+● Insightfulness (not just charts)
+● Logical use of AI
+● Communication & documentation
+9. Possible Project Names (Suggestions)
+● User Insight & Analytics Platform
+● Service Behavior Intelligence
+● Customer Engagement Analytics
+● Smart Service Dashboard
+10. Notes for the Intern
+● Focus on why users behave, not only what happens
+● Assumptions must be documented
+● Simplicity is preferred over over-engineering
+● Business impact matters more than fancy tech

@@ -10,6 +10,7 @@ import UserGrowthChart      from "../components/dashboard/userActivity/UserGrowt
 import ActivityHeatmap      from "../components/dashboard/userActivity/ActivityHeatmap"
 import { useUserActivity }  from "../hooks/useUserActivity"
 import { useUsers }         from "../hooks/useUsers"
+import { DEFAULT_ANALYTICS_FILTERS } from "../constants/dateFilters"
 import {
   Users, TrendingUp, Calendar,
   Zap, AlertTriangle, Clock,
@@ -25,7 +26,7 @@ const STATUT_MAP = {
 const ITEMS_PER_PAGE = 8
 
 function getDefaultFilters() {
-  return { start_date: null, end_date: null, service_id: null }
+  return { ...DEFAULT_ANALYTICS_FILTERS }
 }
 
 const KPISkeleton   = () => <div className="w-full h-32 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
@@ -100,7 +101,7 @@ export default function UserActivityPage() {
     }
   }, [activityData?.kpis])
 
-  const users      = usersData?.data  ?? []
+  const users = useMemo(() => usersData?.data ?? [], [usersData?.data])
   const totalCount = usersData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE))
 

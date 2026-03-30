@@ -8,9 +8,126 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.date_ranges import DATA_START_DATE, resolve_date_range
+from app.core.dependencies import get_current_user
+from app.services.campaign_service import get_campaign_dashboard, get_campaign_list
+from app.repositories.campaign_repo import CampaignRepository
 
 
 router = APIRouter(prefix="/analytics/campaigns", tags=["Campaign Impact"])
+
+
+# ============================================================================
+# NEW Campaign Dashboard Endpoints (using service layer)
+# ============================================================================
+
+
+@router.get("/dashboard")
+def get_campaign_impact_dashboard(
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    service_id: Optional[str] = Query(default=None),
+):
+    """
+    Get complete campaign impact dashboard
+    Includes KPIs, type breakdown, monthly trend, top campaigns
+    Supports optional date range and service filtering
+    """
+    filters = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "service_id": service_id,
+    }
+    payload = get_campaign_dashboard(db, filters=filters)
+    return payload
+
+
+@router.get("/list")
+def get_campaigns_list(
+    status: Optional[str] = Query(None, description="Filter by status: all|completed|sent|scheduled"),
+    campaign_type: Optional[str] = Query(None, description="Filter by type: all|welcome|promotion|retention|reactivation"),
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    service_id: Optional[str] = Query(default=None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    """
+    Get paginated campaign list with impact metrics
+    Supports filtering by status and campaign_type
+    """
+    payload = get_campaign_list(
+        db,
+        status_filter=status,
+        campaign_type_filter=campaign_type,
+        start_date=start_date,
+        end_date=end_date,
+        service_id=service_id,
+        page=page,
+        limit=limit,
+    )
+    return payload
+
+
+@router.get("/overview")
+def get_campaigns_overview(
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    """
+    Get high-level campaign metrics summary
+    Returns total campaigns, conversions, targeted audience, etc.
+    """
+    overview = CampaignRepository.get_campaigns_overview(db)
+    return overview
+
+
+@router.get("/by-type")
+def get_campaigns_by_type(
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    """
+    Get campaign impact aggregated by campaign type
+    Breakdown: welcome, promotion, retention, reactivation
+    """
+    data = CampaignRepository.get_impact_by_type(db)
+    return {"by_type": data}
+
+
+@router.get("/top")
+def get_top_campaigns(
+    limit: int = Query(5, ge=1, le=20),
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    """
+    Get top campaigns by conversion rate
+    """
+    data = CampaignRepository.get_top_campaigns(db, limit=limit)
+    return {"top_campaigns": data}
+
+
+@router.get("/trend")
+def get_campaigns_trend(
+    db: Session = Depends(get_db),
+    user = Depends(get_current_user),
+):
+    """
+    Get monthly campaign trend
+    Aggregated metrics by month and campaign type
+    """
+    data = CampaignRepository.get_campaigns_monthly_trend(db)
+    return {"monthly_trend": data}
+
+
+# ============================================================================
+# EXISTING Campaign Endpoints (preserved for backward compatibility)
+# ============================================================================
 
 
 def _resolve_date_range(
@@ -20,35 +137,15 @@ def _resolve_date_range(
     end_date: Optional[date],
     service_id: Optional[str],
 ) -> tuple[date, date]:
-    # If the client does not send any date filter, use the full range
-    # from campaigns.send_datetime (or fallback to last 90d if empty DB).
-    if start_date is None and end_date is None:
-        sf = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        row = db.execute(
-            text(
-                f"""
-                SELECT
-                    MIN(DATE(send_datetime)) AS min_d,
-                    MAX(DATE(send_datetime)) AS max_d
-                FROM campaigns
-                {sf}
-                """
-            ),
-            {"service_id": service_id},
-        ).fetchone()
-        end_dt = row.max_d or date.today()
-        start_dt = row.min_d or (end_dt - timedelta(days=90))
-        return start_dt, end_dt
-
-    end_dt = end_date or date.today()
-    start_dt = start_date or (end_dt - timedelta(days=90))
-    return start_dt, end_dt
+    _ = db
+    _ = service_id
+    return resolve_date_range(start_date, end_date)
 
 
 @router.get("/kpis")
 def get_campaign_kpis(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -67,7 +164,15 @@ def get_campaign_kpis(
                     c.target_size,
                     COUNT(s.id) AS total_subs
                 FROM campaigns c
-                LEFT JOIN subscriptions s ON s.campaign_id = c.id
+                LEFT JOIN subscriptions s ON (
+                    s.campaign_id = c.id
+                    OR (
+                        s.service_id = c.service_id
+                        AND s.subscription_start_date BETWEEN
+                            c.send_datetime - INTERVAL '1 day'
+                            AND c.send_datetime + INTERVAL '7 days'
+                    )
+                )
                 WHERE DATE(c.send_datetime) >= :start_dt
                   AND DATE(c.send_datetime) <= :end_dt
                   {sf}
@@ -101,7 +206,15 @@ def get_campaign_kpis(
                 c.name AS campaign_name,
                 COUNT(s.id) AS total_subs
             FROM campaigns c
-            LEFT JOIN subscriptions s ON s.campaign_id = c.id
+            LEFT JOIN subscriptions s ON (
+                s.campaign_id = c.id
+                OR (
+                    s.service_id = c.service_id
+                    AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                )
+            )
             WHERE DATE(c.send_datetime) >= :start_dt
               AND DATE(c.send_datetime) <= :end_dt
               {sf}
@@ -126,7 +239,7 @@ def get_campaign_kpis(
 @router.get("/performance")
 def get_campaign_performance(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -148,7 +261,15 @@ def get_campaign_performance(
               ROUND(COUNT(s.id) FILTER (WHERE s.status = 'active')::numeric / NULLIF(c.target_size,0) * 100, 2) AS conv_rate,
               ROUND(AVG(co.retention_d7), 2) AS avg_d7
             FROM campaigns c
-            LEFT JOIN subscriptions s ON s.campaign_id = c.id
+            LEFT JOIN subscriptions s ON (
+                s.campaign_id = c.id
+                OR (
+                    s.service_id = c.service_id
+                    AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                )
+            )
             JOIN services sv ON sv.id = c.service_id
             LEFT JOIN cohorts co ON co.service_id = c.service_id
               AND co.cohort_date = date_trunc('month', c.send_datetime)::date
@@ -183,7 +304,7 @@ def get_campaign_performance(
 @router.get("/comparison")
 def get_campaign_comparison(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -201,7 +322,15 @@ def get_campaign_comparison(
                 COUNT(s.id) FILTER (WHERE s.status = 'active') AS active_subs,
                 ROUND(COUNT(s.id) FILTER (WHERE s.status = 'active')::numeric / NULLIF(c.target_size,0) * 100, 2) AS conv_rate
               FROM campaigns c
-              LEFT JOIN subscriptions s ON s.campaign_id = c.id
+              LEFT JOIN subscriptions s ON (
+                s.campaign_id = c.id
+                OR (
+                    s.service_id = c.service_id
+                    AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                )
+              )
               WHERE DATE(c.send_datetime) >= :start_dt
                 AND DATE(c.send_datetime) <= :end_dt
                 {sf}
@@ -215,7 +344,15 @@ def get_campaign_comparison(
               ROUND(AVG(co.retention_d7), 2) AS avg_d7
             FROM services sv
             JOIN campaigns c ON c.service_id = sv.id
-            LEFT JOIN subscriptions s ON s.campaign_id = c.id
+            LEFT JOIN subscriptions s ON (
+                s.campaign_id = c.id
+                OR (
+                    s.service_id = c.service_id
+                    AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                )
+            )
             LEFT JOIN per_campaign pc ON pc.id = c.id
             LEFT JOIN cohorts co ON co.service_id = c.service_id
               AND co.cohort_date = date_trunc('month', c.send_datetime)::date
@@ -246,30 +383,11 @@ def get_campaign_comparison(
 @router.get("/timeline")
 def get_campaign_timeline(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
-    # Timeline is based on subscriptions (campaign-linked vs organic) by month.
-    if start_date is None and end_date is None:
-        sf = "WHERE service_id = CAST(:service_id AS uuid)" if service_id else ""
-        row = db.execute(
-            text(
-                f"""
-                SELECT
-                    MIN(DATE(subscription_start_date)) AS min_d,
-                    MAX(DATE(subscription_start_date)) AS max_d
-                FROM subscriptions
-                {sf}
-                """
-            ),
-            {"service_id": service_id},
-        ).fetchone()
-        end_dt = row.max_d or date.today()
-        start_dt = row.min_d or (end_dt - timedelta(days=90))
-    else:
-        end_dt = end_date or date.today()
-        start_dt = start_date or (end_dt - timedelta(days=90))
+    start_dt, end_dt = resolve_date_range(start_date, end_date)
 
     params = {"start_dt": start_dt, "end_dt": end_dt, "service_id": service_id}
     sf = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
@@ -291,7 +409,19 @@ def get_campaign_timeline(
               FROM subscriptions s
               WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
                 AND s.subscription_start_date <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-                AND s.campaign_id IS NOT NULL
+                AND (
+                  -- Primary: has campaign_id
+                  s.campaign_id IS NOT NULL
+                  OR
+                  -- Fallback: matches date+service window of ANY campaign
+                  EXISTS (
+                    SELECT 1 FROM campaigns c
+                    WHERE s.service_id = c.service_id
+                      AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                  )
+                )
                 {sf}
               GROUP BY 1
             ),
@@ -302,7 +432,19 @@ def get_campaign_timeline(
               FROM subscriptions s
               WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
                 AND s.subscription_start_date <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-                AND s.campaign_id IS NULL
+                AND (
+                  -- No direct campaign_id link AND
+                  s.campaign_id IS NULL
+                  AND
+                  -- Does not match any campaign's date+service window
+                  NOT EXISTS (
+                    SELECT 1 FROM campaigns c
+                    WHERE s.service_id = c.service_id
+                      AND s.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+                  )
+                )
                 {sf}
               GROUP BY 1
             )

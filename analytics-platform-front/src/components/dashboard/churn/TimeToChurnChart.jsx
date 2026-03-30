@@ -10,6 +10,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts"
+import ChartContainer from "./ChartContainer"
 
 function Card({ title, subtitle, children }) {
   return (
@@ -45,7 +46,7 @@ export default function TimeToChurnChart({ data = [] }) {
       title="Time-to-Churn Distribution"
       subtitle="How fast users churn after subscribing"
     >
-      <div className="h-80 w-full min-w-0">
+      <ChartContainer className="h-80 w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%" minWidth="0" minHeight="0">
           <BarChart data={rows} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.12)" />
@@ -61,7 +62,7 @@ export default function TimeToChurnChart({ data = [] }) {
             <Bar dataKey="TECHNICAL" name="Technical" stackId="a" fill="#EF4444" />
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </ChartContainer>
     </Card>
   )
 }

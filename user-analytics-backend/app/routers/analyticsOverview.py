@@ -31,7 +31,7 @@ def get_summary(
     usage_week_start, usage_week_end = get_week_window(db, source="usage")
     usage_day_start, usage_day_end = get_day_window(db, source="usage")
     billing_month_start, billing_month_end = get_month_window(db, source="billing")
-    churn_month_start, churn_month_end = get_month_window(db, source="churn")
+    churn_month_start, churn_month_end = get_default_window(db, days=30, source="billing")
 
     params  = {
         "service_id": service_id,
@@ -85,7 +85,14 @@ def get_summary(
     """), params).fetchone()
 
     churn = db.execute(text(f"""
-        WITH churn_rows AS (
+                WITH active_start AS (
+                    SELECT COUNT(DISTINCT s.user_id) AS active_count
+                    FROM subscriptions s
+                    WHERE s.subscription_start_date <= :churn_month_start_dt
+                        AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :churn_month_start_dt)
+                        {sf_churn}
+                ),
+                churn_rows AS (
           SELECT
             s.id AS subscription_id,
             s.service_id,
@@ -106,6 +113,8 @@ def get_summary(
           LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
           WHERE COALESCE(u.unsubscription_datetime, s.subscription_end_date) IS NOT NULL
             AND s.status IN ('cancelled', 'expired')
+                        AND COALESCE(u.unsubscription_datetime, s.subscription_end_date)
+                                BETWEEN :churn_month_start_dt AND :churn_month_end_dt
             {sf_churn}
         )
         SELECT
@@ -123,30 +132,29 @@ def get_summary(
                 COUNT(*) FILTER (
                     WHERE churn_dt BETWEEN :churn_month_start_dt AND :churn_month_end_dt
                 ) * 100.0
-                / NULLIF((
-                    SELECT COUNT(*) FROM subscriptions WHERE status = 'active'
-                ), 0), 2
+                / NULLIF((SELECT active_count FROM active_start), 0), 2
             )                                                                AS churn_rate_month_pct
         FROM churn_rows
     """), params).fetchone()
 
     revenue = db.execute(text(f"""
         SELECT
-            ROUND(SUM(st.price) FILTER (WHERE be.status = 'SUCCESS'), 2)      AS total_revenue,
-            COUNT(*) FILTER (WHERE be.status = 'SUCCESS')                     AS success_events,
-            COUNT(*) FILTER (WHERE be.status = 'FAILED')                      AS failed_events,
-            ROUND(COUNT(*) FILTER (WHERE be.status = 'FAILED') * 100.0
+            ROUND(SUM(st.price) FILTER (WHERE LOWER(be.status) = 'success'), 2)      AS total_revenue,
+            COUNT(*) FILTER (WHERE LOWER(be.status) = 'success')                     AS success_events,
+            COUNT(*) FILTER (WHERE LOWER(be.status) = 'failed')                      AS failed_events,
+            COUNT(*) FILTER (WHERE LOWER(be.status) IN ('failed', 'cancelled', 'pending')) AS non_success_events,
+            ROUND(COUNT(*) FILTER (WHERE LOWER(be.status) = 'failed') * 100.0
                 / NULLIF(COUNT(*), 0), 1)                                     AS failed_pct,
             ROUND(SUM(st.price) FILTER (
-                WHERE be.status = 'SUCCESS'
+                WHERE LOWER(be.status) = 'success'
                 AND be.event_datetime BETWEEN :billing_month_start_dt AND :billing_month_end_dt
             ), 2)                                                              AS mrr,
             ROUND(
                 SUM(st.price) FILTER (
-                    WHERE be.status = 'SUCCESS'
+                    WHERE LOWER(be.status) = 'success'
                     AND be.event_datetime BETWEEN :billing_month_start_dt AND :billing_month_end_dt
-                ) / NULLIF(COUNT(DISTINCT be.user_id) FILTER (
-                    WHERE be.status = 'SUCCESS'
+                ) / NULLIF(COUNT(DISTINCT s.user_id) FILTER (
+                    WHERE LOWER(be.status) = 'success'
                     AND be.event_datetime BETWEEN :billing_month_start_dt AND :billing_month_end_dt
                 ), 0), 2
             )                                                                  AS arpu_current_month
@@ -175,6 +183,11 @@ def get_summary(
     dau        = engagement.dau_today         or 0
     mau        = engagement.mau_current_month or 0
     stickiness = round((dau / mau * 100), 1)  if mau > 0 else 0.0
+    failure_data_note = (
+        "N/A - aucun echec enregistre dans la source"
+        if int(revenue.non_success_events or 0) == 0 and int(revenue.success_events or 0) > 0
+        else None
+    )
 
     top_services = db.execute(text("""
         SELECT
@@ -226,7 +239,8 @@ def get_summary(
             "arpu_current_month": float(revenue.arpu_current_month or 0),
             "billing_success":    revenue.success_events,
             "billing_failed":     revenue.failed_events,
-            "failed_pct":         float(revenue.failed_pct         or 0),
+            "failed_pct":         None if failure_data_note else float(revenue.failed_pct or 0),
+            "failure_data_note":  failure_data_note,
         },
         "engagement": {
             "dau_today":         dau,
@@ -263,9 +277,14 @@ def get_overview(
     usage_month_start, usage_month_end = get_month_window(db, source="usage")
     data_anchor = get_data_anchor(db, source="billing")
 
+    churn_window_start = start_dt
+    churn_window_end = end_dt
+
     params = {
         "start_dt": start_dt,
         "end_dt": end_dt,
+        "churn_window_start_dt": churn_window_start,
+        "churn_window_end_dt": churn_window_end,
         "service_id": service_id,
         "usage_day_start_dt": usage_day_start,
         "usage_day_end_dt": usage_day_end,
@@ -318,7 +337,14 @@ def get_overview(
     """), params).fetchone()
 
     churn = db.execute(text(f"""
-        WITH churn_rows AS (
+                WITH active_start AS (
+                    SELECT COUNT(DISTINCT s.user_id) AS active_count
+                    FROM subscriptions s
+                    WHERE s.subscription_start_date <= :churn_window_start_dt
+                        AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :churn_window_start_dt)
+                        {sf_churn}
+                ),
+                churn_rows AS (
           SELECT
             s.id AS subscription_id,
             s.service_id,
@@ -339,7 +365,7 @@ def get_overview(
           LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
           WHERE COALESCE(u.unsubscription_datetime, s.subscription_end_date) IS NOT NULL
             AND s.status IN ('cancelled', 'expired')
-            AND COALESCE(u.unsubscription_datetime, s.subscription_end_date) BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+                        AND COALESCE(u.unsubscription_datetime, s.subscription_end_date) BETWEEN :churn_window_start_dt AND :churn_window_end_dt + INTERVAL '1 day'
             {sf_churn}
         )
         SELECT
@@ -355,32 +381,31 @@ def get_overview(
             COUNT(*) FILTER (WHERE days_since_subscription = 3)              AS dropoff_day3,
             ROUND(
                 COUNT(*) FILTER (
-                    WHERE churn_dt BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
+                    WHERE churn_dt BETWEEN :churn_window_start_dt AND :churn_window_end_dt + INTERVAL '1 day'
                 ) * 100.0
-                / NULLIF((
-                    SELECT COUNT(*) FROM subscriptions WHERE status = 'active'
-                ), 0), 2
+                / NULLIF((SELECT active_count FROM active_start), 0), 2
             )                                                                AS churn_rate_month_pct
         FROM churn_rows
     """), params).fetchone()
 
     revenue = db.execute(text(f"""
         SELECT
-            ROUND(SUM(st.price) FILTER (WHERE be.status = 'SUCCESS'), 2)      AS total_revenue,
-            COUNT(*) FILTER (WHERE be.status = 'SUCCESS')                     AS success_events,
-            COUNT(*) FILTER (WHERE be.status = 'FAILED')                      AS failed_events,
-            ROUND(COUNT(*) FILTER (WHERE be.status = 'FAILED') * 100.0
+            ROUND(SUM(st.price) FILTER (WHERE LOWER(be.status) = 'success'), 2)      AS total_revenue,
+            COUNT(*) FILTER (WHERE LOWER(be.status) = 'success')                     AS success_events,
+            COUNT(*) FILTER (WHERE LOWER(be.status) = 'failed')                      AS failed_events,
+            COUNT(*) FILTER (WHERE LOWER(be.status) IN ('failed', 'cancelled', 'pending')) AS non_success_events,
+            ROUND(COUNT(*) FILTER (WHERE LOWER(be.status) = 'failed') * 100.0
                 / NULLIF(COUNT(*), 0), 1)                                     AS failed_pct,
             ROUND(SUM(st.price) FILTER (
-                WHERE be.status = 'SUCCESS'
+                WHERE LOWER(be.status) = 'success'
                 AND be.event_datetime BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
             ), 2)                                                              AS mrr,
             ROUND(
                 SUM(st.price) FILTER (
-                    WHERE be.status = 'SUCCESS'
+                    WHERE LOWER(be.status) = 'success'
                     AND be.event_datetime BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
-                ) / NULLIF(COUNT(DISTINCT be.user_id) FILTER (
-                    WHERE be.status = 'SUCCESS'
+                ) / NULLIF(COUNT(DISTINCT s.user_id) FILTER (
+                    WHERE LOWER(be.status) = 'success'
                     AND be.event_datetime BETWEEN :start_dt AND :end_dt + INTERVAL '1 day'
                 ), 0), 2
             )                                                                  AS arpu_current_month
@@ -412,6 +437,11 @@ def get_overview(
     dau        = engagement.dau_today         or 0
     mau        = engagement.mau_current_month or 0
     stickiness = round((dau / mau * 100), 1)  if mau > 0 else 0.0
+    failure_data_note = (
+        "N/A - aucun echec enregistre dans la source"
+        if int(revenue.non_success_events or 0) == 0 and int(revenue.success_events or 0) > 0
+        else None
+    )
 
     top_services = db.execute(text(f"""
         SELECT
@@ -471,7 +501,8 @@ def get_overview(
             "arpu_current_month": float(revenue.arpu_current_month or 0),
             "billing_success":    revenue.success_events,
             "billing_failed":     revenue.failed_events,
-            "failed_pct":         float(revenue.failed_pct         or 0),
+            "failed_pct":         None if failure_data_note else float(revenue.failed_pct or 0),
+            "failure_data_note":  failure_data_note,
         },
         "engagement": {
             "dau_today":         dau,

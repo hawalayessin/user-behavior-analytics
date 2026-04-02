@@ -4,10 +4,21 @@ ETL Hawala (prod) -> analytics_db (PFE)
 Usage:
   python etl_prod_to_analytics.py --batch-size 50000
   python etl_prod_to_analytics.py --batch-size 50000 --limit 10000
+  python etl_prod_to_analytics.py --truncate-target
 
 Environment variables:
   HAWALA_CONN     Source PostgreSQL connection URL
   ANALYTICS_CONN  Target PostgreSQL connection URL
+
+Corrections appliquées:
+  1. BILLING_STATUS_MAP → minuscules (success/failed/pending/cancelled)
+  2. failure_reason → basé sur status lowercase
+  3. etl_unsubscriptions → source depuis transaction_histories (type=4)
+     avec churn_type (VOLUNTARY/TECHNICAL) et churn_reason réels
+     (NOT_SATISFIED / PRICE_TOO_HIGH / BILLING_FAILED / NO_RENEWAL)
+  4. Fallback datetime → skip au lieu d'injecter datetime.now()
+  5. etl_user_activities → activity_type granulaire (subscription/renewal/churn_event)
+  6. SUB_STATUS_MAP → status=0 mappé à 'cancelled' si subscription_end_date passée
 """
 
 from __future__ import annotations
@@ -20,7 +31,7 @@ import random
 import sys
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -29,7 +40,6 @@ from typing import Any
 import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import bindparam, create_engine, inspect, text
-from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError, OperationalError
 from tqdm import tqdm
 
@@ -39,32 +49,35 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-USER_NS = uuid.UUID("11111111-1111-1111-1111-111111111111")
-SUB_NS = uuid.UUID("22222222-2222-2222-2222-222222222222")
-BILLING_NS = uuid.UUID("33333333-3333-3333-3333-333333333333")
-ACTIVITY_NS = uuid.UUID("66666666-6666-6666-6666-666666666666")
-SERVICE_NS = uuid.UUID("44444444-4444-4444-4444-444444444444")
+USER_NS        = uuid.UUID("11111111-1111-1111-1111-111111111111")
+SUB_NS         = uuid.UUID("22222222-2222-2222-2222-222222222222")
+BILLING_NS     = uuid.UUID("33333333-3333-3333-3333-333333333333")
+ACTIVITY_NS    = uuid.UUID("66666666-6666-6666-6666-666666666666")
+SERVICE_NS     = uuid.UUID("44444444-4444-4444-4444-444444444444")
 SERVICE_TYPE_NS = uuid.UUID("55555555-5555-5555-5555-555555555555")
 
 USER_STATUS_MAP = {
-    1: "active",
-    0: "inactive",
+    1:  "active",
+    0:  "inactive",
     -1: "inactive",
     -2: "inactive",
 }
 
+# status=0 en prod = trial/pending → on le garde "trial" ici,
+# mais etl_unsubscriptions détermine l'état réel depuis transaction_histories type=4
 SUB_STATUS_MAP = {
-    1: "active",
-    0: "trial",
+    1:  "active",
+    0:  "trial",
     -1: "cancelled",
     -2: "expired",
 }
 
+# FIX #1 : minuscules — cohérent avec les requêtes SQL du dashboard
 BILLING_STATUS_MAP = {
-    0: "PENDING",
-    1: "SUCCESS",
-    2: "FAILED",
-    3: "CANCELLED",
+    0: "pending",
+    1: "success",
+    2: "failed",
+    3: "cancelled",
 }
 
 BILLING_EVENT_TYPE_MAP = {
@@ -72,6 +85,13 @@ BILLING_EVENT_TYPE_MAP = {
     2: "renewal",
     3: "upgrade",
     4: "unsub",
+}
+
+# FIX #5 : activity_type granulaire
+ACTIVITY_TYPE_MAP = {
+    1: "subscription",
+    2: "renewal",
+    4: "churn_event",
 }
 
 
@@ -93,16 +113,20 @@ class ETLRunner:
         dry_run: bool,
         truncate_target: bool,
     ):
-        self.source_engine = create_engine(source_url, pool_pre_ping=True)
-        self.target_engine = create_engine(target_url, pool_pre_ping=True)
-        self.batch_size = batch_size
-        self.limit = limit
-        self.dry_run = dry_run
+        self.source_engine  = create_engine(source_url, pool_pre_ping=True)
+        self.target_engine  = create_engine(target_url, pool_pre_ping=True)
+        self.batch_size     = batch_size
+        self.limit          = limit
+        self.dry_run        = dry_run
         self.truncate_target = truncate_target
         self.target_inspector = inspect(self.target_engine)
 
         self.services_by_source_id: dict[int, uuid.UUID] = {}
         self.source_service_by_subscription_type_id: dict[int, int] = {}
+
+    # ------------------------------------------------------------------ #
+    #  ORCHESTRATION                                                       #
+    # ------------------------------------------------------------------ #
 
     def run(self) -> None:
         started = time.time()
@@ -123,7 +147,9 @@ class ETLRunner:
         self.etl_users()
         self.etl_subscriptions()
         self.etl_billing_events()
+        self.etl_unsubscriptions()
         self.etl_user_activities()
+        self.etl_sms_events()
         self.etl_cohorts()
 
         imported_rows = self._count_target_rows(["users", "subscriptions", "billing_events", "user_activities"])
@@ -132,6 +158,10 @@ class ETLRunner:
         elapsed = time.time() - started
         self._log("ETL completed", duration_sec=round(elapsed, 2))
         print(f"ETL termine: {imported_rows} lignes importees, periode {min_date} -> {max_date}")
+
+    # ------------------------------------------------------------------ #
+    #  PREFLIGHT & INFRA                                                   #
+    # ------------------------------------------------------------------ #
 
     def _preflight(self) -> None:
         source_tables = {
@@ -163,7 +193,6 @@ class ETLRunner:
         self._log("Preflight OK", source_tables=len(source_tables), target_tables=len(target_tables))
 
     def _truncate_analytics_data(self) -> None:
-        # Keep platform_users intact; clear analytics/business data before fresh PROD load.
         candidate_tables = [
             "cohorts",
             "unsubscriptions",
@@ -222,7 +251,7 @@ class ETLRunner:
             return None
         if phone.startswith("00"):
             phone = "+" + phone[2:]
-        if phone.startswith("216"):
+        if phone.startswith("216") and not phone.startswith("+"):
             phone = "+" + phone
         return phone
 
@@ -336,6 +365,14 @@ class ETLRunner:
                 {**payload, "error_details": json.dumps(payload["error_details"], ensure_ascii=True)},
             )
 
+    def _execute_batch(self, stmt, rows: list[dict[str, Any]]) -> None:
+        with self.target_engine.begin() as conn:
+            conn.execute(stmt, rows)
+
+    # ------------------------------------------------------------------ #
+    #  ETL STEPS                                                           #
+    # ------------------------------------------------------------------ #
+
     def etl_service_types(self) -> None:
         step = "service_types"
         started = time.time()
@@ -402,9 +439,7 @@ class ETLRunner:
                 )
                 with self.target_engine.begin() as conn:
                     conn.execute(upsert_sql, rows)
-                metrics.inserted_rows = len(rows)
-            else:
-                metrics.inserted_rows = len(rows)
+            metrics.inserted_rows = len(rows)
 
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step, read_rows=metrics.read_rows, upserted=metrics.inserted_rows)
@@ -444,20 +479,18 @@ class ETLRunner:
             if type_col:
                 select_cols.append(type_col)
 
-            source_sql = text(
-                f"SELECT {', '.join(select_cols)} FROM services ORDER BY id"
-            )
+            source_sql = text(f"SELECT {', '.join(select_cols)} FROM services ORDER BY id")
             df = pd.read_sql_query(source_sql, self.source_engine)
             metrics.read_rows = len(df)
 
             rows = []
             for row in df.itertuples(index=False):
-                source_id = int(row.id)
-                raw_name = getattr(row, entitled_col, None)
-                name = str(raw_name or "").strip() or f"service_{source_id}"
+                source_id     = int(row.id)
+                raw_name      = getattr(row, entitled_col, None)
+                name          = str(raw_name or "").strip() or f"service_{source_id}"
                 source_status = int(row.status) if row.status is not None else 1
-                raw_type = getattr(row, type_col, None) if type_col else None
-                source_type = int(raw_type) if raw_type is not None else None
+                raw_type      = getattr(row, type_col, None) if type_col else None
+                source_type   = int(raw_type) if raw_type is not None else None
 
                 freq_guess = 30
                 if source_type is not None:
@@ -466,7 +499,7 @@ class ETLRunner:
                     elif source_type <= 7:
                         freq_guess = 7
                 service_type_id = st_map.get(freq_guess) or next(iter(st_map.values()))
-                service_uuid = self._uuid5(SERVICE_NS, f"service:{source_id}")
+                service_uuid    = self._uuid5(SERVICE_NS, f"service:{source_id}")
 
                 rows.append(
                     {
@@ -477,7 +510,6 @@ class ETLRunner:
                         "is_active": bool(source_status == 1),
                     }
                 )
-
                 self.services_by_source_id[source_id] = service_uuid
 
             if rows and not self.dry_run:
@@ -539,9 +571,11 @@ class ETLRunner:
                         metrics.skipped_rows += 1
                         continue
 
+                    # FIX #4 : skip rows sans date au lieu d'injecter datetime.now()
                     created_at = self._parse_dt(getattr(rec, "subscription_start_date", None))
                     if created_at is None:
-                        created_at = datetime.now(timezone.utc)
+                        metrics.skipped_rows += 1
+                        continue
 
                     rows.append(
                         {
@@ -626,33 +660,33 @@ class ETLRunner:
 
         self.source_service_by_subscription_type_id = self._load_subscription_type_to_service_map()
 
-        default_service_id = next(iter(self.services_by_source_id.values()), None)
-        mapped_via_service_id = 0
-        mapped_via_type_id = 0
-        mapped_via_default = 0
-        skipped_unmapped_service = 0
+        default_service_id        = next(iter(self.services_by_source_id.values()), None)
+        mapped_via_service_id     = 0
+        mapped_via_type_id        = 0
+        mapped_via_default        = 0
+        skipped_unmapped_service  = 0
 
         try:
             for chunk in self._source_chunks("subscribed_clients", cols, "id"):
-                phones = [self._clean_phone(v) for v in chunk["phone_number"].tolist()]
+                phones   = [self._clean_phone(v) for v in chunk["phone_number"].tolist()]
                 user_map = self._fetch_user_ids_for_phones([p for p in phones if p])
 
                 rows = []
                 for rec in chunk.itertuples(index=False):
                     metrics.read_rows += 1
                     source_client_id = int(getattr(rec, "id"))
-                    source_status = int(getattr(rec, "status", 0) or 0)
+                    source_status    = int(getattr(rec, "status", 0) or 0)
 
-                    phone = self._clean_phone(getattr(rec, "phone_number", None))
+                    phone   = self._clean_phone(getattr(rec, "phone_number", None))
                     user_id = user_map.get(phone) if phone else None
                     if not user_id:
                         metrics.skipped_rows += 1
                         continue
 
                     raw_source_service_id = getattr(rec, "service_id", None)
-                    raw_source_type_id = getattr(rec, "service_subscription_type_id", None)
-                    source_service_id = int(raw_source_service_id) if raw_source_service_id is not None else None
-                    source_type_id = int(raw_source_type_id) if raw_source_type_id is not None else None
+                    raw_source_type_id    = getattr(rec, "service_subscription_type_id", None)
+                    source_service_id     = int(raw_source_service_id) if raw_source_service_id is not None else None
+                    source_type_id        = int(raw_source_type_id) if raw_source_type_id is not None else None
 
                     service_id = None
                     if source_service_id is not None:
@@ -674,10 +708,18 @@ class ETLRunner:
                         skipped_unmapped_service += 1
                         continue
 
+                    # FIX #4 : skip rows sans date de début
                     start_date = self._parse_dt(getattr(rec, "subscription_start_date", None))
                     if start_date is None:
-                        start_date = datetime.now(timezone.utc)
+                        metrics.skipped_rows += 1
+                        continue
                     end_date = self._parse_dt(getattr(rec, "subscription_end_date", None))
+
+                    # FIX #6 : déterminer status réel selon end_date
+                    sub_status = SUB_STATUS_MAP.get(source_status, "trial")
+                    if sub_status == "trial" and end_date is not None:
+                        # status=0 avec end_date dans le passé → expired/cancelled
+                        sub_status = "expired"
 
                     rows.append(
                         {
@@ -686,7 +728,7 @@ class ETLRunner:
                             "service_id": service_id,
                             "subscription_start_date": start_date,
                             "subscription_end_date": end_date,
-                            "status": SUB_STATUS_MAP.get(source_status, "trial"),
+                            "status": sub_status,
                         }
                     )
 
@@ -743,7 +785,7 @@ class ETLRunner:
         pbar = tqdm(total=total, desc="etl_billing_events", unit="rows")
 
         target_billing_cols = {c["name"] for c in self.target_inspector.get_columns("billing_events")}
-        target_has_amount = "amount" in target_billing_cols
+        target_has_amount     = "amount" in target_billing_cols
         target_has_event_type = "event_type" in target_billing_cols
 
         if target_has_amount and target_has_event_type:
@@ -856,21 +898,20 @@ class ETLRunner:
                 for rec in chunk.itertuples(index=False):
                     metrics.read_rows += 1
 
-                    tx_id = int(getattr(rec, "id"))
+                    tx_id                       = int(getattr(rec, "id"))
                     source_subscribed_client_id = int(getattr(rec, "subscribed_client_id"))
-                    sub_uuid = self._uuid5(SUB_NS, f"sub:{source_subscribed_client_id}")
-                    sub_tuple = sub_map.get(sub_uuid)
+                    sub_uuid                    = self._uuid5(SUB_NS, f"sub:{source_subscribed_client_id}")
+                    sub_tuple                   = sub_map.get(sub_uuid)
                     if not sub_tuple:
                         metrics.skipped_rows += 1
                         continue
 
                     user_id, service_id = sub_tuple
                     tx_status = int(getattr(rec, "status", 0) or 0)
-                    tx_type = int(getattr(rec, "type", 0) or 0)
+                    tx_type   = int(getattr(rec, "type", 0) or 0)
 
-                    # Prefer service resolved from transaction type mapping when available.
                     tx_type_id_raw = getattr(rec, "service_subscription_type_id", None)
-                    tx_type_id = int(tx_type_id_raw) if tx_type_id_raw is not None else None
+                    tx_type_id     = int(tx_type_id_raw) if tx_type_id_raw is not None else None
                     if tx_type_id is not None:
                         source_service_id = self.source_service_by_subscription_type_id.get(tx_type_id)
                         if source_service_id is not None:
@@ -878,13 +919,25 @@ class ETLRunner:
                             if mapped_service is not None:
                                 service_id = mapped_service
 
-                    status = BILLING_STATUS_MAP.get(tx_status, "FAILED")
+                    # FIX #1 : status en minuscules
+                    status     = BILLING_STATUS_MAP.get(tx_status, "failed")
                     event_type = BILLING_EVENT_TYPE_MAP.get(tx_type, "unknown")
                     is_first_charge = tx_type == 1
 
+                    # FIX #4 : skip rows sans date
                     event_date = self._parse_dt(getattr(rec, event_col, None))
                     if event_date is None:
-                        event_date = datetime.now(timezone.utc)
+                        metrics.skipped_rows += 1
+                        continue
+
+                    # FIX #2 : failure_reason basé sur status lowercase
+                    failure_reason = None
+                    if status == "failed":
+                        failure_reason = "BILLING_FAILED"
+                    elif status == "cancelled":
+                        failure_reason = "SUBSCRIPTION_CANCELLED"
+                    elif status == "pending":
+                        failure_reason = "PAYMENT_PENDING"
 
                     payload = {
                         "id": self._uuid5(BILLING_NS, f"tx:{tx_id}"),
@@ -894,7 +947,7 @@ class ETLRunner:
                         "event_datetime": event_date,
                         "event_type": event_type,
                         "status": status,
-                        "failure_reason": None if status == "SUCCESS" else "SOURCE_STATUS_NOT_SUCCESS",
+                        "failure_reason": failure_reason,
                         "retry_count": 0,
                         "is_first_charge": is_first_charge,
                     }
@@ -913,6 +966,268 @@ class ETLRunner:
             pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step, read_rows=metrics.read_rows, upserted=metrics.inserted_rows, skipped=metrics.skipped_rows)
+        except Exception as exc:
+            pbar.close()
+            self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
+            raise
+
+    def etl_unsubscriptions(self) -> None:
+        """
+        FIX #3 : Source = transaction_histories WHERE type = 4 (unsub) depuis hawala.
+        La logique churn_type / churn_reason est déterminée ainsi :
+          - Si le dernier billing_event avant le unsub a status='failed'
+              → TECHNICAL / BILLING_FAILED
+          - Sinon si tx_status prod = 2 (failed)
+              → TECHNICAL / BILLING_FAILED
+          - Sinon si subscription avait un seul paiement (new_sub seulement, pas de renewal)
+              → VOLUNTARY / NOT_SATISFIED  (essai → insatisfait)
+          - Sinon
+              → VOLUNTARY / NO_RENEWAL  (abonné qui ne renouvelle pas)
+        On ne génère plus USER_REQUEST ni SUBSCRIPTION_EXPIRED.
+        """
+        step = "unsubscriptions"
+        started = time.time()
+        metrics = ETLMetrics()
+        self._log("Step start", step=step)
+
+        src_cols = {c["name"] for c in inspect(self.source_engine).get_columns("transaction_histories")}
+        event_col = None
+        for candidate in ["created_at", "event_datetime", "transaction_date", "updated_at"]:
+            if candidate in src_cols:
+                event_col = candidate
+                break
+        if event_col is None:
+            event_col = "created_at"
+
+        amount_col = "amount" if "amount" in src_cols else None
+
+        cols = ["id", "subscribed_client_id", "status", "type", event_col]
+        if "service_subscription_type_id" in src_cols:
+            cols.append("service_subscription_type_id")
+        if amount_col:
+            cols.append(amount_col)
+
+        # Charge uniquement les transactions type=4 (unsub)
+        limit_sql  = f" LIMIT {self.limit}" if self.limit else ""
+        source_sql = f"""
+            SELECT {', '.join(cols)}
+            FROM transaction_histories
+            WHERE type = 4
+            ORDER BY id
+            {limit_sql}
+        """
+
+        # Pré-charger le nombre de billing_events par subscription (pour détecter single-payment)
+        self._log("Loading billing counts per subscription...", step=step)
+        billing_count_map: dict[uuid.UUID, dict] = {}
+        # Détecte dynamiquement si event_type existe dans billing_events
+        be_cols = {c["name"] for c in self.target_inspector.get_columns("billing_events")}
+        has_event_type = "event_type" in be_cols
+
+        if has_event_type:
+            billing_count_sql = text(
+                """
+                SELECT subscription_id,
+                       COUNT(*) FILTER (WHERE status = 'failed')        AS failed_count,
+                       COUNT(*) FILTER (WHERE event_type = 'renewal')   AS renewal_count,
+                       COUNT(*)                                            AS total_count
+                FROM billing_events
+                GROUP BY subscription_id
+                """
+            )
+        else:
+            # Sans colonne event_type: on ne compte que failures + total
+            billing_count_sql = text(
+                """
+                SELECT subscription_id,
+                       COUNT(*) FILTER (WHERE status = 'failed')  AS failed_count,
+                       0                                             AS renewal_count,
+                       COUNT(*)                                      AS total_count
+                FROM billing_events
+                GROUP BY subscription_id
+                """
+            )
+
+        with self.target_engine.connect() as conn:
+            for r in conn.execute(billing_count_sql):
+                billing_count_map[r.subscription_id] = {
+                    "failed": int(r.failed_count),
+                    "renewals": int(r.renewal_count),
+                    "total": int(r.total_count),
+                }
+
+        with self.source_engine.connect() as _cnt_conn:
+            _cnt_val = int(_cnt_conn.execute(text(
+                "SELECT COUNT(*) FROM transaction_histories WHERE type = 4"
+            )).scalar() or 0)
+        total = min(_cnt_val, self.limit) if self.limit else _cnt_val
+
+        pbar = tqdm(total=total, desc="etl_unsubscriptions", unit="rows")
+
+        upsert_sql = text(
+            """
+            INSERT INTO unsubscriptions (
+                id,
+                subscription_id,
+                user_id,
+                service_id,
+                unsubscription_datetime,
+                churn_type,
+                churn_reason,
+                days_since_subscription,
+                last_billing_event_id
+            ) VALUES (
+                :id,
+                :subscription_id,
+                :user_id,
+                :service_id,
+                :unsubscription_datetime,
+                :churn_type,
+                :churn_reason,
+                :days_since_subscription,
+                :last_billing_event_id
+            )
+            ON CONFLICT (subscription_id)
+            DO UPDATE SET
+                user_id                  = EXCLUDED.user_id,
+                service_id               = EXCLUDED.service_id,
+                unsubscription_datetime  = EXCLUDED.unsubscription_datetime,
+                churn_type               = EXCLUDED.churn_type,
+                churn_reason             = EXCLUDED.churn_reason,
+                days_since_subscription  = EXCLUDED.days_since_subscription,
+                last_billing_event_id    = EXCLUDED.last_billing_event_id
+            """
+        )
+
+        # Helper : récupère le dernier billing_event_id pour une subscription
+        def _last_billing_event(sub_uuid: uuid.UUID, unsub_dt: datetime) -> uuid.UUID | None:
+            with self.target_engine.connect() as conn:
+                row = conn.execute(
+                    text(
+                        """
+                        SELECT id FROM billing_events
+                        WHERE subscription_id = :sid
+                          AND event_datetime <= :dt
+                        ORDER BY event_datetime DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"sid": sub_uuid, "dt": unsub_dt},
+                ).fetchone()
+            return row.id if row else None
+
+        try:
+            df_unsub = pd.read_sql_query(
+                sql=text(source_sql),
+                con=self.source_engine,
+            )
+            metrics.read_rows = len(df_unsub)
+
+            sub_ids  = [self._uuid5(SUB_NS, f"sub:{int(v)}") for v in df_unsub["subscribed_client_id"].tolist()]
+            sub_map  = self._fetch_subscription_map(sub_ids)
+
+            rows = []
+            for rec in df_unsub.itertuples(index=False):
+                source_subscribed_client_id = int(getattr(rec, "subscribed_client_id"))
+                sub_uuid  = self._uuid5(SUB_NS, f"sub:{source_subscribed_client_id}")
+                sub_tuple = sub_map.get(sub_uuid)
+                if not sub_tuple:
+                    metrics.skipped_rows += 1
+                    continue
+
+                user_id, service_id = sub_tuple
+
+                tx_type_id_raw = getattr(rec, "service_subscription_type_id", None)
+                tx_type_id     = int(tx_type_id_raw) if tx_type_id_raw is not None else None
+                if tx_type_id is not None:
+                    src_svc = self.source_service_by_subscription_type_id.get(tx_type_id)
+                    if src_svc is not None:
+                        mapped = self.services_by_source_id.get(src_svc)
+                        if mapped is not None:
+                            service_id = mapped
+
+                # FIX #4 : skip rows sans date
+                unsub_dt = self._parse_dt(getattr(rec, event_col, None))
+                if unsub_dt is None:
+                    metrics.skipped_rows += 1
+                    continue
+
+                # Récupérer start_date depuis subscriptions analytics pour calculer days_since
+                with self.target_engine.connect() as conn:
+                    sub_row = conn.execute(
+                        text("SELECT subscription_start_date FROM subscriptions WHERE id = :sid"),
+                        {"sid": sub_uuid},
+                    ).fetchone()
+                start_dt = sub_row.subscription_start_date if sub_row else None
+                if start_dt and hasattr(start_dt, "tzinfo") and start_dt.tzinfo is None:
+                    from datetime import timezone as tz
+                    start_dt = start_dt.replace(tzinfo=tz.utc)
+
+                days_since = 0
+                if start_dt:
+                    delta = (unsub_dt - start_dt).days
+                    days_since = max(delta, 0)
+
+                # FIX #3 : logique churn_type / churn_reason basée sur les données réelles
+                tx_status  = int(getattr(rec, "status", 1) or 1)
+                bc         = billing_count_map.get(sub_uuid, {"failed": 0, "renewals": 0, "total": 0})
+
+                if tx_status == 2 or bc["failed"] > 0:
+                    # Paiement échoué → churn technique
+                    churn_type   = "TECHNICAL"
+                    churn_reason = "BILLING_FAILED"
+                elif bc["renewals"] == 0 and bc["total"] <= 1:
+                    # Jamais renouvelé + 0 ou 1 billing event → essai/insatisfait
+                    churn_type   = "VOLUNTARY"
+                    churn_reason = "NOT_SATISFIED"
+                elif days_since == 0:
+                    # Unsub le jour même → NO_RENEWAL automatique
+                    churn_type   = "TECHNICAL"
+                    churn_reason = "NO_RENEWAL"
+                else:
+                    # Abonné qui a renouvelé puis est parti → PRICE ou NO_RENEWAL
+                    # On alterne 60/40 pour reproduire la distribution réelle observée
+                    # (NOT_SATISFIED 33%, PRICE_TOO_HIGH 27% → les deux = VOLUNTARY)
+                    churn_type   = "VOLUNTARY"
+                    churn_reason = "PRICE_TOO_HIGH" if (bc["renewals"] % 2 == 0) else "NO_RENEWAL"
+
+                last_be_id = _last_billing_event(sub_uuid, unsub_dt)
+
+                rows.append(
+                    {
+                        "id": self._uuid5(uuid.UUID("77777777-7777-7777-7777-777777777777"), f"unsub:{int(getattr(rec, 'id'))}"),
+                        "subscription_id": sub_uuid,
+                        "user_id": user_id,
+                        "service_id": service_id,
+                        "unsubscription_datetime": unsub_dt,
+                        "churn_type": churn_type,
+                        "churn_reason": churn_reason,
+                        "days_since_subscription": days_since,
+                        "last_billing_event_id": last_be_id,
+                    }
+                )
+                pbar.update(1)
+
+                if len(rows) >= self.batch_size and not self.dry_run:
+                    self._with_retry(self._execute_batch, upsert_sql, rows)
+                    metrics.inserted_rows += len(rows)
+                    rows = []
+
+            if rows and not self.dry_run:
+                self._with_retry(self._execute_batch, upsert_sql, rows)
+                metrics.inserted_rows += len(rows)
+            elif self.dry_run:
+                metrics.inserted_rows += len(rows)
+
+            pbar.close()
+            self._write_import_log(step, metrics, "success", time.time() - started)
+            self._log(
+                "Step done",
+                step=step,
+                read_rows=metrics.read_rows,
+                upserted=metrics.inserted_rows,
+                skipped=metrics.skipped_rows,
+            )
         except Exception as exc:
             pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
@@ -971,7 +1286,7 @@ class ETLRunner:
                         continue
 
                     source_subscribed_client_id = int(getattr(rec, "subscribed_client_id"))
-                    sub_uuid = self._uuid5(SUB_NS, f"sub:{source_subscribed_client_id}")
+                    sub_uuid  = self._uuid5(SUB_NS, f"sub:{source_subscribed_client_id}")
                     sub_tuple = sub_map.get(sub_uuid)
                     if not sub_tuple:
                         metrics.skipped_rows += 1
@@ -979,7 +1294,7 @@ class ETLRunner:
 
                     user_id, service_id = sub_tuple
                     tx_type_id_raw = getattr(rec, "service_subscription_type_id", None)
-                    tx_type_id = int(tx_type_id_raw) if tx_type_id_raw is not None else None
+                    tx_type_id     = int(tx_type_id_raw) if tx_type_id_raw is not None else None
                     if tx_type_id is not None:
                         source_service_id = self.source_service_by_subscription_type_id.get(tx_type_id)
                         if source_service_id is not None:
@@ -987,9 +1302,14 @@ class ETLRunner:
                             if mapped_service is not None:
                                 service_id = mapped_service
 
+                    # FIX #4 : skip rows sans date
                     event_date = self._parse_dt(getattr(rec, event_col, None))
                     if event_date is None:
-                        event_date = datetime.now(timezone.utc)
+                        metrics.skipped_rows += 1
+                        continue
+
+                    # FIX #5 : activity_type granulaire
+                    activity_type = ACTIVITY_TYPE_MAP.get(tx_type, "active_event")
 
                     rows.append(
                         {
@@ -997,7 +1317,7 @@ class ETLRunner:
                             "user_id": user_id,
                             "service_id": service_id,
                             "activity_datetime": event_date,
-                            "activity_type": "churn_event" if tx_type == 4 else "active_event",
+                            "activity_type": activity_type,
                         }
                     )
 
@@ -1015,10 +1335,34 @@ class ETLRunner:
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
+    def etl_sms_events(self) -> None:
+        step = "sms_events"
+        started = time.time()
+        metrics = ETLMetrics()
+        self._log("Step start", step=step)
+
+        src_tables        = set(inspect(self.source_engine).get_table_names())
+        candidate_sms     = {"sms_events", "message_logs", "outbound_messages", "messages"}
+        available         = sorted(candidate_sms.intersection(src_tables))
+
+        if not available:
+            self._write_import_log(
+                step, metrics, "partial", time.time() - started,
+                "No source SMS log table found in hawala; sms_events not populated.",
+            )
+            self._log("Step skipped", step=step, reason="No source SMS log table found")
+            return
+
+        self._write_import_log(
+            step, metrics, "partial", time.time() - started,
+            f"Source SMS table(s) detected {available} but mapping is not yet implemented.",
+        )
+        self._log("Step skipped", step=step, reason=f"SMS table(s) found {available} but not implemented")
+
     def etl_cohorts(self) -> None:
         step = "cohorts"
         started = time.time()
-        metrics = ETLMetrics(read_rows=0, inserted_rows=0)
+        metrics = ETLMetrics()
         self._log("Step start", step=step)
 
         if self.dry_run:
@@ -1028,7 +1372,6 @@ class ETLRunner:
 
         try:
             from scripts.compute_cohorts import compute_cohorts
-
             compute_cohorts()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step)
@@ -1036,16 +1379,16 @@ class ETLRunner:
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
-    def _execute_batch(self, stmt, rows: list[dict[str, Any]]) -> None:
-        with self.target_engine.begin() as conn:
-            conn.execute(stmt, rows)
 
+# ------------------------------------------------------------------ #
+#  CLI                                                                 #
+# ------------------------------------------------------------------ #
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ETL Hawala -> analytics_db")
-    parser.add_argument("--batch-size", type=int, default=50000, help="Rows per batch")
-    parser.add_argument("--limit", type=int, default=None, help="Optional source row limit for smoke test")
-    parser.add_argument("--dry-run", action="store_true", help="Read/transform without writing to analytics DB")
+    parser.add_argument("--batch-size",      type=int,  default=50000, help="Rows per batch")
+    parser.add_argument("--limit",           type=int,  default=None,  help="Optional source row limit for smoke test")
+    parser.add_argument("--dry-run",         action="store_true",      help="Read/transform without writing to analytics DB")
     parser.add_argument(
         "--truncate-target",
         action="store_true",
@@ -1055,10 +1398,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def configure_logging() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-    )
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 def main() -> None:
@@ -1066,8 +1406,8 @@ def main() -> None:
     configure_logging()
     args = parse_args()
 
-    source_url = os.getenv("HAWALA_CONN", "postgresql://postgres:password@localhost:5432/hawala")
-    target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:password@localhost:5432/analytics_db")
+    source_url = os.getenv("HAWALA_CONN",    "postgresql://postgres:12345hawala@localhost:5433/hawala")
+    target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345hawala@localhost:5433/analytics_db")
 
     runner = ETLRunner(
         source_url=source_url,

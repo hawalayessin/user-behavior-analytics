@@ -11,7 +11,7 @@ from app.routers import auth
 from app.routers import platform_user
 from app.routers import service
 from app.routers import userActivity
-from app.routers import trialAnalytics 
+from app.routers import trialAnalytics
 from app.routers import retention
 from app.routers import admin_import
 from app.routers import campaign_impact
@@ -19,6 +19,7 @@ from app.routers import churn_analysis
 from app.routers import management
 from app.routers import ml_churn
 from app.routers import cross_service
+from app.routers import segmentation
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
@@ -80,7 +81,7 @@ app.include_router(analyticsOverview.router)
 app.include_router(platform_user.router, prefix="/platform-users", tags=["Platform Users"])
 app.include_router(service.router)
 app.include_router(userActivity.router)
-app.include_router(trialAnalytics.router) 
+app.include_router(trialAnalytics.router)
 app.include_router(retention.router)
 app.include_router(admin_import.router)
 app.include_router(campaign_impact.router)
@@ -88,6 +89,7 @@ app.include_router(churn_analysis.router)
 app.include_router(management.router)
 app.include_router(ml_churn.router)
 app.include_router(cross_service.router)
+app.include_router(segmentation.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

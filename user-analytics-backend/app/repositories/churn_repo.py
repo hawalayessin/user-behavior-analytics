@@ -93,20 +93,65 @@ def get_global_churn_rate(db: Session, start_date: date | datetime | None = None
     total_ever = db.query(func.count(Subscription.id)).scalar() or 1
     snapshot_rate = round(churned_ever / total_ever * 100, 2)
 
-    base_exposed = (
-        db.query(func.count(Subscription.id))
-        .filter(Subscription.subscription_start_date <= end)
-        .scalar()
-        or 1
-    )
-    period_rate = round(churned / base_exposed * 100, 2)
+    monthly_metrics = _compute_monthly_churn_metrics(db, start_date, end_date)
 
     return {
         "global_churn_rate": snapshot_rate,
-        "monthly_churn_rate": period_rate,
+        "monthly_churn_rate": float(monthly_metrics["churn_rate"]),
         "churned_total": churned_ever,
         "total_subscriptions": total_ever,
-        "period_churned": churned,
+        "period_churned": int(monthly_metrics["unsub_count"]),
+        "period_base": int(monthly_metrics["active_count"]),
+    }
+
+
+def _compute_monthly_churn_metrics(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+) -> dict[str, Any]:
+    if start_date is None or end_date is None:
+        period_start, period_end = get_default_window(db, days=30, source="billing")
+    else:
+        period_start, period_end = _normalize_range(db, start_date, end_date, source="billing")
+
+    row = db.execute(
+        text(
+            """
+            WITH unsubs AS (
+                SELECT COUNT(*) AS cnt
+                FROM unsubscriptions u
+                WHERE u.unsubscription_datetime >= :start_dt
+                  AND u.unsubscription_datetime <= :end_dt
+            ),
+            active_start AS (
+                SELECT COUNT(DISTINCT s.user_id) AS cnt
+                FROM subscriptions s
+                WHERE s.subscription_start_date <= :start_dt
+                  AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :start_dt)
+            )
+            SELECT
+                unsubs.cnt AS unsub_count,
+                active_start.cnt AS active_count,
+                CASE
+                    WHEN active_start.cnt > 0 THEN ROUND(unsubs.cnt * 100.0 / active_start.cnt, 2)
+                    ELSE 0
+                END AS churn_rate
+            FROM unsubs, active_start
+            """
+        ),
+        {"start_dt": period_start, "end_dt": period_end},
+    ).fetchone()
+
+    if not row:
+        return {"start": period_start, "end": period_end, "unsub_count": 0, "active_count": 0, "churn_rate": 0.0}
+
+    return {
+        "start": period_start,
+        "end": period_end,
+        "unsub_count": int(row.unsub_count or 0),
+        "active_count": int(row.active_count or 0),
+        "churn_rate": float(row.churn_rate or 0),
     }
 
 
@@ -318,11 +363,11 @@ def get_monthly_churn_rate(
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
 ) -> dict[str, Any]:
-    metrics = get_global_churn_rate(db, start_date, end_date)
+    metrics = _compute_monthly_churn_metrics(db, start_date, end_date)
     return {
-        "rate": float(metrics.get("monthly_churn_rate", 0) or 0),
-        "churned": int(metrics.get("period_churned", 0) or 0),
-        "total": int(metrics.get("total_subscriptions", 0) or 0),
+        "rate": float(metrics.get("churn_rate", 0) or 0),
+        "churned": int(metrics.get("unsub_count", 0) or 0),
+        "total": int(metrics.get("active_count", 0) or 0),
     }
 
 
@@ -331,6 +376,8 @@ def get_churn_breakdown(
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
 ) -> dict[str, Any]:
+    if start_date is None or end_date is None:
+        start_date, end_date = get_default_window(db, days=30, source="billing")
     breakdown = get_voluntary_vs_technical_churn(db, start_date, end_date)
     voluntary_count = int(breakdown.get("voluntary_count", 0) or 0)
     technical_count = int(breakdown.get("technical_count", 0) or 0)

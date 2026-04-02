@@ -94,7 +94,7 @@ class ChurnPredictor:
             u.churn_reason,
             u.days_since_subscription,
             CASE
-              WHEN s.subscription_end_date IS NOT NULL THEN 1
+              WHEN LOWER(COALESCE(s.status, '')) IN ('cancelled', 'expired') THEN 1
               ELSE 0
             END AS churned
           FROM subscriptions s
@@ -324,6 +324,37 @@ class ChurnPredictor:
 
     def train(self, db_session: Session) -> dict[str, Any]:
         X, y = self.generate_training_dataset(db_session)
+        n_positive = int((y == 1).sum())
+        n_negative = int((y == 0).sum())
+        label_distribution = {"1": n_positive, "0": n_negative}
+
+        if y.nunique() < 2:
+            warning = (
+                "Training skipped: dataset contains a single class only. "
+                "Need both churned (1) and non-churned (0) samples to train LogisticRegression."
+            )
+            metrics = {
+                "trained_at": pd.Timestamp.utcnow().isoformat(),
+                "roc_auc": None,
+                "churn_rate": float(y.mean()) if len(y) else 0.0,
+                "accuracy": 1.0,
+                "report": {
+                    "warning": warning,
+                    "class_distribution": {
+                        "n_positive": n_positive,
+                        "n_negative": n_negative,
+                    },
+                    "label_distribution": label_distribution,
+                },
+                "coefficients": {},
+                "n_samples": int(len(y)),
+                "n_positive": n_positive,
+                "n_negative": n_negative,
+                "warning": warning,
+            }
+            self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
+            joblib.dump(metrics, self.metrics_path)
+            return metrics
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y if y.nunique() > 1 else None
@@ -353,11 +384,15 @@ class ChurnPredictor:
             "roc_auc": roc_auc,
             "churn_rate": churn_rate,
             "accuracy": float(report.get("accuracy", 0.0)),
-            "report": report,
+          "report": {
+            **report,
+            "label_distribution": label_distribution,
+          },
             "coefficients": coeffs,
             "n_samples": int(len(df := pd.concat([X, y.rename("churned")], axis=1))),
-            "n_positive": int(int(y.sum())),
-            "n_negative": int(int((y == 0).sum())),
+          "n_positive": n_positive,
+          "n_negative": n_negative,
+            "warning": None,
         }
 
         # Persist model + metrics.

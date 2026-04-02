@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.repositories import churn_repo
-from app.utils.temporal import get_month_window
+from app.utils.temporal import get_default_window
 
 
 _DASHBOARD_CACHE_TTL_SECONDS = 30
@@ -23,7 +23,7 @@ def get_churn_dashboard(
     """Retourne tous les KPIs + données charts pour le dashboard churn."""
 
     if not start_date or not end_date:
-        start_date, end_date = get_month_window(db)
+        start_date, end_date = get_default_window(db, days=30, source="billing")
 
     cache_key = (start_date.isoformat(), end_date.isoformat())
     cached = _dashboard_cache.get(cache_key)

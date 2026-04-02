@@ -69,8 +69,8 @@ export const navigationConfig = [
         route: '/analytics/churn-prediction',
       },
       {
-        label: 'Segmentation',
-        icon: PieChart,
+        label: 'User Segmentation',
+        icon: Users,
         route: '/analytics/segmentation',
       },
     ],

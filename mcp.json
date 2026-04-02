@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "postgresql-mcp-henkdz": {
+      "command": "npx",
+      "args": [
+        "@henkey/postgres-mcp-server",
+        "--connection-string",
+        "postgresql://postgres:12345hawala@localhost:5433/analytics_db"
+      ]
+    },
+    "postgresql-mcp-hawala": {
+      "command": "npx",
+      "args": [
+        "@henkey/postgres-mcp-server",
+        "--connection-string",
+        "postgresql://postgres:12345hawala@localhost:5433/hawala"
+      ]
+    }
+  }
+}

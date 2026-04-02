@@ -15,6 +15,7 @@ import CampaignImpactPage from './pages/dashboard/CampaignImpactPage'
 import ChurnAnalysisPage from './pages/dashboard/ChurnAnalysisPage'
 import AIChurnInsights from './pages/dashboard/AIChurnInsights'
 import CrossServiceBehaviorPage from './pages/dashboard/CrossServiceBehaviorPage'
+import UserSegmentationPage from './pages/dashboard/UserSegmentationPage'
 import ManagementPage from './pages/admin/ManagementPage'
 
 function App() {
@@ -62,7 +63,7 @@ function App() {
           />
           <Route
             path="/analytics/segmentation"
-            element={<PrivateRoute><div className="min-h-screen text-slate-200 p-10">Segmentation (coming soon)</div></PrivateRoute>}
+            element={<PrivateRoute><UserSegmentationPage /></PrivateRoute>}
           />
           <Route
             path="/management/subscribers"

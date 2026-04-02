@@ -26,3 +26,4 @@ dist/
 
 # Secrets
 *.sqlite3
+.agents/

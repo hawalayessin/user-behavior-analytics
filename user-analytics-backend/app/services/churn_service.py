@@ -32,6 +32,7 @@ def get_churn_dashboard(
         return cached[1]
 
     global_metrics = churn_repo.get_global_churn_rate(db, start_date, end_date)
+    monthly_metrics = churn_repo.get_monthly_churn_rate(db, start_date, end_date)
     avg_lifetime_days = churn_repo.get_avg_lifetime_days(db, start_date, end_date)
     churn_breakdown = churn_repo.get_churn_breakdown(db, start_date, end_date)
 
@@ -43,9 +44,10 @@ def get_churn_dashboard(
                 "total": int(global_metrics.get("total_subscriptions", 0) or 0),
             },
             "monthly_churn_rate": {
-                "rate": float(global_metrics.get("monthly_churn_rate", 0) or 0),
-                "churned": int(global_metrics.get("period_churned", 0) or 0),
-                "total": int(global_metrics.get("total_subscriptions", 0) or 0),
+                "rate": float(monthly_metrics.get("rate", 0) or 0),
+                "churned": int(monthly_metrics.get("churned", 0) or 0),
+                "total": int(monthly_metrics.get("total", 0) or 0),
+                "message": monthly_metrics.get("message"),
             },
             "avg_lifetime_days": {
                 "avg_days": float(avg_lifetime_days or 0),

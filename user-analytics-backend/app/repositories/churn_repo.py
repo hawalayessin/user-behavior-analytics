@@ -111,47 +111,100 @@ def _compute_monthly_churn_metrics(
     end_date: date | datetime | None = None,
 ) -> dict[str, Any]:
     if start_date is None or end_date is None:
-        period_start, period_end = get_default_window(db, days=30, source="billing")
+        row = db.execute(
+            text(
+                """
+                WITH anchor AS (
+                    SELECT MAX(event_datetime) AS ts
+                    FROM billing_events
+                ),
+                period AS (
+                    SELECT
+                        (anchor.ts - INTERVAL '30 days') AS start_ts,
+                        anchor.ts AS end_ts
+                    FROM anchor
+                    WHERE anchor.ts IS NOT NULL
+                ),
+                unsubs AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM unsubscriptions u, period p
+                    WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
+                ),
+                active_at_start AS (
+                    SELECT COUNT(DISTINCT s.id) AS cnt
+                    FROM subscriptions s, period p
+                    WHERE s.subscription_start_date <= p.start_ts
+                      AND (s.subscription_end_date IS NULL OR s.subscription_end_date > p.start_ts)
+                )
+                SELECT
+                    COALESCE(unsubs.cnt, 0) AS unsub_count,
+                    COALESCE(active_at_start.cnt, 0) AS active_count,
+                    CASE
+                        WHEN COALESCE(active_at_start.cnt, 0) > 0
+                        THEN ROUND(COALESCE(unsubs.cnt, 0) * 100.0 / active_at_start.cnt, 2)
+                        ELSE 0
+                    END AS churn_rate,
+                    (SELECT start_ts FROM period LIMIT 1) AS period_start,
+                    (SELECT end_ts FROM period LIMIT 1) AS period_end
+                FROM unsubs, active_at_start
+                """
+            )
+        ).fetchone()
     else:
         period_start, period_end = _normalize_range(db, start_date, end_date, source="billing")
-
-    row = db.execute(
-        text(
-            """
-            WITH unsubs AS (
-                SELECT COUNT(*) AS cnt
-                FROM unsubscriptions u
-                WHERE u.unsubscription_datetime >= :start_dt
-                  AND u.unsubscription_datetime <= :end_dt
+        row = db.execute(
+            text(
+                """
+                WITH period AS (
+                    SELECT
+                        CAST(:start_dt AS timestamp) AS start_ts,
+                        CAST(:end_dt AS timestamp) AS end_ts
+                ),
+                unsubs AS (
+                    SELECT COUNT(*) AS cnt
+                    FROM unsubscriptions u, period p
+                    WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
+                ),
+                active_at_start AS (
+                    SELECT COUNT(DISTINCT s.id) AS cnt
+                    FROM subscriptions s, period p
+                    WHERE s.subscription_start_date <= p.start_ts
+                      AND (s.subscription_end_date IS NULL OR s.subscription_end_date > p.start_ts)
+                )
+                SELECT
+                    COALESCE(unsubs.cnt, 0) AS unsub_count,
+                    COALESCE(active_at_start.cnt, 0) AS active_count,
+                    CASE
+                        WHEN COALESCE(active_at_start.cnt, 0) > 0
+                        THEN ROUND(COALESCE(unsubs.cnt, 0) * 100.0 / active_at_start.cnt, 2)
+                        ELSE 0
+                    END AS churn_rate,
+                    (SELECT start_ts FROM period LIMIT 1) AS period_start,
+                    (SELECT end_ts FROM period LIMIT 1) AS period_end
+                FROM unsubs, active_at_start
+                """
             ),
-            active_start AS (
-                SELECT COUNT(DISTINCT s.user_id) AS cnt
-                FROM subscriptions s
-                WHERE s.subscription_start_date <= :start_dt
-                  AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :start_dt)
-            )
-            SELECT
-                unsubs.cnt AS unsub_count,
-                active_start.cnt AS active_count,
-                CASE
-                    WHEN active_start.cnt > 0 THEN ROUND(unsubs.cnt * 100.0 / active_start.cnt, 2)
-                    ELSE 0
-                END AS churn_rate
-            FROM unsubs, active_start
-            """
-        ),
-        {"start_dt": period_start, "end_dt": period_end},
-    ).fetchone()
+            {"start_dt": period_start, "end_dt": period_end},
+        ).fetchone()
 
     if not row:
-        return {"start": period_start, "end": period_end, "unsub_count": 0, "active_count": 0, "churn_rate": 0.0}
+        fallback_start, fallback_end = get_default_window(db, days=30, source="billing")
+        return {
+            "start": fallback_start,
+            "end": fallback_end,
+            "unsub_count": 0,
+            "active_count": 0,
+            "churn_rate": 0.0,
+            "message": "No churn events in selected period",
+        }
 
     return {
-        "start": period_start,
-        "end": period_end,
+        "start": row.period_start,
+        "end": row.period_end,
         "unsub_count": int(row.unsub_count or 0),
         "active_count": int(row.active_count or 0),
         "churn_rate": float(row.churn_rate or 0),
+        "message": "No churn events in selected period" if int(row.unsub_count or 0) == 0 else None,
     }
 
 
@@ -165,22 +218,20 @@ def get_avg_lifetime_days(db: Session, start_date: date | datetime | None = None
                     user_id,
                     service_id,
                     subscription_start_date,
-                    subscription_end_date,
-                    status
+                    subscription_end_date
                 FROM subscriptions
                 WHERE subscription_end_date IS NOT NULL
                     AND subscription_start_date IS NOT NULL
                     AND status IN ('cancelled', 'expired')
                     AND subscription_end_date >= :start_dt
                     AND subscription_end_date <= :end_dt
-                ORDER BY user_id, service_id, subscription_start_date, id DESC
+                ORDER BY user_id, service_id, subscription_start_date, subscription_end_date DESC
             )
             SELECT AVG(
                 EXTRACT(epoch FROM (subscription_end_date - subscription_start_date)) / 86400.0
             )
             FROM dedup
-            WHERE subscription_end_date > subscription_start_date
-                AND subscription_end_date - subscription_start_date > interval '1 day'
+            WHERE subscription_end_date > subscription_start_date + interval '1 day'
             """
         ),
         {"start_dt": start, "end_dt": end},
@@ -368,6 +419,7 @@ def get_monthly_churn_rate(
         "rate": float(metrics.get("churn_rate", 0) or 0),
         "churned": int(metrics.get("unsub_count", 0) or 0),
         "total": int(metrics.get("active_count", 0) or 0),
+        "message": metrics.get("message"),
     }
 
 
@@ -377,20 +429,80 @@ def get_churn_breakdown(
     end_date: date | datetime | None = None,
 ) -> dict[str, Any]:
     if start_date is None or end_date is None:
-        start_date, end_date = get_default_window(db, days=30, source="billing")
-    breakdown = get_voluntary_vs_technical_churn(db, start_date, end_date)
-    voluntary_count = int(breakdown.get("voluntary_count", 0) or 0)
-    technical_count = int(breakdown.get("technical_count", 0) or 0)
+        row = db.execute(
+            text(
+                """
+                WITH anchor AS (
+                    SELECT MAX(event_datetime) AS ts
+                    FROM billing_events
+                ),
+                period AS (
+                    SELECT
+                        (anchor.ts - INTERVAL '30 days') AS start_ts,
+                        anchor.ts AS end_ts
+                    FROM anchor
+                    WHERE anchor.ts IS NOT NULL
+                )
+                SELECT
+                    COUNT(*) AS total_unsubs,
+                    COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') AS voluntary,
+                    COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') AS technical,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') * 100.0
+                        / NULLIF(COUNT(*), 0), 1
+                    ) AS voluntary_pct,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') * 100.0
+                        / NULLIF(COUNT(*), 0), 1
+                    ) AS technical_pct
+                FROM unsubscriptions u, period p
+                WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
+                """
+            )
+        ).fetchone()
+    else:
+        normalized_start, normalized_end = _normalize_range(db, start_date, end_date, source="billing")
+        row = db.execute(
+            text(
+                """
+                WITH period AS (
+                    SELECT
+                        CAST(:start_dt AS timestamp) AS start_ts,
+                        CAST(:end_dt AS timestamp) AS end_ts
+                )
+                SELECT
+                    COUNT(*) AS total_unsubs,
+                    COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') AS voluntary,
+                    COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') AS technical,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE u.churn_type = 'VOLUNTARY') * 100.0
+                        / NULLIF(COUNT(*), 0), 1
+                    ) AS voluntary_pct,
+                    ROUND(
+                        COUNT(*) FILTER (WHERE u.churn_type = 'TECHNICAL') * 100.0
+                        / NULLIF(COUNT(*), 0), 1
+                    ) AS technical_pct
+                FROM unsubscriptions u, period p
+                WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
+                """
+            ),
+            {"start_dt": normalized_start, "end_dt": normalized_end},
+        ).fetchone()
+
+    total = int((row.total_unsubs if row else 0) or 0)
+    voluntary_count = int((row.voluntary if row else 0) or 0)
+    technical_count = int((row.technical if row else 0) or 0)
     return {
-        "total": voluntary_count + technical_count,
+        "total": total,
         "voluntary": {
             "count": voluntary_count,
-            "rate": float(breakdown.get("voluntary_rate", 0) or 0),
+            "rate": float((row.voluntary_pct if row else 0) or 0),
         },
         "technical": {
             "count": technical_count,
-            "rate": float(breakdown.get("technical_rate", 0) or 0),
+            "rate": float((row.technical_pct if row else 0) or 0),
         },
+        "message": "No churn events in selected period" if total == 0 else None,
     }
 
 

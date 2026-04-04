@@ -10,7 +10,17 @@ DATABASE_URL = os.getenv(
     "postgresql://postgres:12345hawala@localhost:5433/analytics_db"
 )
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+    connect_args={
+        "options": "-c statement_timeout=10000"
+    }
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

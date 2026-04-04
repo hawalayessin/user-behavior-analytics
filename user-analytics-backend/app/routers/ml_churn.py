@@ -89,7 +89,12 @@ def get_churn_scores(
         {"risk_category": "High", "count": int(distribution_dict.get("High", 0))},
     ]
 
-    top_df = df_user.sort_values("churn_risk", ascending=False).head(top)
+    # "Top risky users" should honor the selected risk threshold.
+    top_df = (
+        df_user[df_user["churn_risk"] >= threshold]
+        .sort_values("churn_risk", ascending=False)
+        .head(top)
+    )
 
     top_users = [
         {

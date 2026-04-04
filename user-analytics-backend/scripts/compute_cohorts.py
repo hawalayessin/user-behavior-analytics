@@ -21,6 +21,8 @@ def compute_cohorts():
     print("=" * 60)
 
     try:
+        # This step can scan large historical windows; disable timeout for the current transaction.
+        db.execute(text("SET LOCAL statement_timeout = 0"))
 
         # ─────────────────────────────────────────────
         # ÉTAPE 0 : Diagnostic des statuts réels en DB

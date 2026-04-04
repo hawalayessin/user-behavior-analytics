@@ -28,6 +28,7 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 import time
 import uuid
@@ -53,6 +54,7 @@ USER_NS        = uuid.UUID("11111111-1111-1111-1111-111111111111")
 SUB_NS         = uuid.UUID("22222222-2222-2222-2222-222222222222")
 BILLING_NS     = uuid.UUID("33333333-3333-3333-3333-333333333333")
 ACTIVITY_NS    = uuid.UUID("66666666-6666-6666-6666-666666666666")
+SMS_NS         = uuid.UUID("77777777-7777-7777-7777-777777777777")
 SERVICE_NS     = uuid.UUID("44444444-4444-4444-4444-444444444444")
 SERVICE_TYPE_NS = uuid.UUID("55555555-5555-5555-5555-555555555555")
 
@@ -623,6 +625,190 @@ class ETLRunner:
         with self.target_engine.connect() as conn:
             rows = conn.execute(q, {"ids": subscription_ids}).fetchall()
         return {r.id: (r.user_id, r.service_id) for r in rows}
+
+    @staticmethod
+    def _first_existing_column(columns: set[str], candidates: list[str]) -> str | None:
+        for c in candidates:
+            if c in columns:
+                return c
+        return None
+
+    @staticmethod
+    def _to_str(value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    @staticmethod
+    def _parse_uuid(value: Any) -> uuid.UUID | None:
+        if value is None:
+            return None
+        try:
+            return uuid.UUID(str(value).strip())
+        except Exception:
+            return None
+
+    @staticmethod
+    def _extract_otp_code(message_text: str | None) -> str | None:
+        if not message_text:
+            return None
+        match = re.search(r"\b(\d{4,8})\b", message_text)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _detect_delivery_status(raw_status: Any) -> str | None:
+        val = str(raw_status or "").strip().lower()
+        if not val:
+            return None
+        if val in {"delivered", "delivery_success", "success", "ok", "sent_ok"}:
+            return "DELIVERED"
+        if val in {"sent", "submitted", "submit", "dispatched"}:
+            return "SENT"
+        if val in {"failed", "error", "undelivered", "rejected", "ko"}:
+            return "FAILED"
+        if val in {"queued", "pending", "processing", "waiting"}:
+            return "QUEUED"
+        return "UNKNOWN"
+
+    @staticmethod
+    def _detect_direction(raw_direction: Any, raw_event_type: Any) -> str | None:
+        d = str(raw_direction or "").strip().lower()
+        e = str(raw_event_type or "").strip().lower()
+        if d in {"in", "inbound", "incoming", "mo", "received"}:
+            return "INBOUND"
+        if d in {"out", "outbound", "outgoing", "mt", "sent"}:
+            return "OUTBOUND"
+        if any(k in e for k in ["inbound", "incoming", "reply", "ussd_request"]):
+            return "INBOUND"
+        if any(k in e for k in ["outbound", "delivery", "otp", "notify", "sms"]):
+            return "OUTBOUND"
+        return None
+
+    @staticmethod
+    def _detect_is_otp(message_text: str | None, template_name: str | None, template_code: str | None, raw_event_type: Any) -> bool:
+        txt = " ".join(
+            [
+                str(message_text or ""),
+                str(template_name or ""),
+                str(template_code or ""),
+                str(raw_event_type or ""),
+            ]
+        ).lower()
+        return any(k in txt for k in ["otp", "verification", "verify", "code", "one-time", "one time"])
+
+    @staticmethod
+    def _detect_activation_status(raw_status: Any, raw_event_type: Any, message_text: str | None) -> str | None:
+        blob = " ".join([str(raw_status or ""), str(raw_event_type or ""), str(message_text or "")]).lower()
+        if any(k in blob for k in ["success", "activated", "activation_success", "confirmed", "optin_success"]):
+            return "SUCCESS"
+        if any(k in blob for k in ["fail", "failed", "error", "rejected"]):
+            return "FAILED"
+        if any(k in blob for k in ["abandon", "timeout", "expired"]):
+            return "ABANDONED"
+        if any(k in blob for k in ["start", "initiated", "begin", "pending"]):
+            return "STARTED"
+        return None
+
+    def _detect_is_activation(self, raw_event_type: Any, message_text: str | None, flow_name: str | None, activation_status: str | None) -> bool:
+        if activation_status in {"STARTED", "SUCCESS", "FAILED", "ABANDONED"}:
+            return True
+        blob = " ".join([str(raw_event_type or ""), str(message_text or ""), str(flow_name or "")]).lower()
+        return any(k in blob for k in ["activation", "activate", "subscribe", "subscription", "optin", "confirm", "newsub"])
+
+    @staticmethod
+    def _detect_channel(
+        raw_channel: Any,
+        raw_event_type: Any,
+        message_text: str | None,
+        shortcode: str | None,
+        ussd_code: str | None,
+        website_path: str | None,
+    ) -> str:
+        blob = " ".join(
+            [
+                str(raw_channel or ""),
+                str(raw_event_type or ""),
+                str(message_text or ""),
+                str(shortcode or ""),
+                str(ussd_code or ""),
+                str(website_path or ""),
+            ]
+        ).lower()
+        if any(k in blob for k in ["ussd", "menu", "*159", "*1589", "shortcode"]):
+            return "USSD"
+        if any(k in blob for k in ["web", "website", "landing", "site", "http://", "https://"]):
+            return "WEB"
+        if any(k in blob for k in ["otp", "verification", "verify", "code"]):
+            return "OTP"
+        return "SMS"
+
+    @staticmethod
+    def _detect_activation_channel(
+        raw_channel: Any,
+        raw_event_type: Any,
+        message_text: str | None,
+        website_path: str | None,
+        ussd_code: str | None,
+    ) -> str | None:
+        blob = " ".join(
+            [
+                str(raw_channel or ""),
+                str(raw_event_type or ""),
+                str(message_text or ""),
+                str(website_path or ""),
+                str(ussd_code or ""),
+            ]
+        ).lower()
+        if any(k in blob for k in ["web", "website", "landing", "site", "http://", "https://"]):
+            return "WEB"
+        if any(k in blob for k in ["ussd", "menu", "*159", "*1589", "shortcode"]):
+            return "USSD"
+        if any(k in blob for k in ["otp", "verification", "verify", "code"]):
+            return "OTP"
+        if any(k in blob for k in ["activation", "activate", "subscribe", "optin", "confirm"]):
+            return "SMS"
+        return None
+
+    def _resolve_sms_source_table(self) -> tuple[str | None, set[str]]:
+        source_inspector = inspect(self.source_engine)
+        source_tables = set(source_inspector.get_table_names())
+
+        candidates = ["message_events", "smsevents", "sms_events", "messagelogs", "message_logs", "outboundmessages", "outbound_messages", "messages"]
+        useful_cols = {
+            "phone", "phone_number", "phonenumber", "msisdn", "mobile",
+            "message", "message_content", "content", "body", "text", "sms_text",
+            "delivery_status", "status", "message_status", "delivery_state",
+            "direction", "msg_direction", "traffic_type",
+            "event_datetime", "created_at", "sent_at", "delivered_at", "updated_at",
+            "service_id", "template_name", "template", "template_code", "channel",
+        }
+
+        ranked: list[tuple[str, int, int, set[str]]] = []
+        for table in candidates:
+            if table not in source_tables:
+                continue
+            cols = {c["name"] for c in source_inspector.get_columns(table)}
+            score = len(cols.intersection(useful_cols))
+            try:
+                volume = self._count_source(table)
+            except Exception:
+                volume = 0
+            ranked.append((table, score, volume, cols))
+
+        if not ranked:
+            return None, set()
+
+        ranked.sort(key=lambda t: (t[1], t[2]), reverse=True)
+        best = ranked[0]
+        return best[0], best[3]
+
+    def _resolve_sms_target_table(self) -> str:
+        target_tables = set(self.target_inspector.get_table_names())
+        if "sms_events" in target_tables:
+            return "sms_events"
+        if "smsevents" in target_tables:
+            return "smsevents"
+        raise RuntimeError("Target SMS table not found: sms_events/smsevents")
 
     def etl_subscriptions(self) -> None:
         step = "subscriptions"
@@ -1340,24 +1526,369 @@ class ETLRunner:
         started = time.time()
         metrics = ETLMetrics()
         self._log("Step start", step=step)
+        unknown_channel_rows = 0
+        null_user_rows = 0
+        null_service_rows = 0
+        otp_rows = 0
+        activation_rows = 0
 
-        src_tables        = set(inspect(self.source_engine).get_table_names())
-        candidate_sms     = {"sms_events", "message_logs", "outbound_messages", "messages"}
-        available         = sorted(candidate_sms.intersection(src_tables))
-
-        if not available:
+        source_table, source_cols = self._resolve_sms_source_table()
+        if source_table is None:
             self._write_import_log(
-                step, metrics, "partial", time.time() - started,
-                "No source SMS log table found in hawala; sms_events not populated.",
+                step,
+                metrics,
+                "partial",
+                time.time() - started,
+                "No source SMS log table found in hawala; smsevents not populated.",
             )
             self._log("Step skipped", step=step, reason="No source SMS log table found")
             return
 
-        self._write_import_log(
-            step, metrics, "partial", time.time() - started,
-            f"Source SMS table(s) detected {available} but mapping is not yet implemented.",
+        target_table = self._resolve_sms_target_table()
+        target_cols = {c["name"] for c in self.target_inspector.get_columns(target_table)}
+        target_cols_meta = {c["name"]: c for c in self.target_inspector.get_columns(target_table)}
+        target_user_required = bool(target_cols_meta.get("user_id", {}).get("nullable") is False)
+
+        ts_candidates = ["event_datetime", "message_datetime", "created_at", "sent_at", "delivered_at", "updated_at"]
+        phone_candidates = ["phone", "phone_number", "phonenumber", "msisdn", "mobile"]
+        message_candidates = ["message", "message_content", "content", "body", "text", "sms_text"]
+        status_candidates = ["delivery_status", "status", "message_status", "delivery_state"]
+        direction_candidates = ["direction", "msg_direction", "traffic_type", "type"]
+        event_type_candidates = ["event_type", "type", "event", "category"]
+        template_name_candidates = ["template_name", "template"]
+        template_code_candidates = ["template_code", "code"]
+        session_candidates = ["session_id", "ussd_session_id", "reference", "external_ref"]
+        channel_candidates = ["channel", "source", "source_channel", "origin", "medium"]
+
+        source_id_col = self._first_existing_column(source_cols, ["id", "sms_id", "message_id", "log_id"])
+        event_dt_col = self._first_existing_column(source_cols, ts_candidates)
+        phone_col = self._first_existing_column(source_cols, phone_candidates)
+        message_col = self._first_existing_column(source_cols, message_candidates)
+        status_col = self._first_existing_column(source_cols, status_candidates)
+        direction_col = self._first_existing_column(source_cols, direction_candidates)
+        event_type_col = self._first_existing_column(source_cols, event_type_candidates)
+        template_name_col = self._first_existing_column(source_cols, template_name_candidates)
+        template_code_col = self._first_existing_column(source_cols, template_code_candidates)
+        channel_col = self._first_existing_column(source_cols, channel_candidates)
+        session_col = self._first_existing_column(source_cols, session_candidates)
+
+        service_id_col = self._first_existing_column(source_cols, ["service_id"])
+        source_type_id_col = self._first_existing_column(source_cols, ["servicesubscriptiontypeid", "service_subscription_type_id", "subscription_type_id"])
+        subscribed_client_col = self._first_existing_column(source_cols, ["subscribedclientid", "subscribed_client_id", "client_id"])
+        source_user_id_col = self._first_existing_column(source_cols, ["user_id"])
+        ussd_code_col = self._first_existing_column(source_cols, ["ussd_code", "shortcode", "code"])
+        shortcode_col = self._first_existing_column(source_cols, ["shortcode", "short_code"])
+        website_path_col = self._first_existing_column(source_cols, ["website_path", "landing_page", "url", "path"])
+        flow_name_col = self._first_existing_column(source_cols, ["flow_name", "flow", "journey", "activation_flow"])
+        activation_status_col = self._first_existing_column(source_cols, ["activation_status", "status", "state"])
+        external_ref_col = self._first_existing_column(source_cols, ["external_ref", "reference", "message_ref"])
+
+        selected_cols = [c for c in [
+            source_id_col,
+            event_dt_col,
+            phone_col,
+            message_col,
+            status_col,
+            direction_col,
+            event_type_col,
+            template_name_col,
+            template_code_col,
+            channel_col,
+            session_col,
+            service_id_col,
+            source_type_id_col,
+            subscribed_client_col,
+            source_user_id_col,
+            ussd_code_col,
+            shortcode_col,
+            website_path_col,
+            flow_name_col,
+            activation_status_col,
+            external_ref_col,
+        ] if c]
+        selected_cols = list(dict.fromkeys(selected_cols))
+
+        if not selected_cols:
+            self._write_import_log(
+                step,
+                metrics,
+                "partial",
+                time.time() - started,
+                f"SMS source table '{source_table}' found but no usable columns detected.",
+            )
+            self._log("Step skipped", step=step, reason="No usable SMS source columns", source_table=source_table)
+            return
+
+        order_col = source_id_col or event_dt_col or selected_cols[0]
+        total = min(self._count_source(source_table), self.limit) if self.limit else self._count_source(source_table)
+        pbar = tqdm(total=total, desc="etl_sms_events", unit="rows")
+
+        payload_columns = [
+            "id", "user_id", "campaign_id", "service_id", "event_datetime", "event_type", "message_content",
+            "direction", "delivery_status", "channel", "activation_channel", "source_system", "template_name",
+            "template_code", "otp_code", "is_otp", "is_activation", "activation_status", "flow_name",
+            "session_id", "external_ref", "phone_number", "shortcode", "ussd_code", "website_path",
+            "landing_page", "event_result", "failure_reason", "metadata",
+        ]
+        active_payload_cols = [c for c in payload_columns if c in target_cols]
+
+        if "id" not in active_payload_cols:
+            pbar.close()
+            raise RuntimeError(f"Target table {target_table} has no 'id' column")
+
+        placeholders = []
+        for col in active_payload_cols:
+            if col == "metadata":
+                placeholders.append("CAST(:metadata AS jsonb)")
+            else:
+                placeholders.append(f":{col}")
+
+        update_cols = [c for c in active_payload_cols if c != "id"]
+        update_set = ",\n                        ".join([f"{c} = EXCLUDED.{c}" for c in update_cols])
+        upsert_sql = text(
+            f"""
+            INSERT INTO {target_table} ({', '.join(active_payload_cols)})
+            VALUES ({', '.join(placeholders)})
+            ON CONFLICT (id)
+            DO UPDATE SET
+                        {update_set}
+            """
         )
-        self._log("Step skipped", step=step, reason=f"SMS table(s) found {available} but not implemented")
+
+        self._log(
+            "SMS source selected",
+            step=step,
+            source_table=source_table,
+            source_columns=sorted(list(source_cols)),
+            selected_columns=selected_cols,
+            target_table=target_table,
+            target_columns=sorted(list(target_cols)),
+        )
+
+        try:
+            for chunk in self._source_chunks(source_table, selected_cols, order_col):
+                phones = []
+                if phone_col and phone_col in chunk.columns:
+                    phones = [self._clean_phone(v) for v in chunk[phone_col].tolist()]
+                user_map = self._fetch_user_ids_for_phones([p for p in phones if p])
+
+                sub_map = {}
+                if subscribed_client_col and subscribed_client_col in chunk.columns:
+                    sub_ids = []
+                    for v in chunk[subscribed_client_col].tolist():
+                        try:
+                            sub_ids.append(self._uuid5(SUB_NS, f"sub:{int(v)}"))
+                        except Exception:
+                            continue
+                    sub_map = self._fetch_subscription_map(sub_ids)
+
+                rows = []
+                for rec in chunk.itertuples(index=False):
+                    metrics.read_rows += 1
+
+                    raw_event_dt = getattr(rec, event_dt_col, None) if event_dt_col else None
+                    event_dt = self._parse_dt(raw_event_dt)
+                    if event_dt is None:
+                        metrics.skipped_rows += 1
+                        continue
+
+                    phone_number = self._clean_phone(getattr(rec, phone_col, None)) if phone_col else None
+                    message_text = self._to_str(getattr(rec, message_col, None)) if message_col else ""
+                    raw_status = getattr(rec, status_col, None) if status_col else None
+                    raw_direction = getattr(rec, direction_col, None) if direction_col else None
+                    raw_event_type = getattr(rec, event_type_col, None) if event_type_col else None
+                    raw_channel = getattr(rec, channel_col, None) if channel_col else None
+
+                    template_name = self._to_str(getattr(rec, template_name_col, None)) if template_name_col else None
+                    template_code = self._to_str(getattr(rec, template_code_col, None)) if template_code_col else None
+                    flow_name = self._to_str(getattr(rec, flow_name_col, None)) if flow_name_col else None
+
+                    session_id = self._to_str(getattr(rec, session_col, None)) if session_col else None
+                    external_ref = self._to_str(getattr(rec, external_ref_col, None)) if external_ref_col else None
+                    shortcode = self._to_str(getattr(rec, shortcode_col, None)) if shortcode_col else None
+                    ussd_code = self._to_str(getattr(rec, ussd_code_col, None)) if ussd_code_col else None
+                    website_path = self._to_str(getattr(rec, website_path_col, None)) if website_path_col else None
+
+                    delivery_status = self._detect_delivery_status(raw_status)
+                    direction = self._detect_direction(raw_direction, raw_event_type) or "OUTBOUND"
+                    activation_status = self._detect_activation_status(
+                        getattr(rec, activation_status_col, None) if activation_status_col else raw_status,
+                        raw_event_type,
+                        message_text,
+                    )
+
+                    is_otp = self._detect_is_otp(message_text, template_name, template_code, raw_event_type)
+                    otp_code = self._extract_otp_code(message_text) if is_otp else None
+                    is_activation = self._detect_is_activation(raw_event_type, message_text, flow_name, activation_status)
+
+                    channel = self._detect_channel(raw_channel, raw_event_type, message_text, shortcode, ussd_code, website_path)
+                    activation_channel = self._detect_activation_channel(raw_channel, raw_event_type, message_text, website_path, ussd_code)
+
+                    if channel == "SMS" and not raw_channel and not raw_event_type:
+                        unknown_channel_rows += 1
+
+                    user_id = None
+                    raw_user_id = getattr(rec, source_user_id_col, None) if source_user_id_col else None
+                    raw_user_uuid = self._parse_uuid(raw_user_id)
+                    if raw_user_uuid:
+                        user_id = raw_user_uuid
+                    elif phone_number:
+                        user_id = user_map.get(phone_number)
+                        if user_id is None:
+                            user_id = self._uuid5(USER_NS, f"user:{phone_number}")
+
+                    service_id = None
+                    raw_service_id = getattr(rec, service_id_col, None) if service_id_col else None
+                    if raw_service_id is not None:
+                        raw_service_uuid = self._parse_uuid(raw_service_id)
+                        if raw_service_uuid is not None:
+                            service_id = raw_service_uuid
+                        else:
+                            try:
+                                service_id = self.services_by_source_id.get(int(raw_service_id))
+                            except Exception:
+                                service_id = None
+
+                    raw_type_id = getattr(rec, source_type_id_col, None) if source_type_id_col else None
+                    if service_id is None and raw_type_id is not None:
+                        try:
+                            src_service_id = self.source_service_by_subscription_type_id.get(int(raw_type_id))
+                        except Exception:
+                            src_service_id = None
+                        if src_service_id is not None:
+                            service_id = self.services_by_source_id.get(src_service_id)
+
+                    raw_subscribed_client = getattr(rec, subscribed_client_col, None) if subscribed_client_col else None
+                    if raw_subscribed_client is not None:
+                        try:
+                            sub_uuid = self._uuid5(SUB_NS, f"sub:{int(raw_subscribed_client)}")
+                            sub_tuple = sub_map.get(sub_uuid)
+                        except Exception:
+                            sub_tuple = None
+                        if sub_tuple:
+                            sub_user_id, sub_service_id = sub_tuple
+                            if user_id is None:
+                                user_id = sub_user_id
+                            if service_id is None:
+                                service_id = sub_service_id
+
+                    if user_id is None:
+                        null_user_rows += 1
+                        if target_user_required:
+                            metrics.skipped_rows += 1
+                            continue
+                    if service_id is None:
+                        null_service_rows += 1
+
+                    if is_otp:
+                        otp_rows += 1
+                    if is_activation:
+                        activation_rows += 1
+
+                    event_type_norm = self._to_str(raw_event_type).upper() if raw_event_type is not None else ""
+                    if not event_type_norm:
+                        if is_activation:
+                            event_type_norm = "ACTIVATION"
+                        elif is_otp:
+                            event_type_norm = "OTP"
+                        elif delivery_status in {"DELIVERED", "FAILED", "SENT", "QUEUED"}:
+                            event_type_norm = f"DELIVERY_{delivery_status}"
+                        else:
+                            event_type_norm = "SMS"
+
+                    source_pk = getattr(rec, source_id_col, None) if source_id_col else None
+                    if source_pk is not None and str(source_pk).strip() != "":
+                        sms_id = self._uuid5(SMS_NS, f"sms:{source_table}:{source_pk}")
+                    else:
+                        key = "|".join(
+                            [
+                                source_table,
+                                phone_number or "",
+                                event_dt.isoformat(),
+                                event_type_norm,
+                                (message_text or "")[:80],
+                                direction or "",
+                            ]
+                        )
+                        sms_id = self._uuid5(SMS_NS, key)
+
+                    event_result = delivery_status or activation_status or "UNKNOWN"
+                    failure_reason = None
+                    if delivery_status == "FAILED":
+                        failure_reason = self._to_str(raw_status) or "DELIVERY_FAILED"
+                    elif activation_status == "FAILED":
+                        failure_reason = self._to_str(raw_status) or "ACTIVATION_FAILED"
+
+                    metadata = {
+                        "source_table": source_table,
+                        "raw_status": self._to_str(raw_status),
+                        "raw_channel": self._to_str(raw_channel),
+                        "raw_event_type": self._to_str(raw_event_type),
+                        "source_id": self._to_str(source_pk),
+                        "message_length": len(message_text or ""),
+                        "contains_link": bool(re.search(r"https?://|www\\.", message_text or "", flags=re.IGNORECASE)),
+                        "contains_code": bool(re.search(r"\\b\\d{4,8}\\b", message_text or "")),
+                    }
+
+                    payload = {
+                        "id": sms_id,
+                        "user_id": user_id,
+                        "campaign_id": None,
+                        "service_id": service_id,
+                        "event_datetime": event_dt,
+                        "event_type": event_type_norm,
+                        "message_content": message_text or None,
+                        "direction": direction,
+                        "delivery_status": delivery_status,
+                        "channel": channel,
+                        "activation_channel": activation_channel,
+                        "source_system": source_table,
+                        "template_name": template_name or None,
+                        "template_code": template_code or None,
+                        "otp_code": otp_code,
+                        "is_otp": bool(is_otp),
+                        "is_activation": bool(is_activation),
+                        "activation_status": activation_status,
+                        "flow_name": flow_name or None,
+                        "session_id": session_id or None,
+                        "external_ref": external_ref or None,
+                        "phone_number": phone_number,
+                        "shortcode": shortcode or None,
+                        "ussd_code": ussd_code or None,
+                        "website_path": website_path or None,
+                        "landing_page": website_path or None,
+                        "event_result": event_result,
+                        "failure_reason": failure_reason,
+                        "metadata": json.dumps(metadata, ensure_ascii=True),
+                    }
+
+                    rows.append({k: payload.get(k) for k in active_payload_cols})
+
+                if rows and not self.dry_run:
+                    self._with_retry(self._execute_batch, upsert_sql, rows)
+
+                metrics.inserted_rows += len(rows)
+                pbar.update(len(chunk))
+
+            pbar.close()
+            self._write_import_log(step, metrics, "success", time.time() - started)
+            self._log(
+                "Step done",
+                step=step,
+                source_table=source_table,
+                read_rows=metrics.read_rows,
+                upserted=metrics.inserted_rows,
+                skipped=metrics.skipped_rows,
+                unknown_channel_rows=unknown_channel_rows,
+                null_user_id_rows=null_user_rows,
+                null_service_id_rows=null_service_rows,
+                otp_rows=otp_rows,
+                activation_rows=activation_rows,
+            )
+        except Exception as exc:
+            pbar.close()
+            self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
+            raise
 
     def etl_cohorts(self) -> None:
         step = "cohorts"
@@ -1376,7 +1907,12 @@ class ETLRunner:
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step)
         except Exception as exc:
-            self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
+            msg = str(exc)
+            if "statement timeout" in msg.lower() or "querycanceled" in msg.lower():
+                self._write_import_log(step, metrics, "partial", time.time() - started, msg)
+                self._log("Step partial", step=step, reason="statement timeout", error=msg)
+                return
+            self._write_import_log(step, metrics, "failed", time.time() - started, msg)
             raise
 
 

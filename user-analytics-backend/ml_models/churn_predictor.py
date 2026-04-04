@@ -29,7 +29,8 @@ class ChurnPredictor:
 
     Notes:
     - Training dataset is built from subscriptions table (subscription-level granularity).
-    - Active scoring uses subscription_end_date IS NULL.
+    - Active scoring is status-driven (active/trial).
+      This avoids empty predictions when source end dates are inconsistent.
     """
 
     def __init__(
@@ -191,7 +192,7 @@ class ChurnPredictor:
         Granularity: (subscription_id)
         Includes user phone + service name for UI top lists.
         """
-        where_clauses = ["s.subscription_end_date IS NULL", "s.status IN ('active', 'trial')"]
+        where_clauses = ["LOWER(COALESCE(s.status, '')) IN ('active', 'trial')"]
         params = {}
         if service_id:
             where_clauses.append("s.service_id = CAST(:service_id AS uuid)")

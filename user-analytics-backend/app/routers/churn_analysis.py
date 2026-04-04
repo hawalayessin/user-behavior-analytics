@@ -1,11 +1,61 @@
-﻿from fastapi import APIRouter, Depends, Query
+﻿import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.services import churn_service
 
 router = APIRouter(prefix="/analytics/churn", tags=["Churn Analysis"])
+
+_kpis_executor = ThreadPoolExecutor(max_workers=4)
+
+
+async def _run_in_thread(func):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_kpis_executor, func)
+
+
+def _kpi_global_churn_rate():
+    from app.repositories import churn_repo
+
+    db = SessionLocal()
+    try:
+        return churn_repo.get_global_churn_rate(db)
+    finally:
+        db.close()
+
+
+def _kpi_monthly_churn_rate():
+    from app.repositories import churn_repo
+
+    db = SessionLocal()
+    try:
+        return churn_repo.get_monthly_churn_rate(db)
+    finally:
+        db.close()
+
+
+def _kpi_avg_lifetime_days():
+    from app.repositories import churn_repo
+
+    db = SessionLocal()
+    try:
+        return churn_repo.get_avg_lifetime_days(db)
+    finally:
+        db.close()
+
+
+def _kpi_churn_breakdown():
+    from app.repositories import churn_repo
+
+    db = SessionLocal()
+    try:
+        return churn_repo.get_churn_breakdown(db)
+    finally:
+        db.close()
 
 
 @router.get("/dashboard")
@@ -18,15 +68,21 @@ def get_churn_dashboard(
 
 
 @router.get("/kpis")
-def get_kpis(db: Session = Depends(get_db)):
-    from app.repositories import churn_repo
-    from app.utils.temporal import get_month_window
-    start, end = get_month_window(db)
+async def get_kpis(db: Session = Depends(get_db)):
+    _ = db
+
+    global_churn_rate, monthly_churn_rate, avg_lifetime_days, churn_breakdown = await asyncio.gather(
+        _run_in_thread(_kpi_global_churn_rate),
+        _run_in_thread(_kpi_monthly_churn_rate),
+        _run_in_thread(_kpi_avg_lifetime_days),
+        _run_in_thread(_kpi_churn_breakdown),
+    )
+
     return {
-        "global_churn_rate":  churn_repo.get_global_churn_rate(db),
-        "monthly_churn_rate": churn_repo.get_monthly_churn_rate(db, start, end),
-        "avg_lifetime_days":  churn_repo.get_avg_lifetime_days(db),
-        "churn_breakdown":    churn_repo.get_churn_breakdown(db),
+        "global_churn_rate": global_churn_rate,
+        "monthly_churn_rate": monthly_churn_rate,
+        "avg_lifetime_days": avg_lifetime_days,
+        "churn_breakdown": churn_breakdown,
     }
 
 

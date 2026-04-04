@@ -58,7 +58,8 @@ def get_user_activity(
     kpis = db.execute(text(f"""
         SELECT
             COUNT(DISTINCT user_id) FILTER (
-                WHERE DATE(activity_datetime) = :end_dt
+                WHERE activity_datetime >= CAST(:end_dt AS timestamp)
+                  AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
             ) AS dau_today,
 
             COUNT(DISTINCT user_id) FILTER (
@@ -278,7 +279,8 @@ def get_user_activity(
         JOIN users u ON u.id = s.user_id
         LEFT JOIN user_activities ua_today
             ON  ua_today.user_id = s.user_id
-            AND DATE(ua_today.activity_datetime) = :end_dt
+                        AND ua_today.activity_datetime >= CAST(:end_dt AS timestamp)
+                        AND ua_today.activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
           AND s.subscription_start_date <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_srv}

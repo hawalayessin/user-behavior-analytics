@@ -26,10 +26,10 @@ class CampaignRepository:
         params: Dict[str, Any] = {}
         filters: List[str] = []
         if start_date:
-            filters.append("DATE(c.send_datetime) >= :start_date")
+            filters.append("c.send_datetime >= CAST(:start_date AS timestamp)")
             params["start_date"] = start_date
         if end_date:
-            filters.append("DATE(c.send_datetime) <= :end_date")
+            filters.append("c.send_datetime < CAST(:end_date AS timestamp) + INTERVAL '1 day'")
             params["end_date"] = end_date
         if service_id:
             filters.append("c.service_id = CAST(:service_id AS uuid)")
@@ -93,6 +93,32 @@ class CampaignRepository:
         Uses both campaign_id (primary) and date+service (fallback) for subscription matching.
         """
         query = text("""
+            WITH campaign_subs AS (
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON sub.campaign_id = c.id
+
+                UNION ALL
+
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON c.service_id = sub.service_id
+                WHERE sub.campaign_id IS NULL
+                  AND sub.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+            ),
+            dedup_subs AS (
+                SELECT DISTINCT ON (id, matched_campaign_id)
+                    id,
+                    matched_campaign_id
+                FROM campaign_subs
+                ORDER BY id, matched_campaign_id
+            )
             SELECT 
                 c.id,
                 c.name,
@@ -115,19 +141,7 @@ class CampaignRepository:
                 COALESCE(SUM(CASE WHEN b.is_first_charge THEN 1 ELSE 0 END), 0)::FLOAT / 
                     NULLIF(COUNT(DISTINCT s.id), 0) as first_charge_rate
             FROM campaigns c
-            LEFT JOIN subscriptions s
-                ON (
-                    -- Primary: via campaign_id (if set)
-                    s.campaign_id = c.id
-                    OR
-                    -- Fallback: via date+service (within 7 days after send_datetime)
-                    (
-                        s.service_id = c.service_id
-                        AND s.subscription_start_date BETWEEN
-                            c.send_datetime - INTERVAL '1 day'
-                            AND c.send_datetime + INTERVAL '7 days'
-                    )
-                )
+            LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
             LEFT JOIN billing_events b ON b.subscription_id = s.id
             WHERE 1=1
         """)
@@ -141,10 +155,10 @@ class CampaignRepository:
             filters.append("AND c.campaign_type = :campaign_type_filter")
             params["campaign_type_filter"] = campaign_type_filter
         if start_date:
-            filters.append("AND DATE(c.send_datetime) >= :start_date")
+            filters.append("AND c.send_datetime >= CAST(:start_date AS timestamp)")
             params["start_date"] = start_date
         if end_date:
-            filters.append("AND DATE(c.send_datetime) <= :end_date")
+            filters.append("AND c.send_datetime < CAST(:end_date AS timestamp) + INTERVAL '1 day'")
             params["end_date"] = end_date
         if service_id:
             filters.append("AND c.service_id = CAST(:service_id AS uuid)")
@@ -220,10 +234,10 @@ class CampaignRepository:
         params: Dict[str, Any] = {}
         filters: List[str] = []
         if start_date:
-            filters.append("DATE(c.send_datetime) >= :start_date")
+            filters.append("c.send_datetime >= CAST(:start_date AS timestamp)")
             params["start_date"] = start_date
         if end_date:
-            filters.append("DATE(c.send_datetime) <= :end_date")
+            filters.append("c.send_datetime < CAST(:end_date AS timestamp) + INTERVAL '1 day'")
             params["end_date"] = end_date
         if service_id:
             filters.append("c.service_id = CAST(:service_id AS uuid)")
@@ -231,6 +245,32 @@ class CampaignRepository:
         where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
 
         result = db.execute(text(f"""
+            WITH campaign_subs AS (
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON sub.campaign_id = c.id
+
+                UNION ALL
+
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON c.service_id = sub.service_id
+                WHERE sub.campaign_id IS NULL
+                  AND sub.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+            ),
+            dedup_subs AS (
+                SELECT DISTINCT ON (id, matched_campaign_id)
+                    id,
+                    matched_campaign_id
+                FROM campaign_subs
+                ORDER BY id, matched_campaign_id
+            )
             SELECT 
                 c.campaign_type,
                 COUNT(DISTINCT c.id) as count,
@@ -246,19 +286,7 @@ class CampaignRepository:
                     2
                 ) as conversion_rate
             FROM campaigns c
-            LEFT JOIN subscriptions s
-                ON (
-                    -- Primary: via campaign_id
-                    s.campaign_id = c.id
-                    OR
-                    -- Fallback: via date+service (within 7 days)
-                    (
-                        s.service_id = c.service_id
-                        AND s.subscription_start_date BETWEEN
-                            c.send_datetime - INTERVAL '1 day'
-                            AND c.send_datetime + INTERVAL '7 days'
-                    )
-                )
+            LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
             LEFT JOIN billing_events b ON b.subscription_id = s.id
             {where_sql}
             GROUP BY c.campaign_type
@@ -294,10 +322,10 @@ class CampaignRepository:
         params: Dict[str, Any] = {"limit": limit}
         filters: List[str] = []
         if start_date:
-            filters.append("DATE(c.send_datetime) >= :start_date")
+            filters.append("c.send_datetime >= CAST(:start_date AS timestamp)")
             params["start_date"] = start_date
         if end_date:
-            filters.append("DATE(c.send_datetime) <= :end_date")
+            filters.append("c.send_datetime < CAST(:end_date AS timestamp) + INTERVAL '1 day'")
             params["end_date"] = end_date
         if service_id:
             filters.append("c.service_id = CAST(:service_id AS uuid)")
@@ -305,6 +333,32 @@ class CampaignRepository:
         where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
 
         result = db.execute(text(f"""
+            WITH campaign_subs AS (
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON sub.campaign_id = c.id
+
+                UNION ALL
+
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON c.service_id = sub.service_id
+                WHERE sub.campaign_id IS NULL
+                  AND sub.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+            ),
+            dedup_subs AS (
+                SELECT DISTINCT ON (id, matched_campaign_id)
+                    id,
+                    matched_campaign_id
+                FROM campaign_subs
+                ORDER BY id, matched_campaign_id
+            )
             SELECT 
                 c.id,
                 c.name,
@@ -319,19 +373,7 @@ class CampaignRepository:
                     2
                 ) as conversion_rate
             FROM campaigns c
-            LEFT JOIN subscriptions s
-                ON (
-                    -- Primary: via campaign_id
-                    s.campaign_id = c.id
-                    OR
-                    -- Fallback: via date+service (within 7 days)
-                    (
-                        s.service_id = c.service_id
-                        AND s.subscription_start_date BETWEEN
-                            c.send_datetime - INTERVAL '1 day'
-                            AND c.send_datetime + INTERVAL '7 days'
-                    )
-                )
+            LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
             {where_sql}
             GROUP BY c.id, c.name, c.campaign_type, c.target_size
             ORDER BY conversion_rate DESC NULLS LAST, subscriptions DESC NULLS LAST
@@ -365,10 +407,10 @@ class CampaignRepository:
         params: Dict[str, Any] = {}
         filters: List[str] = ["c.send_datetime IS NOT NULL"]
         if start_date:
-            filters.append("DATE(c.send_datetime) >= :start_date")
+            filters.append("c.send_datetime >= CAST(:start_date AS timestamp)")
             params["start_date"] = start_date
         if end_date:
-            filters.append("DATE(c.send_datetime) <= :end_date")
+            filters.append("c.send_datetime < CAST(:end_date AS timestamp) + INTERVAL '1 day'")
             params["end_date"] = end_date
         if service_id:
             filters.append("c.service_id = CAST(:service_id AS uuid)")
@@ -376,6 +418,32 @@ class CampaignRepository:
         where_sql = f"WHERE {' AND '.join(filters)}"
 
         result = db.execute(text(f"""
+            WITH campaign_subs AS (
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON sub.campaign_id = c.id
+
+                UNION ALL
+
+                SELECT
+                    sub.id,
+                    c.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN campaigns c ON c.service_id = sub.service_id
+                WHERE sub.campaign_id IS NULL
+                  AND sub.subscription_start_date BETWEEN
+                        c.send_datetime - INTERVAL '1 day'
+                        AND c.send_datetime + INTERVAL '7 days'
+            ),
+            dedup_subs AS (
+                SELECT DISTINCT ON (id, matched_campaign_id)
+                    id,
+                    matched_campaign_id
+                FROM campaign_subs
+                ORDER BY id, matched_campaign_id
+            )
             SELECT 
                 DATE_TRUNC('month', c.send_datetime)::DATE as month,
                 c.campaign_type,
@@ -391,19 +459,7 @@ class CampaignRepository:
                     2
                 ) as conversion_rate
             FROM campaigns c
-            LEFT JOIN subscriptions s
-                ON (
-                    -- Primary: via campaign_id
-                    s.campaign_id = c.id
-                    OR
-                    -- Fallback: via date+service (within 7 days)
-                    (
-                        s.service_id = c.service_id
-                        AND s.subscription_start_date BETWEEN
-                            c.send_datetime - INTERVAL '1 day'
-                            AND c.send_datetime + INTERVAL '7 days'
-                    )
-                )
+            LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
             LEFT JOIN billing_events b ON b.subscription_id = s.id
             {where_sql}
             GROUP BY DATE_TRUNC('month', c.send_datetime), c.campaign_type

@@ -160,27 +160,29 @@ ASSIGN_BATCH_SQL = text(r"""
             s.subscription_start_date
         FROM subscriptions s
         WHERE s.campaign_id IS NULL
+          AND s.service_id IS NOT NULL
+          AND s.subscription_start_date IS NOT NULL
+        ORDER BY s.id
         LIMIT :batch_size
         FOR UPDATE OF s SKIP LOCKED
     ),
     candidates AS (
         SELECT
             ls.id                     AS sub_id,
-            c.id                      AS campaign_id,
-            ls.subscription_start_date AS sub_start,
-            c.send_datetime           AS send_dt,
-            ROW_NUMBER() OVER (
-                PARTITION BY ls.id
-                ORDER BY ABS(EXTRACT(EPOCH FROM (ls.subscription_start_date - c.send_datetime))), c.send_datetime DESC
-            ) AS rn
+            c.id                      AS campaign_id
         FROM locked_subscriptions ls
-        JOIN campaigns c ON c.service_id = ls.service_id
+        JOIN LATERAL (
+            SELECT c1.id
+            FROM campaigns c1
+            WHERE c1.service_id = ls.service_id
+            ORDER BY ABS(EXTRACT(EPOCH FROM (ls.subscription_start_date - c1.send_datetime))), c1.send_datetime DESC
+            LIMIT 1
+        ) c ON TRUE
     )
     UPDATE subscriptions s
     SET    campaign_id = c.campaign_id
     FROM   candidates c
     WHERE  s.id = c.sub_id
-      AND  c.rn = 1
 
 """)
 
@@ -212,12 +214,14 @@ def do_assign(engine, dry_run: bool) -> int:
         log("DRY RUN assign skipped")
         return 0
 
-    batch_size = 5000
+    batch_size = 2000
     max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         try:
             by_service_total = 0
             fallback_total = 0
+            by_service_batches = 0
+            fallback_batches = 0
 
             while True:
                 with engine.begin() as conn:
@@ -225,7 +229,17 @@ def do_assign(engine, dry_run: bool) -> int:
                     conn.execute(text("SET LOCAL statement_timeout = '60s'"))
                     r = conn.execute(ASSIGN_BATCH_SQL, {"batch_size": batch_size})
                 changed = r.rowcount or 0
+                by_service_batches += 1
                 by_service_total += changed
+                if changed > 0 and (by_service_batches == 1 or by_service_batches % 10 == 0):
+                    log(
+                        "Assign progress",
+                        phase="service_match",
+                        batch=by_service_batches,
+                        batch_size=batch_size,
+                        changed=changed,
+                        cumulative=by_service_total,
+                    )
                 if changed == 0:
                     break
 
@@ -235,7 +249,17 @@ def do_assign(engine, dry_run: bool) -> int:
                     conn.execute(text("SET LOCAL statement_timeout = '60s'"))
                     fallback = conn.execute(ASSIGN_ORGANIC_FALLBACK_BATCH_SQL, {"batch_size": batch_size})
                 changed = fallback.rowcount or 0
+                fallback_batches += 1
                 fallback_total += changed
+                if changed > 0 and (fallback_batches == 1 or fallback_batches % 10 == 0):
+                    log(
+                        "Assign progress",
+                        phase="organic_fallback",
+                        batch=fallback_batches,
+                        batch_size=batch_size,
+                        changed=changed,
+                        cumulative=fallback_total,
+                    )
                 if changed == 0:
                     break
 
@@ -243,7 +267,9 @@ def do_assign(engine, dry_run: bool) -> int:
             log(
                 "Subscriptions assignées",
                 by_service=by_service_total,
+                by_service_batches=by_service_batches,
                 organic_fallback=fallback_total,
+                fallback_batches=fallback_batches,
                 total=total,
                 attempt=attempt,
             )

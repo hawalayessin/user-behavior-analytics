@@ -4,7 +4,8 @@ Provides data access for campaign analytics, impact metrics, and performance ana
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func, case
+from sqlalchemy import text
+from sqlalchemy.sql import bindparam
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 
@@ -479,3 +480,35 @@ class CampaignRepository:
             })
 
         return monthly_data
+
+    @staticmethod
+    def insert_campaign_targets(
+        db: Session,
+        campaign_id: str,
+        targets: List[Dict[str, Any]],
+    ) -> int:
+        """Bulk insert targets for one campaign, ignoring duplicates on (campaign_id, phone_number)."""
+        if not targets:
+            return 0
+
+        payload = []
+        for row in targets:
+            payload.append(
+                {
+                    "campaign_id": campaign_id,
+                    "phone_number": str(row.get("phone_number", "")).strip(),
+                    "segment": (str(row.get("segment", "")).strip() or None),
+                    "region": (str(row.get("region", "")).strip() or None),
+                }
+            )
+
+        stmt = text(
+            """
+            INSERT INTO campaign_targets (campaign_id, phone_number, segment, region)
+            VALUES (CAST(:campaign_id AS uuid), :phone_number, :segment, :region)
+            ON CONFLICT (campaign_id, phone_number) DO NOTHING
+            """
+        )
+
+        result = db.execute(stmt, payload)
+        return int(result.rowcount or 0)

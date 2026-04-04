@@ -19,6 +19,7 @@ from app.routers import admin_import
 from app.routers import campaign_impact
 from app.routers import churn_analysis
 from app.routers import management
+from app.routers import campaign_upload
 from app.routers import ml_churn
 from app.routers import cross_service
 from app.routers import segmentation
@@ -103,6 +104,7 @@ app.include_router(admin_import.router)
 app.include_router(campaign_impact.router)
 app.include_router(churn_analysis.router)
 app.include_router(management.router)
+app.include_router(campaign_upload.router)
 app.include_router(ml_churn.router)
 app.include_router(cross_service.router)
 app.include_router(segmentation.router)

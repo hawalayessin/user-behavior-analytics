@@ -9,6 +9,15 @@ export function useManagement() {
   const [error, setError] = useState(null)
 
   const fetchAll = useCallback(async () => {
+    const token = localStorage.getItem("access_token")
+    if (!token) {
+      setServices([])
+      setCampaigns([])
+      setError("Unauthorized: please login as admin")
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
@@ -50,6 +59,15 @@ export function useManagement() {
     await fetchAll()
     return res.data
   }
+
+  const uploadCampaignTargets = async (file) => {
+    const formData = new FormData()
+    formData.append("targets_file", file)
+    const res = await api.post("/admin/management/campaigns/upload-targets", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    return res.data
+  }
   const updateCampaign = async (id, payload) => {
     const res = await api.put(`/admin/management/campaigns/${id}`, payload)
     await fetchAll()
@@ -71,6 +89,7 @@ export function useManagement() {
     updateService,
     deleteService,
     createCampaign,
+    uploadCampaignTargets,
     updateCampaign,
     deleteCampaign,
   }

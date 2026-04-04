@@ -11,8 +11,10 @@ export function useChurnKPIs({ start_date, end_date, service_id } = {}) {
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (start_date) params.set("start_date", start_date)
-      if (end_date) params.set("end_date", end_date)
+      if (start_date && end_date) {
+        params.set("start_date", start_date)
+        params.set("end_date", end_date)
+      }
       if (service_id) params.set("service_id", service_id)
       const qs = params.toString()
       const payload = await getWithCache(`/analytics/churn/kpis${qs ? `?${qs}` : ""}`, { force })

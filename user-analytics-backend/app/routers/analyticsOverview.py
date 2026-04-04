@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from datetime import date
 from typing import Optional
 
@@ -19,7 +20,7 @@ from app.utils.temporal import (
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
-_summary_executor = ThreadPoolExecutor(max_workers=6)
+_summary_executor = ThreadPoolExecutor(max_workers=7)
 
 
 async def _run_in_thread(func, *args):
@@ -124,9 +125,7 @@ def _summary_churn_block(params: dict, service_id: Optional[str]):
 
 def _summary_revenue_block(params: dict, service_id: Optional[str]):
     sf_rev = "AND srv.id = CAST(:service_id AS uuid)" if service_id else ""
-    db = SessionLocal()
-    try:
-        return db.execute(text(f"""
+    revenue_query = text(f"""
             SELECT
                 ROUND(SUM(st.price) FILTER (WHERE be.status = 'success'), 2)      AS total_revenue,
                 COUNT(*) FILTER (WHERE be.status = 'success')                     AS success_events,
@@ -152,7 +151,18 @@ def _summary_revenue_block(params: dict, service_id: Optional[str]):
             JOIN services       srv ON srv.id = s.service_id
             JOIN service_types  st  ON st.id  = srv.service_type_id
             WHERE 1=1 {sf_rev}
-        """), params).fetchone()
+        """)
+    db = SessionLocal()
+    try:
+        try:
+            return db.execute(revenue_query, params).fetchone()
+        except OperationalError as exc:
+            # Keep /analytics/summary resilient when the DB enforces short statement_timeout.
+            if "statement timeout" not in str(exc).lower():
+                raise
+            db.rollback()
+            db.execute(text("SET LOCAL statement_timeout = 0"))
+            return db.execute(revenue_query, params).fetchone()
     finally:
         db.close()
 
@@ -200,6 +210,78 @@ def _summary_top_services_block():
         db.close()
 
 
+def _summary_sms_block(params: dict, service_id: Optional[str]):
+    sf_sms = "AND se.service_id = CAST(:service_id AS uuid)" if service_id else ""
+    db = SessionLocal()
+    try:
+        return db.execute(text(f"""
+            WITH anchor AS (
+                SELECT MAX(event_datetime) AS ts
+                FROM sms_events
+            ),
+            cur AS (
+                SELECT se.*
+                FROM sms_events se
+                CROSS JOIN anchor a
+                WHERE a.ts IS NOT NULL
+                  AND se.event_datetime > a.ts - (:sms_window_days || ' days')::interval
+                  AND se.event_datetime <= a.ts
+                  {sf_sms}
+            ),
+            prev AS (
+                SELECT se.*
+                FROM sms_events se
+                CROSS JOIN anchor a
+                WHERE a.ts IS NOT NULL
+                  AND se.event_datetime > a.ts - ((:sms_window_days * 2) || ' days')::interval
+                  AND se.event_datetime <= a.ts - (:sms_window_days || ' days')::interval
+                  {sf_sms}
+            ),
+            cur_rates AS (
+                SELECT
+                    COALESCE(
+                        ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        0
+                    ) AS otp_templates_pct,
+                    COALESCE(
+                        ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        0
+                    ) AS activation_templates_pct,
+                    COALESCE(
+                        ROUND(COUNT(*) * 1.0 / NULLIF(COUNT(DISTINCT service_id), 0), 1),
+                        0
+                    ) AS templates_per_service,
+                    COUNT(*) AS total_templates,
+                    COUNT(DISTINCT service_id) AS total_services
+                FROM cur
+            ),
+            prev_rates AS (
+                SELECT
+                    COALESCE(
+                        ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        0
+                    ) AS otp_templates_pct,
+                    COALESCE(
+                        ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        0
+                    ) AS activation_templates_pct
+                FROM prev
+            )
+            SELECT
+                cr.otp_templates_pct AS otp_templates_pct,
+                cr.activation_templates_pct AS activation_templates_pct,
+                ROUND(cr.otp_templates_pct - pr.otp_templates_pct, 1) AS otp_rate_trend_pct,
+                ROUND(cr.activation_templates_pct - pr.activation_templates_pct, 1) AS activation_rate_trend_pct,
+                cr.templates_per_service AS templates_per_service,
+                cr.total_templates AS total_templates,
+                cr.total_services AS total_services
+            FROM cur_rates cr
+            CROSS JOIN prev_rates pr
+        """), params).fetchone()
+    finally:
+        db.close()
+
+
 # ══════════════════════════════════════════════════════════════════
 # GET /analytics/summary  — données globales SANS filtre de date
 # ══════════════════════════════════════════════════════════════════
@@ -230,14 +312,16 @@ async def get_summary(
         "billing_month_end_dt": billing_month_end,
         "churn_month_start_dt": churn_month_start,
         "churn_month_end_dt": churn_month_end,
+        "sms_window_days": 30,
     }
-    users, subs, churn, revenue, engagement, top_services = await asyncio.gather(
+    users, subs, churn, revenue, engagement, top_services, sms = await asyncio.gather(
         _run_in_thread(_summary_users_block, params),
         _run_in_thread(_summary_subscriptions_block, params, service_id),
         _run_in_thread(_summary_churn_block, params, service_id),
         _run_in_thread(_summary_revenue_block, params, service_id),
         _run_in_thread(_summary_engagement_block, params, service_id),
         _run_in_thread(_summary_top_services_block),
+        _run_in_thread(_summary_sms_block, params, service_id),
     )
 
     dau        = engagement.dau_today         or 0
@@ -293,6 +377,15 @@ async def get_summary(
             "mau_current_month": mau,
             "stickiness_pct":    stickiness,
         },
+        "sms": {
+            "otp_templates_pct":         float(sms.otp_templates_pct or 0),
+            "activation_templates_pct":  float(sms.activation_templates_pct or 0),
+            "otp_rate_trend_pct":        float(sms.otp_rate_trend_pct or 0),
+            "activation_rate_trend_pct": float(sms.activation_rate_trend_pct or 0),
+            "templates_per_service":     float(sms.templates_per_service or 0),
+            "total_templates":           int(sms.total_templates or 0),
+            "total_services":            int(sms.total_services or 0),
+        },
         "top_services": [
             {
                 "name":           row.service_name,
@@ -324,9 +417,11 @@ def get_overview(
 
     if start_date is None and end_date is None:
         churn_window_start, churn_window_end = get_default_window(db, days=30, source="billing")
+        sms_window_days = 30
     else:
         churn_window_start = start_dt
         churn_window_end = end_dt
+        sms_window_days = max((end_dt - start_dt).days + 1, 1)
 
     params = {
         "start_dt": start_dt,
@@ -340,6 +435,7 @@ def get_overview(
         "usage_week_end_dt": usage_week_end,
         "usage_month_start_dt": usage_month_start,
         "usage_month_end_dt": usage_month_end,
+        "sms_window_days": sms_window_days,
     }
 
     sf_subs = "AND srv.id = CAST(:service_id AS uuid)" if service_id else ""
@@ -500,6 +596,71 @@ def get_overview(
         ORDER BY active_subs DESC
     """), params).fetchall()
 
+    sms = db.execute(text(f"""
+        WITH anchor AS (
+            SELECT MAX(event_datetime) AS ts
+            FROM sms_events
+        ),
+        cur AS (
+            SELECT se.*
+            FROM sms_events se
+            CROSS JOIN anchor a
+            WHERE a.ts IS NOT NULL
+              AND se.event_datetime > a.ts - (:sms_window_days || ' days')::interval
+              AND se.event_datetime <= a.ts
+              {"AND se.service_id = CAST(:service_id AS uuid)" if service_id else ""}
+        ),
+        prev AS (
+            SELECT se.*
+            FROM sms_events se
+            CROSS JOIN anchor a
+            WHERE a.ts IS NOT NULL
+              AND se.event_datetime > a.ts - ((:sms_window_days * 2) || ' days')::interval
+              AND se.event_datetime <= a.ts - (:sms_window_days || ' days')::interval
+              {"AND se.service_id = CAST(:service_id AS uuid)" if service_id else ""}
+        ),
+        cur_rates AS (
+            SELECT
+                COALESCE(
+                    ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    0
+                ) AS otp_templates_pct,
+                COALESCE(
+                    ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    0
+                ) AS activation_templates_pct,
+                COALESCE(
+                    ROUND(COUNT(*) * 1.0 / NULLIF(COUNT(DISTINCT service_id), 0), 1),
+                    0
+                ) AS templates_per_service,
+                COUNT(*) AS total_templates,
+                COUNT(DISTINCT service_id) AS total_services
+            FROM cur
+        ),
+        prev_rates AS (
+            SELECT
+                COALESCE(
+                    ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    0
+                ) AS otp_templates_pct,
+                COALESCE(
+                    ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    0
+                ) AS activation_templates_pct
+            FROM prev
+        )
+        SELECT
+            cr.otp_templates_pct AS otp_templates_pct,
+            cr.activation_templates_pct AS activation_templates_pct,
+            ROUND(cr.otp_templates_pct - pr.otp_templates_pct, 1) AS otp_rate_trend_pct,
+            ROUND(cr.activation_templates_pct - pr.activation_templates_pct, 1) AS activation_rate_trend_pct,
+            cr.templates_per_service AS templates_per_service,
+            cr.total_templates AS total_templates,
+            cr.total_services AS total_services
+        FROM cur_rates cr
+        CROSS JOIN prev_rates pr
+    """), params).fetchone()
+
     return {
         "generated_at": data_anchor.isoformat(),
         "data_anchor": data_anchor.strftime("%Y-%m-%d"),
@@ -549,6 +710,15 @@ def get_overview(
             "wau_current_week":  engagement.wau_current_week or 0,
             "mau_current_month": mau,
             "stickiness_pct":    stickiness,
+        },
+        "sms": {
+            "otp_templates_pct":         float(sms.otp_templates_pct or 0),
+            "activation_templates_pct":  float(sms.activation_templates_pct or 0),
+            "otp_rate_trend_pct":        float(sms.otp_rate_trend_pct or 0),
+            "activation_rate_trend_pct": float(sms.activation_rate_trend_pct or 0),
+            "templates_per_service":     float(sms.templates_per_service or 0),
+            "total_templates":           int(sms.total_templates or 0),
+            "total_services":            int(sms.total_services or 0),
         },
         "top_services": [
             {

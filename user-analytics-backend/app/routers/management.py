@@ -12,12 +12,14 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import require_admin
+from app.repositories.campaign_repo import CampaignRepository
 
 
 router = APIRouter(prefix="/admin/management", tags=["Admin Management"])
 
 
 BillingType = Literal["daily", "weekly"]
+PHONE_REGEX = re.compile(r"^\+?[0-9]{8,15}$")
 
 
 def _slug(value: str) -> str:
@@ -59,10 +61,41 @@ class ServiceUpdateBody(BaseModel):
 
 
 class CampaignCreateBody(BaseModel):
+    class TargetRow(BaseModel):
+        phone_number: str = Field(..., min_length=1, max_length=20)
+        segment: Optional[str] = Field(default=None, max_length=100)
+        region: Optional[str] = Field(default=None, max_length=100)
+
     name: str = Field(..., min_length=1, max_length=255)
     service_id: uuid.UUID
     send_date: datetime
     target_size: int = Field(..., gt=0)
+    targets: Optional[list[TargetRow]] = None
+
+
+def _sanitize_targets(rows: Optional[list[CampaignCreateBody.TargetRow]]) -> list[dict]:
+    if not rows:
+        return []
+
+    valid: list[dict] = []
+    seen: set[str] = set()
+    for row in rows:
+        phone = str(row.phone_number or "").strip().strip("'\"")
+        if not phone:
+            continue
+        if not PHONE_REGEX.match(phone):
+            continue
+        if phone in seen:
+            continue
+        seen.add(phone)
+        valid.append(
+            {
+                "phone_number": phone,
+                "segment": (str(row.segment).strip() if row.segment else None),
+                "region": (str(row.region).strip() if row.region else None),
+            }
+        )
+    return valid
 
 
 class CampaignUpdateBody(BaseModel):
@@ -373,6 +406,9 @@ def create_campaign(
     computed_status = _campaign_status(send_dt)
     status_value = "scheduled" if computed_status in ("scheduled", "active") else "completed"
 
+    clean_targets = _sanitize_targets(body.targets)
+    effective_target_size = len(clean_targets) if clean_targets else int(body.target_size)
+
     row = db.execute(
         text(
             """
@@ -390,11 +426,15 @@ def create_campaign(
             "name": name,
             "service_id": str(body.service_id),
             "send_datetime": send_dt,
-            "target_size": int(body.target_size),
+            "target_size": effective_target_size,
             "campaign_type": "promotion",
             "status": status_value,
         },
     ).fetchone()
+
+    if clean_targets:
+        CampaignRepository.insert_campaign_targets(db, str(row.id), clean_targets)
+
     db.commit()
 
     return {
@@ -403,7 +443,7 @@ def create_campaign(
         "service_id": str(body.service_id),
         "service_name": db.execute(text("SELECT name FROM services WHERE id = CAST(:id AS uuid)"), {"id": str(body.service_id)}).scalar(),
         "send_date": send_dt.date().isoformat(),
-        "target_size": int(body.target_size),
+        "target_size": int(effective_target_size),
         "total_subs": 0,
         "conversion_rate": 0.0,
         "status": computed_status,

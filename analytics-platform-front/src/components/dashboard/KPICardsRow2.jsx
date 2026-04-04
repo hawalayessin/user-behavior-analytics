@@ -1,10 +1,10 @@
-import PropTypes from "prop-types"
-import { Zap, ArrowRightLeft, AlertCircle } from "lucide-react"
-import KPICard from "./KPICard"
+import PropTypes from "prop-types";
+import { Zap, ArrowRightLeft } from "lucide-react";
+import KPICard from "./KPICard";
 
 export default function KPICardsRow2({ data, metrics }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <KPICard
         title="DAU Today"
         value={data.engagement.dau_today.toLocaleString()}
@@ -21,27 +21,19 @@ export default function KPICardsRow2({ data, metrics }) {
             ? "↓ Below benchmark (18–25%) — action needed"
             : "✓ Above benchmark (18–25%)"
         }
-        subtitleColor={metrics.isConversionBelowBM ? "text-red-400" : "text-emerald-400"}
+        subtitleColor={
+          metrics.isConversionBelowBM ? "text-red-400" : "text-emerald-400"
+        }
         icon={ArrowRightLeft}
         iconColor="#10B981"
         iconBg="bg-emerald-500/20"
         alert={metrics.isConversionBelowBM}
       />
-      <KPICard
-        title="Billing Failure Rate"
-        value={`${data.revenue.failed_pct}%`}
-        subtitle={`${data.revenue.billing_failed} failed / ${data.revenue.billing_success} success`}
-        icon={AlertCircle}
-        iconColor="#EF4444"
-        iconBg="bg-red-500/20"
-        alert={metrics.isBillingAlert}
-        trend={-0.4}
-      />
     </div>
-  )
+  );
 }
 
 KPICardsRow2.propTypes = {
-  data:    PropTypes.object.isRequired,
+  data: PropTypes.object.isRequired,
   metrics: PropTypes.object.isRequired,
-}
+};

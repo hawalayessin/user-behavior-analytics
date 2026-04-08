@@ -11,6 +11,7 @@ This script updates subscriptions.campaign_id to populate the foreign key.
 """
 
 import sys
+import argparse
 from pathlib import Path
 
 # Add parent directory to path so we can import app modules
@@ -19,7 +20,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from sqlalchemy import text
 from app.core.database import SessionLocal
 
-def link_campaigns_to_subscriptions():
+def link_campaigns_to_subscriptions(
+    start_date: str = "2025-10-01",
+    batch_size: int = 20000,
+    statement_timeout_ms: int = 0,
+):
     """
     Update subscriptions.campaign_id using date+service matching
     """
@@ -29,6 +34,18 @@ def link_campaigns_to_subscriptions():
         print("=" * 70)
         print("ETL: Link Subscriptions to Campaigns")
         print("=" * 70)
+
+        # Helpful indexes for large-range matching.
+        db.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_subscriptions_campaign_null_service_start
+            ON subscriptions (service_id, subscription_start_date)
+            WHERE campaign_id IS NULL
+        """))
+        db.execute(text("""
+            CREATE INDEX IF NOT EXISTS ix_campaigns_service_send_datetime
+            ON campaigns (service_id, send_datetime)
+        """))
+        db.commit()
         
         # Count before
         before = db.execute(text(
@@ -36,28 +53,64 @@ def link_campaigns_to_subscriptions():
         )).scalar()
         print(f"\nBefore: {before} subscriptions with campaign_id")
         
-        # Main update: link subscription to closest campaign
-        # within 7 days after send_datetime, same service
+        # Process by chunks to avoid statement timeout on big tables.
         update_query = text("""
-            UPDATE subscriptions s
-            SET campaign_id = (
-                SELECT c.id
-                FROM campaigns c
-                WHERE c.service_id = s.service_id
-                  AND s.subscription_start_date BETWEEN
-                      c.send_datetime - INTERVAL '1 day'
-                      AND c.send_datetime + INTERVAL '7 days'
-                ORDER BY ABS(
-                    EXTRACT(EPOCH FROM (s.subscription_start_date - c.send_datetime))
-                )
-                LIMIT 1
+            WITH candidates AS (
+                SELECT s.id, s.service_id, s.subscription_start_date
+                FROM subscriptions s
+                WHERE s.campaign_id IS NULL
+                  AND s.subscription_start_date >= :start_date
+                  AND EXISTS (
+                      SELECT 1
+                      FROM campaigns c
+                      WHERE c.service_id = s.service_id
+                        AND s.subscription_start_date BETWEEN
+                            c.send_datetime - INTERVAL '1 day'
+                            AND c.send_datetime + INTERVAL '7 days'
+                  )
+                ORDER BY s.subscription_start_date
+                LIMIT :batch_size
+            ),
+            matched AS (
+                SELECT cand.id AS subscription_id, c_best.id AS campaign_id
+                FROM candidates cand
+                JOIN LATERAL (
+                    SELECT c.id
+                    FROM campaigns c
+                    WHERE c.service_id = cand.service_id
+                      AND cand.subscription_start_date BETWEEN
+                          c.send_datetime - INTERVAL '1 day'
+                          AND c.send_datetime + INTERVAL '7 days'
+                    ORDER BY ABS(
+                        EXTRACT(EPOCH FROM (cand.subscription_start_date - c.send_datetime))
+                    )
+                    LIMIT 1
+                ) c_best ON TRUE
             )
-            WHERE s.campaign_id IS NULL
-              AND s.subscription_start_date >= '2025-10-01'
+            UPDATE subscriptions s
+            SET campaign_id = m.campaign_id
+            FROM matched m
+            WHERE s.id = m.subscription_id
+            RETURNING s.id
         """)
-        
-        result = db.execute(update_query)
-        db.commit()
+
+        total_linked = 0
+        loops = 0
+        while True:
+            loops += 1
+            db.execute(text(f"SET LOCAL statement_timeout = {int(statement_timeout_ms)}"))
+            result = db.execute(
+                update_query,
+                {"start_date": start_date, "batch_size": batch_size},
+            )
+            updated = len(result.fetchall())
+            db.commit()
+
+            if updated == 0:
+                break
+
+            total_linked += updated
+            print(f"Batch {loops}: +{updated} linked (total +{total_linked})")
         
         # Count after
         after = db.execute(text(
@@ -95,4 +148,14 @@ def link_campaigns_to_subscriptions():
 
 
 if __name__ == "__main__":
-    link_campaigns_to_subscriptions()
+    parser = argparse.ArgumentParser(description="Link subscriptions to nearest campaign")
+    parser.add_argument("--start-date", type=str, default="2025-10-01", help="Min subscription_start_date")
+    parser.add_argument("--batch-size", type=int, default=20000, help="Rows processed per batch")
+    parser.add_argument("--statement-timeout-ms", type=int, default=0, help="Postgres statement timeout in ms (0=disabled)")
+    args = parser.parse_args()
+
+    link_campaigns_to_subscriptions(
+        start_date=args.start_date,
+        batch_size=args.batch_size,
+        statement_timeout_ms=args.statement_timeout_ms,
+    )

@@ -2,16 +2,16 @@ import { useState, useEffect, useCallback } from "react"
 import api from "../services/api"
 
 export function useRetentionHeatmap({ service_id, last_n_months = 6 } = {}) {
-  const [data,    setData]    = useState(null)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
+  const [error, setError] = useState(null)
 
   const fetchHeatmap = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (service_id)    params.set("service_id", service_id)
+      if (service_id) params.set("service_id", service_id)
       if (last_n_months) params.set("last_n_months", String(last_n_months))
 
       const res = await api.get(`/analytics/retention/heatmap?${params.toString()}`)

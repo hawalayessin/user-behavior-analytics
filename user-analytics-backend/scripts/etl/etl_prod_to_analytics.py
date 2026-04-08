@@ -18,7 +18,7 @@ Corrections appliquées:
      (NOT_SATISFIED / PRICE_TOO_HIGH / BILLING_FAILED / NO_RENEWAL)
   4. Fallback datetime → skip au lieu d'injecter datetime.now()
   5. etl_user_activities → activity_type granulaire (subscription/renewal/churn_event)
-  6. SUB_STATUS_MAP → status=0 mappé à 'cancelled' si subscription_end_date passée
+    6. Map status aligné sur la vérité métier prod
 """
 
 from __future__ import annotations
@@ -65,14 +65,14 @@ USER_STATUS_MAP = {
     -2: "inactive",
 }
 
-# status=0 en prod = trial/pending → on le garde "trial" ici,
-# mais etl_unsubscriptions détermine l'état réel depuis transaction_histories type=4
-SUB_STATUS_MAP = {
-    1:  "active",
-    0:  "trial",
-    -1: "cancelled",
-    -2: "expired",
-}
+def map_status(status_int: int) -> str:
+    mapping = {
+        1:  "active",
+        -1: "cancelled",
+        -2: "billing_failed",
+        0:  "pending",
+    }
+    return mapping.get(status_int, "unknown")
 
 # FIX #1 : minuscules — cohérent avec les requêtes SQL du dashboard
 BILLING_STATUS_MAP = {
@@ -829,10 +829,10 @@ class ETLRunner:
             """
             INSERT INTO subscriptions (
                 id, user_id, service_id, campaign_id,
-                subscription_start_date, subscription_end_date, status
+                subscription_start_date, subscription_end_date, status, created_at
             ) VALUES (
                 :id, :user_id, :service_id, NULL,
-                :subscription_start_date, :subscription_end_date, :status
+                :subscription_start_date, :subscription_end_date, :status, :created_at
             )
             ON CONFLICT (id)
             DO UPDATE SET
@@ -840,7 +840,8 @@ class ETLRunner:
                 service_id = EXCLUDED.service_id,
                 subscription_start_date = EXCLUDED.subscription_start_date,
                 subscription_end_date = EXCLUDED.subscription_end_date,
-                status = EXCLUDED.status
+                status = EXCLUDED.status,
+                created_at = EXCLUDED.created_at
             """
         )
 
@@ -901,11 +902,7 @@ class ETLRunner:
                         continue
                     end_date = self._parse_dt(getattr(rec, "subscription_end_date", None))
 
-                    # FIX #6 : déterminer status réel selon end_date
-                    sub_status = SUB_STATUS_MAP.get(source_status, "trial")
-                    if sub_status == "trial" and end_date is not None:
-                        # status=0 avec end_date dans le passé → expired/cancelled
-                        sub_status = "expired"
+                    sub_status = map_status(source_status)
 
                     rows.append(
                         {
@@ -915,6 +912,7 @@ class ETLRunner:
                             "subscription_start_date": start_date,
                             "subscription_end_date": end_date,
                             "status": sub_status,
+                            "created_at": start_date,
                         }
                     )
 

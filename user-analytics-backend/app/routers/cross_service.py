@@ -4,8 +4,6 @@ Cross-Service Behavior Analytics
 All endpoints support optional filters: start_date, end_date, service_id.
 """
 
-from __future__ import annotations
-
 from datetime import date, timedelta
 from typing import Optional
 
@@ -15,9 +13,24 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.date_ranges import DATA_START_DATE, resolve_date_range
+from app.core.cache import build_cache_key, cache_or_compute, cached_endpoint
+from app.core.config import settings
 
 
 router = APIRouter(prefix="/analytics/cross-service", tags=["Cross-Service Behavior"])
+
+
+def _cross_service_payload(
+    start_date: Optional[date] = DATA_START_DATE,
+    end_date: Optional[date] = None,
+    service_id: Optional[str] = None,
+    **_: object,
+) -> dict:
+    return {
+        "start_date": start_date.isoformat() if start_date else DATA_START_DATE.isoformat(),
+        "end_date": end_date.isoformat() if end_date else "auto",
+        "service_id": service_id or "all",
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -66,6 +79,11 @@ def _resolve_params(
 # 1) GET /analytics/cross-service/overview
 # ──────────────────────────────────────────────────────────────────────
 @router.get("/overview")
+@cached_endpoint(
+    "cross_service_overview",
+    settings.CROSS_SERVICE_CACHE_TTL_SECONDS,
+    key_builder=_cross_service_payload,
+)
 def get_overview(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(default=DATA_START_DATE),
@@ -238,6 +256,11 @@ def get_overview(
 # 2) GET /analytics/cross-service/co-subscriptions
 # ──────────────────────────────────────────────────────────────────────
 @router.get("/co-subscriptions")
+@cached_endpoint(
+    "cross_service_co_subscriptions",
+    settings.CROSS_SERVICE_CACHE_TTL_SECONDS,
+    key_builder=_cross_service_payload,
+)
 def get_co_subscriptions(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(default=DATA_START_DATE),
@@ -307,6 +330,11 @@ def get_co_subscriptions(
 # 3) GET /analytics/cross-service/migrations
 # ──────────────────────────────────────────────────────────────────────
 @router.get("/migrations")
+@cached_endpoint(
+    "cross_service_migrations",
+    settings.CROSS_SERVICE_CACHE_TTL_SECONDS,
+    key_builder=_cross_service_payload,
+)
 def get_migrations(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(default=DATA_START_DATE),
@@ -374,6 +402,11 @@ def get_migrations(
 # 4) GET /analytics/cross-service/distribution
 # ──────────────────────────────────────────────────────────────────────
 @router.get("/distribution")
+@cached_endpoint(
+    "cross_service_distribution",
+    settings.CROSS_SERVICE_CACHE_TTL_SECONDS,
+    key_builder=_cross_service_payload,
+)
 def get_distribution(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(default=DATA_START_DATE),
@@ -416,3 +449,52 @@ def get_distribution(
             for r in rows
         ]
     }
+
+
+@router.get("/all")
+def get_all_cross_service(
+    db: Session = Depends(get_db),
+    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    end_date: Optional[date] = Query(default=None),
+    service_id: Optional[str] = Query(default=None),
+):
+    start_dt, end_dt = resolve_date_range(start_date, end_date)
+    cache_key = build_cache_key(
+        "cross-service:all",
+        {
+            "start_date": start_dt.isoformat(),
+            "end_date": end_dt.isoformat(),
+            "service_id": service_id or "all",
+        },
+    )
+
+    return cache_or_compute(
+        cache_key,
+        settings.CROSS_SERVICE_CACHE_TTL_SECONDS,
+        compute_function=lambda: {
+            "overview": get_overview(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            "co_subscriptions": get_co_subscriptions(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            "migrations": get_migrations(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            "distribution": get_distribution(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+        },
+    )

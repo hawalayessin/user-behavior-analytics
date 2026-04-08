@@ -23,6 +23,7 @@ from app.routers import campaign_upload
 from app.routers import ml_churn
 from app.routers import cross_service
 from app.routers import segmentation
+from app.routers import anomalies
 
 from app.core.security import hash_password
 from app.models.platform_users import PlatformUser
@@ -108,6 +109,7 @@ app.include_router(campaign_upload.router)
 app.include_router(ml_churn.router)
 app.include_router(cross_service.router)
 app.include_router(segmentation.router)
+app.include_router(anomalies.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

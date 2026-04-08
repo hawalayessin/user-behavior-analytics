@@ -7,12 +7,32 @@ import uuid
 
 from app.core.database import get_db
 from app.core.date_ranges import resolve_date_range
+from app.core.cache import cached_endpoint
+from app.core.config import settings
 from app.utils.temporal import get_data_anchor
 
 router = APIRouter(prefix="/analytics", tags=["User Activity"])
 
 
+def _user_activity_cache_payload(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    service_id: Optional[str] = None,
+    **_: object,
+) -> dict:
+    return {
+        "start_date": start_date.isoformat() if start_date else "auto",
+        "end_date": end_date.isoformat() if end_date else "auto",
+        "service_id": service_id or "all",
+    }
+
+
 @router.get("/user-activity")
+@cached_endpoint(
+    "user_activity",
+    settings.USER_ACTIVITY_CACHE_TTL_SECONDS,
+    key_builder=_user_activity_cache_payload,
+)
 def get_user_activity(
     db:         Session = Depends(get_db),
     start_date: Optional[date] = Query(default=None),
@@ -256,6 +276,7 @@ def get_user_activity(
     by_service_rows = db.execute(text(f"""
         SELECT
             srv.name AS service_name,
+            COUNT(*) AS subscriptions,
             COUNT(*) FILTER (WHERE s.status = 'active')  AS active_users,
             COUNT(*) FILTER (WHERE s.status = 'trial')   AS trial_users,
             COUNT(*) FILTER (
@@ -285,7 +306,7 @@ def get_user_activity(
           AND s.subscription_start_date <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_srv}
         GROUP BY srv.id, srv.name
-        ORDER BY active_users DESC
+                ORDER BY subscriptions DESC
     """), params).fetchall()
 
     # ── 7. Inactivity buckets (EN labels) ──────────────────────
@@ -337,6 +358,7 @@ def get_user_activity(
         "by_service": [
             {
                 "service_name":      row.service_name,
+                "subscriptions":     row.subscriptions     or 0,
                 "active_users":      row.active_users      or 0,
                 "trial_users":       row.trial_users       or 0,
                 "inactive_7d":       row.inactive_7d       or 0,

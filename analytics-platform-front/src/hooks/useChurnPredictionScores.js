@@ -1,38 +1,46 @@
-import { useCallback, useEffect, useState } from "react"
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
 export function useChurnPredictionScores({ top = 10, threshold = 0.4, store = false, filters = {} } = {}) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const normalizedFilters = useMemo(() => ({
+    start_date: filters?.start_date ?? null,
+    end_date: filters?.end_date ?? null,
+    service_id: filters?.service_id ?? null,
+  }), [filters?.end_date, filters?.service_id, filters?.start_date])
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      "ml",
+      "churn",
+      "scores",
+      top,
+      threshold,
+      store,
+      normalizedFilters.start_date,
+      normalizedFilters.end_date,
+      normalizedFilters.service_id,
+    ],
+    queryFn: async () => {
       const res = await api.get("/ml/churn/scores", {
-        params: { 
-          top, 
-          threshold, 
+        params: {
+          top,
+          threshold,
           store,
-          start_date: filters?.start_date,
-          end_date: filters?.end_date,
-          service_id: filters?.service_id
+          start_date: normalizedFilters.start_date,
+          end_date: normalizedFilters.end_date,
+          service_id: normalizedFilters.service_id,
         },
       })
-      setData(res.data ?? null)
-    } catch (err) {
-      setError(err?.response?.data?.detail ?? err.message ?? "Error loading churn scores")
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [top, threshold, store, filters])
+      return res.data ?? null
+    },
+  })
 
-  useEffect(() => {
-    fetchData()
-  }, [top, threshold, store, filters?.start_date, filters?.end_date, filters?.service_id])
-
-  return { data, loading, error, refetch: fetchData }
+  return {
+    data,
+    loading: isLoading,
+    error: error?.response?.data?.detail ?? error?.message ?? null,
+    refetch,
+  }
 }
 

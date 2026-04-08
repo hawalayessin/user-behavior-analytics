@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
@@ -10,6 +11,17 @@ from app.models import User
 from app.schemas.users import UserDetailResponse
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+def _exec_with_timeout_retry(db: Session, sql_text, params: dict):
+    try:
+        return db.execute(sql_text, params)
+    except OperationalError as exc:
+        if "statement timeout" not in str(exc).lower():
+            raise
+        db.rollback()
+        db.execute(text("SET LOCAL statement_timeout = 0"))
+        return db.execute(sql_text, params)
 
 
 # ─────────────────────────────────────────────
@@ -24,40 +36,44 @@ def list_users(
     search:     Optional[str]      = Query(None),
     service_id: Optional[str]      = Query(None),
     page:       int                = Query(1, ge=1),
-    page_size:  int                = Query(20, ge=1, le=200),
+    page_size:  int                = Query(10, ge=1, le=200),
+    cursor_created_at: Optional[datetime] = Query(None),
+    cursor_id: Optional[str] = Query(None),
     export:     bool               = Query(False),   # ✅ NOUVEAU
     db:         Session            = Depends(get_db),
 ):
     # ── Si export=true → pas de limite ───────
     if export:
         limit  = None
-        offset = 0
     else:
         limit  = page_size
-        offset = (page - 1) * page_size
 
     # ── filtres dynamiques ────────────────────
     where_clauses = ["1=1"]
+    paging_where_clauses = ["1=1"]
     params: dict  = {}
 
     if not export:
         params["limit"]  = limit
-        params["offset"] = offset
 
     if status:
         where_clauses.append("u.status = :status")
+        paging_where_clauses.append("u.status = :status")
         params["status"] = status
 
     if search:
         where_clauses.append("u.phone_number ILIKE :search")
+        paging_where_clauses.append("u.phone_number ILIKE :search")
         params["search"] = f"%{search}%"
 
     if date_from:
         where_clauses.append("u.created_at >= :date_from")
+        paging_where_clauses.append("u.created_at >= :date_from")
         params["date_from"] = date_from
 
     if date_to:
         where_clauses.append("u.created_at <= :date_to")
+        paging_where_clauses.append("u.created_at <= :date_to")
         params["date_to"] = date_to
 
     if service_id:
@@ -69,91 +85,125 @@ def list_users(
                   AND sub.service_id = CAST(:service_id AS uuid)
             )
         """)
+        paging_where_clauses.append("""
+            EXISTS (
+                SELECT 1
+                FROM subscriptions sub
+                WHERE sub.user_id = u.id
+                  AND sub.service_id = CAST(:service_id AS uuid)
+            )
+        """)
         params["service_id"] = service_id
 
+    if not export and cursor_created_at and cursor_id:
+        paging_where_clauses.append("(u.created_at, u.id) < (:cursor_created_at, CAST(:cursor_id AS uuid))")
+        params["cursor_created_at"] = cursor_created_at
+        params["cursor_id"] = cursor_id
+
     where_sql = " AND ".join(where_clauses)
+    paging_where_sql = " AND ".join(paging_where_clauses)
+    sf_unsub = "AND un.service_id = CAST(:service_id AS uuid)" if service_id else ""
 
-    # ── requête principale ────────────────────
-    limit_clause = "" if export else "LIMIT :limit OFFSET :offset"
+    # ── requête principale optimisée ──────────
+    # 1) Paginer d'abord la table users
+    # 2) Agréger subscriptions/services seulement pour les users de la page
+    limit_clause = "" if export else "LIMIT :limit"
+    paging_where_for_query = where_sql if export else paging_where_sql
 
-    rows = db.execute(text(f"""
+    users_query = text(f"""
+        WITH paged_users AS (
+            SELECT
+                u.id,
+                u.phone_number,
+                u.status,
+                u.created_at
+            FROM users u
+            WHERE {paging_where_for_query}
+            ORDER BY u.created_at DESC, u.id DESC
+            {limit_clause}
+        )
         SELECT
-            u.id,
-            u.phone_number,
-            u.status,
-            u.created_at,
-            u.last_activity_at,
-
-            COALESCE(
-                ARRAY_AGG(DISTINCT srv.name)
-                FILTER (WHERE srv.name IS NOT NULL),
-                ARRAY[]::text[]
-            ) AS service_names,
-
-            COALESCE(
-                ARRAY_AGG(DISTINCT s.service_id::text)
-                FILTER (WHERE s.service_id IS NOT NULL),
-                ARRAY[]::text[]
-            ) AS service_ids,
-
-            (
-                SELECT c.name
-                FROM subscriptions sub
-                JOIN campaigns c ON c.id = sub.campaign_id
-                WHERE sub.user_id = u.id
-                  AND c.status = 'sent'
-                ORDER BY c.send_datetime DESC
-                LIMIT 1
-            ) AS campaign_name,
-
-            COUNT(*) FILTER (WHERE s.id IS NOT NULL)    AS total_subscriptions,
-            COUNT(*) FILTER (WHERE s.status = 'active') AS active_subscriptions
-
-        FROM users u
-        LEFT JOIN subscriptions s ON s.user_id = u.id
-        LEFT JOIN services srv    ON srv.id = s.service_id
-
-        WHERE {where_sql}
-
-        GROUP BY u.id
-        ORDER BY u.created_at DESC
-        {limit_clause}
-    """), params).fetchall()
+            pu.id,
+            pu.phone_number,
+            pu.status,
+            pu.created_at,
+            lu.last_activity_at,
+            COALESCE(ss.services, '[]'::jsonb) AS services,
+            COALESCE(ss.total_subscriptions, 0) AS total_subscriptions,
+            COALESCE(ss.active_subscriptions, 0) AS active_subscriptions,
+            camp.campaign_name
+        FROM paged_users pu
+        LEFT JOIN LATERAL (
+            SELECT MAX(un.unsubscription_datetime) AS last_activity_at
+            FROM unsubscriptions un
+            WHERE un.user_id = pu.id
+            {sf_unsub}
+        ) lu ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT
+                COALESCE(
+                    jsonb_agg(DISTINCT jsonb_build_object('id', s.service_id::text, 'name', srv.name))
+                    FILTER (WHERE s.service_id IS NOT NULL),
+                    '[]'::jsonb
+                ) AS services,
+                COUNT(*) FILTER (WHERE s.id IS NOT NULL) AS total_subscriptions,
+                COUNT(*) FILTER (WHERE s.status = 'active') AS active_subscriptions
+            FROM subscriptions s
+            LEFT JOIN services srv ON srv.id = s.service_id
+            WHERE s.user_id = pu.id
+        ) ss ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT c.name AS campaign_name
+            FROM subscriptions sub
+            JOIN campaigns c ON c.id = sub.campaign_id
+            WHERE sub.user_id = pu.id
+              AND c.status = 'sent'
+            ORDER BY c.send_datetime DESC
+            LIMIT 1
+        ) camp ON TRUE
+        ORDER BY pu.created_at DESC, pu.id DESC
+    """)
+    rows = _exec_with_timeout_retry(db, users_query, params).fetchall()
 
     # ── count total ───────────────────────────
     count_params = {k: v for k, v in params.items() if k not in ("limit", "offset")}
-    count_row = db.execute(text(f"""
-        SELECT COUNT(DISTINCT u.id) AS total
+    count_query = text(f"""
+        SELECT COUNT(*) AS total
         FROM users u
-        LEFT JOIN subscriptions s ON s.user_id = u.id
         WHERE {where_sql}
-    """), count_params).fetchone()
+    """)
+    count_row = _exec_with_timeout_retry(db, count_query, count_params).fetchone()
 
     # ── serialization ─────────────────────────
     users_out = []
     for r in rows:
-        services = []
-        if r.service_names and r.service_ids:
-            for name, sid in zip(r.service_names, r.service_ids):
-                services.append({"id": sid, "name": name})
-
         users_out.append({
             "id":                   str(r.id),
             "phone_number":         r.phone_number,
             "status":               r.status,
             "created_at":           r.created_at.isoformat() if r.created_at else None,
             "last_activity_at":     r.last_activity_at.isoformat() if r.last_activity_at else None,
-            "services":             services,
+            "services":             r.services or [],
             "total_subscriptions":  r.total_subscriptions or 0,
             "active_subscriptions": r.active_subscriptions or 0,
             "campaign_name":        r.campaign_name,
         })
+
+    next_cursor = None
+    if not export and rows:
+        last_row = rows[-1]
+        if last_row.created_at and last_row.id:
+            next_cursor = {
+                "created_at": last_row.created_at.isoformat(),
+                "id": str(last_row.id),
+            }
 
     return {
         "data":      users_out,
         "total":     count_row.total if count_row else 0,
         "page":      page,
         "page_size": page_size,
+        "next_cursor": next_cursor,
     }
 
 

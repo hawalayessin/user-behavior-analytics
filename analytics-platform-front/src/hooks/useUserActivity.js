@@ -1,32 +1,48 @@
-import { useState, useEffect, useCallback } from "react"
+import { useMemo } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
 export function useUserActivity({ start_date, end_date, service_id } = {}) {
-  const [data,    setData]    = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
+  const normalized = useMemo(
+    () => ({
+      start_date: start_date ?? null,
+      end_date: end_date ?? null,
+      service_id: service_id ?? null,
+    }),
+    [end_date, service_id, start_date],
+  )
 
-  const fetchActivity = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      if (start_date) params.set("start_date", start_date)
-      if (end_date)   params.set("end_date",   end_date)
-      if (service_id) params.set("service_id", service_id)
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      "analytics",
+      "user-activity",
+      normalized.start_date,
+      normalized.end_date,
+      normalized.service_id,
+    ],
+    queryFn: async () => {
+      const res = await api.get("/analytics/user-activity", {
+        params: {
+          start_date: normalized.start_date,
+          end_date: normalized.end_date,
+          service_id: normalized.service_id,
+        },
+      })
+      return res.data ?? null
+    },
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
+    placeholderData: keepPreviousData,
+  })
 
-      const res = await api.get(`/analytics/user-activity?${params.toString()}`)
-      setData(res.data)
-    } catch (err) {
-      setError(err.response?.data?.detail ?? err.message ?? "Erreur lors du chargement")
-    } finally {
-      setLoading(false)
-    }
-  }, [start_date, end_date, service_id])
-
-  useEffect(() => {
-    fetchActivity()
-  }, [fetchActivity])
-
-  return { data, loading, error, refetch: fetchActivity }
+  return {
+    data,
+    loading: isLoading,
+    error: error?.response?.data?.detail ?? error?.message ?? null,
+    refetch,
+  }
 }

@@ -38,23 +38,67 @@ class CampaignRepository:
         where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
 
         result = db.execute(text(f"""
-            SELECT 
-                COUNT(DISTINCT c.id) as total_campaigns,
-                SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END) as completed_campaigns,
-                SUM(CASE WHEN c.status = 'sent' THEN 1 ELSE 0 END) as sent_campaigns,
-                SUM(CASE WHEN c.status = 'scheduled' THEN 1 ELSE 0 END) as scheduled_campaigns,
-                COALESCE(SUM(c.target_size), 0) as total_targeted,
-                COUNT(DISTINCT s.id) as total_subscriptions,
+            WITH filtered_campaigns AS (
+                SELECT
+                    c.id,
+                    c.status,
+                    c.service_id,
+                    c.send_datetime,
+                    COALESCE(c.target_size, 0) AS target_size
+                FROM campaigns c
+                {where_sql}
+            ),
+            campaign_subs AS (
+                SELECT
+                    sub.id,
+                    fc.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN filtered_campaigns fc ON sub.campaign_id = fc.id
+
+                UNION ALL
+
+                SELECT
+                    sub.id,
+                    fc.id AS matched_campaign_id
+                FROM subscriptions sub
+                JOIN filtered_campaigns fc ON fc.service_id = sub.service_id
+                WHERE sub.campaign_id IS NULL
+                  AND sub.subscription_start_date BETWEEN
+                        fc.send_datetime - INTERVAL '1 day'
+                        AND fc.send_datetime + INTERVAL '7 days'
+            ),
+            dedup_subs AS (
+                SELECT DISTINCT ON (id, matched_campaign_id)
+                    id,
+                    matched_campaign_id
+                FROM campaign_subs
+                ORDER BY id, matched_campaign_id
+            ),
+            subs_per_campaign AS (
+                SELECT
+                    matched_campaign_id AS campaign_id,
+                    COUNT(DISTINCT id) AS subscriptions
+                FROM dedup_subs
+                GROUP BY matched_campaign_id
+            )
+            SELECT
+                COUNT(*) AS total_campaigns,
+                SUM(CASE WHEN fc.status = 'completed' THEN 1 ELSE 0 END) AS completed_campaigns,
+                SUM(CASE WHEN fc.status = 'sent' THEN 1 ELSE 0 END) AS sent_campaigns,
+                SUM(CASE WHEN fc.status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_campaigns,
+                COALESCE(SUM(fc.target_size), 0) AS total_targeted,
+                COALESCE(SUM(spc.subscriptions), 0) AS total_subscriptions,
                 ROUND(
-                    (CASE 
-                        WHEN COALESCE(SUM(c.target_size), 0) = 0 THEN 0
-                        ELSE (COUNT(DISTINCT s.id)::FLOAT / NULLIF(SUM(c.target_size), 0)) * 100
-                    END)::numeric, 
+                    (
+                        CASE
+                            WHEN COALESCE(SUM(fc.target_size), 0) = 0 THEN 0
+                            ELSE (COALESCE(SUM(spc.subscriptions), 0)::FLOAT / NULLIF(SUM(fc.target_size), 0)) * 100
+                        END
+                    )::numeric,
                     2
-                ) as conversion_rate
-            FROM campaigns c
-            LEFT JOIN subscriptions s ON s.campaign_id = c.id
-            {where_sql}
+                ) AS conversion_rate
+            FROM filtered_campaigns fc
+            LEFT JOIN subs_per_campaign spc ON spc.campaign_id = fc.id
         """), params).fetchone()
 
         if not result:
@@ -246,24 +290,34 @@ class CampaignRepository:
         where_sql = f"WHERE {' AND '.join(filters)}" if filters else ""
 
         result = db.execute(text(f"""
-            WITH campaign_subs AS (
+            WITH filtered_campaigns AS (
+                SELECT
+                    c.id,
+                    c.campaign_type,
+                    c.service_id,
+                    c.send_datetime,
+                    COALESCE(c.target_size, 0) AS target_size
+                FROM campaigns c
+                {where_sql}
+            ),
+            campaign_subs AS (
                 SELECT
                     sub.id,
-                    c.id AS matched_campaign_id
+                    fc.id AS matched_campaign_id
                 FROM subscriptions sub
-                JOIN campaigns c ON sub.campaign_id = c.id
+                JOIN filtered_campaigns fc ON sub.campaign_id = fc.id
 
                 UNION ALL
 
                 SELECT
                     sub.id,
-                    c.id AS matched_campaign_id
+                    fc.id AS matched_campaign_id
                 FROM subscriptions sub
-                JOIN campaigns c ON c.service_id = sub.service_id
+                JOIN filtered_campaigns fc ON fc.service_id = sub.service_id
                 WHERE sub.campaign_id IS NULL
                   AND sub.subscription_start_date BETWEEN
-                        c.send_datetime - INTERVAL '1 day'
-                        AND c.send_datetime + INTERVAL '7 days'
+                        fc.send_datetime - INTERVAL '1 day'
+                        AND fc.send_datetime + INTERVAL '7 days'
             ),
             dedup_subs AS (
                 SELECT DISTINCT ON (id, matched_campaign_id)
@@ -271,27 +325,39 @@ class CampaignRepository:
                     matched_campaign_id
                 FROM campaign_subs
                 ORDER BY id, matched_campaign_id
+            ),
+            per_campaign AS (
+                SELECT
+                    fc.id,
+                    fc.campaign_type,
+                    fc.target_size,
+                    COUNT(DISTINCT ds.id) AS subscriptions,
+                    COUNT(DISTINCT b.id) AS billing_events,
+                    COALESCE(SUM(CASE WHEN b.is_first_charge THEN 1 ELSE 0 END), 0) AS first_charges
+                FROM filtered_campaigns fc
+                LEFT JOIN dedup_subs ds ON ds.matched_campaign_id = fc.id
+                LEFT JOIN billing_events b ON b.subscription_id = ds.id
+                GROUP BY fc.id, fc.campaign_type, fc.target_size
             )
-            SELECT 
-                c.campaign_type,
-                COUNT(DISTINCT c.id) as count,
-                SUM(c.target_size) as targeted,
-                COUNT(DISTINCT s.id) as subscriptions,
-                COUNT(DISTINCT b.id) as billing_events,
-                COALESCE(SUM(CASE WHEN b.is_first_charge THEN 1 ELSE 0 END), 0) as first_charges,
+            SELECT
+                campaign_type,
+                COUNT(*) AS count,
+                SUM(target_size) AS targeted,
+                SUM(subscriptions) AS subscriptions,
+                SUM(billing_events) AS billing_events,
+                SUM(first_charges) AS first_charges,
                 ROUND(
-                    (CASE 
-                        WHEN NULLIF(SUM(c.target_size), 0) IS NULL THEN 0
-                        ELSE (COUNT(DISTINCT s.id)::FLOAT / SUM(c.target_size)) * 100
-                    END)::numeric, 
+                    (
+                        CASE
+                            WHEN NULLIF(SUM(target_size), 0) IS NULL THEN 0
+                            ELSE (SUM(subscriptions)::FLOAT / SUM(target_size)) * 100
+                        END
+                    )::numeric,
                     2
-                ) as conversion_rate
-            FROM campaigns c
-            LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
-            LEFT JOIN billing_events b ON b.subscription_id = s.id
-            {where_sql}
-            GROUP BY c.campaign_type
-            ORDER BY COUNT(DISTINCT c.id) DESC
+                ) AS conversion_rate
+            FROM per_campaign
+            GROUP BY campaign_type
+            ORDER BY COUNT(*) DESC
         """), params).fetchall()
 
         types_data = []
@@ -419,24 +485,35 @@ class CampaignRepository:
         where_sql = f"WHERE {' AND '.join(filters)}"
 
         result = db.execute(text(f"""
-            WITH campaign_subs AS (
+            WITH filtered_campaigns AS (
+                SELECT
+                    c.id,
+                    DATE_TRUNC('month', c.send_datetime)::DATE AS month,
+                    c.campaign_type,
+                    c.service_id,
+                    c.send_datetime,
+                    COALESCE(c.target_size, 0) AS target_size
+                FROM campaigns c
+                {where_sql}
+            ),
+            campaign_subs AS (
                 SELECT
                     sub.id,
-                    c.id AS matched_campaign_id
+                    fc.id AS matched_campaign_id
                 FROM subscriptions sub
-                JOIN campaigns c ON sub.campaign_id = c.id
+                JOIN filtered_campaigns fc ON sub.campaign_id = fc.id
 
                 UNION ALL
 
                 SELECT
                     sub.id,
-                    c.id AS matched_campaign_id
+                    fc.id AS matched_campaign_id
                 FROM subscriptions sub
-                JOIN campaigns c ON c.service_id = sub.service_id
+                JOIN filtered_campaigns fc ON fc.service_id = sub.service_id
                 WHERE sub.campaign_id IS NULL
                   AND sub.subscription_start_date BETWEEN
-                        c.send_datetime - INTERVAL '1 day'
-                        AND c.send_datetime + INTERVAL '7 days'
+                        fc.send_datetime - INTERVAL '1 day'
+                        AND fc.send_datetime + INTERVAL '7 days'
             ),
             dedup_subs AS (
                 SELECT DISTINCT ON (id, matched_campaign_id)
@@ -444,26 +521,38 @@ class CampaignRepository:
                     matched_campaign_id
                 FROM campaign_subs
                 ORDER BY id, matched_campaign_id
+            ),
+            per_campaign AS (
+                SELECT
+                    fc.id,
+                    fc.month,
+                    fc.campaign_type,
+                    fc.target_size,
+                    COUNT(DISTINCT ds.id) AS subscriptions,
+                    COALESCE(SUM(CASE WHEN b.is_first_charge THEN 1 ELSE 0 END), 0) AS first_charges
+                FROM filtered_campaigns fc
+                LEFT JOIN dedup_subs ds ON ds.matched_campaign_id = fc.id
+                LEFT JOIN billing_events b ON b.subscription_id = ds.id
+                GROUP BY fc.id, fc.month, fc.campaign_type, fc.target_size
             )
-            SELECT 
-                DATE_TRUNC('month', c.send_datetime)::DATE as month,
-                c.campaign_type,
-                COUNT(DISTINCT c.id) as campaign_count,
-                SUM(c.target_size) as targeted,
-                COUNT(DISTINCT s.id) as subscriptions,
-                COALESCE(SUM(CASE WHEN b.is_first_charge THEN 1 ELSE 0 END), 0) as first_charges,
+            SELECT
+                month,
+                campaign_type,
+                COUNT(*) AS campaign_count,
+                SUM(target_size) AS targeted,
+                SUM(subscriptions) AS subscriptions,
+                SUM(first_charges) AS first_charges,
                 ROUND(
-                    (CASE 
-                        WHEN NULLIF(SUM(c.target_size), 0) IS NULL THEN 0
-                        ELSE (COUNT(DISTINCT s.id)::FLOAT / SUM(c.target_size)) * 100
-                    END)::numeric, 
+                    (
+                        CASE
+                            WHEN NULLIF(SUM(target_size), 0) IS NULL THEN 0
+                            ELSE (SUM(subscriptions)::FLOAT / SUM(target_size)) * 100
+                        END
+                    )::numeric,
                     2
-                ) as conversion_rate
-            FROM campaigns c
-            LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
-            LEFT JOIN billing_events b ON b.subscription_id = s.id
-            {where_sql}
-            GROUP BY DATE_TRUNC('month', c.send_datetime), c.campaign_type
+                ) AS conversion_rate
+            FROM per_campaign
+            GROUP BY month, campaign_type
             ORDER BY month DESC
         """), params).fetchall()
 

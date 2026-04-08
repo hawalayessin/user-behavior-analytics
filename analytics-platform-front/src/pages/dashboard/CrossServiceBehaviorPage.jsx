@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState } from "react";
 import {
   AlertCircle,
   RotateCcw,
@@ -12,7 +12,7 @@ import {
   Package,
   Target,
   Sparkles,
-} from "lucide-react"
+} from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -22,41 +22,47 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-} from "recharts"
+} from "recharts";
 
-import AppLayout from "../../components/layout/AppLayout"
-import KPICard from "../../components/dashboard/KPICard"
-import FilterBar from "../../components/dashboard/FilterBar"
-import { useCrossService } from "../../hooks/useCrossService"
-import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters"
+import AppLayout from "../../components/layout/AppLayout";
+import KPICard from "../../components/dashboard/KPICard";
+import FilterBar from "../../components/dashboard/FilterBar";
+import { useCrossService } from "../../hooks/useCrossService";
+import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 
 /* ───────── helpers ───────── */
 
 function SkeletonCard() {
-  return <div className="w-full h-28 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  return (
+    <div className="w-full h-28 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  );
 }
 
 function SkeletonBlock({ h = "h-80" }) {
-  return <div className={`w-full ${h} bg-slate-800 animate-pulse rounded-xl border border-slate-700`} />
+  return (
+    <div
+      className={`w-full ${h} bg-slate-800 animate-pulse rounded-xl border border-slate-700`}
+    />
+  );
 }
 
 /* ───── color map for heatmap cells ───── */
 function heatColor(rate) {
-  if (rate >= 25) return "bg-indigo-500 text-white"
-  if (rate >= 15) return "bg-indigo-500/70 text-white"
-  if (rate >= 10) return "bg-indigo-500/40 text-slate-100"
-  if (rate >= 5) return "bg-indigo-500/20 text-slate-200"
-  if (rate > 0) return "bg-indigo-500/10 text-slate-300"
-  return "bg-slate-800/50 text-slate-500"
+  if (rate >= 25) return "bg-indigo-500 text-white";
+  if (rate >= 15) return "bg-indigo-500/70 text-white";
+  if (rate >= 10) return "bg-indigo-500/40 text-slate-100";
+  if (rate >= 5) return "bg-indigo-500/20 text-slate-200";
+  if (rate > 0) return "bg-indigo-500/10 text-slate-300";
+  return "bg-slate-800/50 text-slate-500";
 }
 
 /* ───── bar chart gradient colors ───── */
-const BAR_COLORS = ["#6366f1", "#818cf8", "#a78bfa", "#c084fc"]
+const BAR_COLORS = ["#6366f1", "#818cf8", "#a78bfa", "#c084fc"];
 
 /* ───── custom tooltip for bar chart ───── */
 function DistributionTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null
-  const d = payload[0].payload
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
   return (
     <div className="bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 shadow-xl">
       <p className="text-sm font-semibold text-slate-100">
@@ -66,14 +72,14 @@ function DistributionTooltip({ active, payload }) {
         {d.user_count.toLocaleString()} users ({d.percentage}%)
       </p>
     </div>
-  )
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 export default function CrossServiceBehaviorPage() {
-  const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS)
+  const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS);
 
   const {
     overview,
@@ -83,36 +89,36 @@ export default function CrossServiceBehaviorPage() {
     loading,
     error,
     refetch,
-  } = useCrossService(filters)
+  } = useCrossService(filters);
 
   /* ── derive unique services list for heatmap axis ── */
   const serviceNames = useMemo(() => {
-    if (!coSubscriptions?.matrix?.length) return []
-    const set = new Set()
+    if (!coSubscriptions?.matrix?.length) return [];
+    const set = new Set();
     coSubscriptions.matrix.forEach((r) => {
-      set.add(r.service_a)
-      set.add(r.service_b)
-    })
-    return Array.from(set).sort()
-  }, [coSubscriptions])
+      set.add(r.service_a);
+      set.add(r.service_b);
+    });
+    return Array.from(set).sort();
+  }, [coSubscriptions]);
 
   /* ── lookup map: (A,B) → rate ── */
   const rateMap = useMemo(() => {
-    const m = {}
-    if (!coSubscriptions?.matrix) return m
+    const m = {};
+    if (!coSubscriptions?.matrix) return m;
     coSubscriptions.matrix.forEach((r) => {
-      m[`${r.service_a}__${r.service_b}`] = r.rate
-    })
-    return m
-  }, [coSubscriptions])
+      m[`${r.service_a}__${r.service_b}`] = r.rate;
+    });
+    return m;
+  }, [coSubscriptions]);
 
   /* ── build recommendations from actual data ── */
   const recommendations = useMemo(() => {
-    const recs = []
+    const recs = [];
 
     // Rec 1 — bundle from top combo
     if (overview?.top_combo?.count > 0) {
-      const { service_a, service_b, count } = overview.top_combo
+      const { service_a, service_b, count } = overview.top_combo;
       recs.push({
         icon: Package,
         title: "Bundle Suggestion",
@@ -120,7 +126,7 @@ export default function CrossServiceBehaviorPage() {
         border: "border-emerald-500/30",
         bg: "bg-emerald-500/5",
         text: `${service_a} + ${service_b} — ${count} users already subscribe to both. Consider offering a bundle discount of -20% to drive cross-adoption.`,
-      })
+      });
     } else {
       recs.push({
         icon: Package,
@@ -129,12 +135,12 @@ export default function CrossServiceBehaviorPage() {
         border: "border-emerald-500/30",
         bg: "bg-emerald-500/5",
         text: "Identify top service pairs from co-subscription data and offer bundle pricing to increase multi-service adoption.",
-      })
+      });
     }
 
     // Rec 2 — re-engagement from top migration
     if (migrations?.migrations?.length > 0) {
-      const top = migrations.migrations[0]
+      const top = migrations.migrations[0];
       recs.push({
         icon: Target,
         title: "Re-engagement Opportunity",
@@ -142,7 +148,7 @@ export default function CrossServiceBehaviorPage() {
         border: "border-amber-500/30",
         bg: "bg-amber-500/5",
         text: `${top.user_count} users migrated from ${top.from_service} → ${top.to_service}. Target ${top.from_service} churned users with a ${top.to_service} trial campaign.`,
-      })
+      });
     } else {
       recs.push({
         icon: Target,
@@ -151,7 +157,7 @@ export default function CrossServiceBehaviorPage() {
         border: "border-amber-500/30",
         bg: "bg-amber-500/5",
         text: "Analyse migration paths to identify re-engagement opportunities for churned users across services.",
-      })
+      });
     }
 
     // Rec 3 — algorithmic / retention comparison
@@ -164,10 +170,10 @@ export default function CrossServiceBehaviorPage() {
       text: overview
         ? `Multi-service users show ${overview.cross_retention_rate}% retention vs ${overview.mono_retention_rate}% for mono-service users. Encouraging cross-service adoption could reduce churn significantly.`
         : "Multi-service users typically show higher retention. Collaborative filtering can recommend new services based on usage patterns.",
-    })
+    });
 
-    return recs
-  }, [overview, migrations])
+    return recs;
+  }, [overview, migrations]);
 
   return (
     <AppLayout pageTitle="Cross-Service Behavior">
@@ -179,7 +185,8 @@ export default function CrossServiceBehaviorPage() {
               Cross-Service Behavior
             </h1>
             <p className="text-sm text-slate-400">
-              Analyse multi-service adoption, migration paths and co-subscription patterns
+              Analyse multi-service adoption, migration paths and
+              co-subscription patterns
             </p>
           </div>
           <button
@@ -192,7 +199,11 @@ export default function CrossServiceBehaviorPage() {
         </div>
 
         {/* ── Filter Bar ── */}
-        <FilterBar onApply={setFilters} defaultPeriod="all" />
+        <FilterBar
+          onApply={setFilters}
+          defaultPeriod="all"
+          appliedFilters={filters}
+        />
 
         {/* ── Error Banner ── */}
         {error && (
@@ -255,9 +266,7 @@ export default function CrossServiceBehaviorPage() {
               <KPICard
                 title="Cross-Service Retention"
                 value={
-                  overview
-                    ? `${overview.cross_retention_rate ?? 0}%`
-                    : "—"
+                  overview ? `${overview.cross_retention_rate ?? 0}%` : "—"
                 }
                 subtitle={
                   overview
@@ -265,7 +274,8 @@ export default function CrossServiceBehaviorPage() {
                     : "Loading…"
                 }
                 subtitleColor={
-                  overview && overview.cross_retention_rate > overview.mono_retention_rate
+                  overview &&
+                  overview.cross_retention_rate > overview.mono_retention_rate
                     ? "text-emerald-400"
                     : "text-slate-500"
                 }
@@ -306,7 +316,8 @@ export default function CrossServiceBehaviorPage() {
               Co-Subscription Heatmap
             </h3>
             <p className="text-sm text-slate-400">
-              Which services are used together? Percentage of row-service users who also subscribe to column-service.
+              Which services are used together? Percentage of row-service users
+              who also subscribe to column-service.
             </p>
           </div>
 
@@ -336,7 +347,10 @@ export default function CrossServiceBehaviorPage() {
                 </thead>
                 <tbody>
                   {serviceNames.map((rowService) => (
-                    <tr key={rowService} className="border-t border-slate-700/30">
+                    <tr
+                      key={rowService}
+                      className="border-t border-slate-700/30"
+                    >
                       <td className="px-4 py-3 text-slate-200 font-medium whitespace-nowrap bg-slate-900/30">
                         {rowService}
                       </td>
@@ -349,21 +363,21 @@ export default function CrossServiceBehaviorPage() {
                             >
                               —
                             </td>
-                          )
+                          );
                         }
                         const rate =
-                          rateMap[`${rowService}__${colService}`] ?? 0
+                          rateMap[`${rowService}__${colService}`] ?? 0;
                         return (
                           <td
                             key={colService}
                             className={`px-4 py-3 text-center text-xs font-mono font-semibold rounded transition-colors ${heatColor(
-                              rate
+                              rate,
                             )}`}
                             title={`${rate}% of ${rowService} users also use ${colService}`}
                           >
                             {rate > 0 ? `${rate}%` : "—"}
                           </td>
-                        )
+                        );
                       })}
                     </tr>
                   ))}
@@ -384,7 +398,8 @@ export default function CrossServiceBehaviorPage() {
                 Migration Paths
               </h3>
               <p className="text-sm text-slate-400">
-                User migration flows between services (ended service A → started service B)
+                User migration flows between services (ended service A → started
+                service B)
               </p>
             </div>
 
@@ -412,7 +427,10 @@ export default function CrossServiceBehaviorPage() {
                     </span>
 
                     {/* Arrow */}
-                    <ArrowRight size={16} className="flex-shrink-0 text-indigo-400" />
+                    <ArrowRight
+                      size={16}
+                      className="flex-shrink-0 text-indigo-400"
+                    />
 
                     {/* To */}
                     <span className="text-sm font-medium text-slate-200 truncate min-w-0">
@@ -468,8 +486,15 @@ export default function CrossServiceBehaviorPage() {
                     tick={{ fill: "#94a3b8", fontSize: 12 }}
                     axisLine={{ stroke: "#475569" }}
                   />
-                  <Tooltip content={<DistributionTooltip />} cursor={{ fill: "rgba(99,102,241,0.08)" }} />
-                  <Bar dataKey="user_count" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                  <Tooltip
+                    content={<DistributionTooltip />}
+                    cursor={{ fill: "rgba(99,102,241,0.08)" }}
+                  />
+                  <Bar
+                    dataKey="user_count"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={60}
+                  >
                     {distribution.distribution.map((_, index) => (
                       <Cell
                         key={`cell-${index}`}
@@ -516,12 +541,13 @@ export default function CrossServiceBehaviorPage() {
             </h3>
           </div>
           <p className="text-sm text-slate-400">
-            Data-driven recommendations to increase multi-service adoption and revenue.
+            Data-driven recommendations to increase multi-service adoption and
+            revenue.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {recommendations.map((rec, i) => {
-              const Icon = rec.icon
+              const Icon = rec.icon;
               return (
                 <div
                   key={i}
@@ -537,11 +563,11 @@ export default function CrossServiceBehaviorPage() {
                     {rec.text}
                   </p>
                 </div>
-              )
+              );
             })}
           </div>
         </div>
       </div>
     </AppLayout>
-  )
+  );
 }

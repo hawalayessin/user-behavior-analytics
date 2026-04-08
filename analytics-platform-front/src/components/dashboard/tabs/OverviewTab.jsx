@@ -1,7 +1,6 @@
 import PropTypes from "prop-types";
 import KPICardsRow1 from "../KPICardsRow1";
 import KPICardsRow2 from "../KPICardsRow2";
-import KPICardsSMSRow from "../KPICardsSMSRow";
 import SubscriptionDonutChart from "../SubscriptionDonutChart";
 import ChurnPieChart from "../ChurnPieChart";
 import TrialDropoffChart from "../TrialDropoffChart";
@@ -19,7 +18,6 @@ export default function OverviewTab({ data, filters }) {
     <div className="space-y-6">
       <KPICardsRow1 data={data} metrics={metrics} />
       <KPICardsRow2 data={data} metrics={metrics} />
-      <KPICardsSMSRow data={data} />
 
       <TopServicesTable services={data.top_services} />
       <BIInsightsPanel insights={metrics.biInsights} />

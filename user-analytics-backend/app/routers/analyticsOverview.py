@@ -1,5 +1,6 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -8,7 +9,17 @@ from sqlalchemy.exc import OperationalError
 from datetime import date
 from typing import Optional
 
+from app.core.cache import (
+    build_cache_key,
+    cache_get_json,
+    cache_get_or_set_json,
+    cache_or_compute,
+    invalidate_analytics_cache,
+    cache_set_json,
+)
 from app.core.database import SessionLocal, get_db
+from app.core.config import settings
+from app.core.dependencies import require_admin
 from app.core.date_ranges import resolve_date_range
 from app.utils.temporal import (
     get_data_anchor,
@@ -28,10 +39,61 @@ async def _run_in_thread(func, *args):
     return await loop.run_in_executor(_summary_executor, lambda: func(*args))
 
 
+def _exec_with_timeout_retry(db: Session, sql_text, params: dict):
+    try:
+        return db.execute(sql_text, params)
+    except OperationalError as exc:
+        if "statement timeout" not in str(exc).lower():
+            raise
+        db.rollback()
+        db.execute(text("SET LOCAL statement_timeout = 0"))
+        return db.execute(sql_text, params)
+
+
+def _analytics_cache_key(block: str, params: dict, service_id: Optional[str]) -> str:
+    parts = [
+        "analytics",
+        "summary",
+        block,
+        service_id or "all",
+        str(params.get("last30_start_dt", "")),
+        str(params.get("last30_end_dt", "")),
+        str(params.get("usage_month_start_dt", "")),
+        str(params.get("usage_month_end_dt", "")),
+        str(params.get("usage_week_start_dt", "")),
+        str(params.get("usage_week_end_dt", "")),
+        str(params.get("usage_day_start_dt", "")),
+        str(params.get("usage_day_end_dt", "")),
+        str(params.get("billing_month_start_dt", "")),
+        str(params.get("billing_month_end_dt", "")),
+        str(params.get("churn_month_start_dt", "")),
+        str(params.get("churn_month_end_dt", "")),
+        str(params.get("sms_window_days", "")),
+    ]
+    return ":".join(parts)
+
+
+def _to_namespace_row(cached: dict | None):
+    if cached is None:
+        return None
+    return SimpleNamespace(**cached)
+
+
+def _to_namespace_rows(cached: list[dict] | None):
+    if cached is None:
+        return None
+    return [SimpleNamespace(**item) for item in cached]
+
+
 def _summary_users_block(params: dict):
+    cache_key = _analytics_cache_key("users", params, None)
+    cached = _to_namespace_row(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
     db = SessionLocal()
     try:
-        return db.execute(text("""
+        row = db.execute(text("""
             SELECT
                 COUNT(*)                                                          AS total_users,
                 COUNT(*) FILTER (WHERE status = 'active')                         AS active_users,
@@ -39,45 +101,70 @@ def _summary_users_block(params: dict):
                 COUNT(*) FILTER (WHERE created_at BETWEEN :last30_start_dt AND :last30_end_dt) AS new_last_30_days
             FROM users
         """), params).fetchone()
+        if row is not None:
+            cache_set_json(
+                cache_key,
+                dict(row._mapping),
+                settings.ANALYTICS_CACHE_TTL_SECONDS,
+            )
+        return row
     finally:
         db.close()
 
 
 def _summary_subscriptions_block(params: dict, service_id: Optional[str]):
+    cache_key = _analytics_cache_key("subscriptions", params, service_id)
+    cached = _to_namespace_row(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
     sf_subs = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     db = SessionLocal()
     try:
-        return db.execute(text(f"""
+        query = text(f"""
             SELECT
-                COUNT(*)                                               AS total,
+                COUNT(*) FILTER (WHERE s.status != 'pending')         AS total,
+                COUNT(*)                                               AS total_with_pending,
                 COUNT(*) FILTER (WHERE s.status = 'active')           AS active,
-                COUNT(*) FILTER (WHERE s.status = 'trial')            AS trial,
-                COUNT(*) FILTER (WHERE s.status = 'expired')          AS expired,
+                COUNT(*) FILTER (WHERE s.status = 'billing_failed')   AS billing_failed,
                 COUNT(*) FILTER (WHERE s.status = 'cancelled')        AS cancelled,
+                COUNT(*) FILTER (WHERE s.status = 'pending')          AS pending,
+                COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'active')         AS active_users,
+                COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'billing_failed') AS at_risk_users,
+                COUNT(*) FILTER (
+                    WHERE s.subscription_start_date BETWEEN :last30_start_dt AND :last30_end_dt
+                      AND s.status != 'pending'
+                ) AS new_last_30_days,
                 ROUND(
                     COUNT(*) FILTER (WHERE s.status = 'active') * 100.0
-                    / NULLIF(
-                        COUNT(*) FILTER (WHERE s.status IN ('active','expired'))
-                        + COUNT(*) FILTER (
-                            WHERE s.status = 'cancelled'
-                            AND (s.subscription_end_date - s.subscription_start_date)
-                                <= INTERVAL '3 days'
-                        ), 0
-                    ), 1
+                    / NULLIF(COUNT(*) FILTER (WHERE s.status != 'pending'), 0), 1
                 )                                                      AS conversion_rate_pct
             FROM subscriptions s
             WHERE 1=1 {sf_subs}
-        """), params).fetchone()
+        """)
+        row = _exec_with_timeout_retry(db, query, params).fetchone()
+        if row is not None:
+            cache_set_json(
+                cache_key,
+                dict(row._mapping),
+                settings.ANALYTICS_CACHE_TTL_SECONDS,
+            )
+        return row
     finally:
         db.close()
 
 
 def _summary_churn_block(params: dict, service_id: Optional[str]):
+    cache_key = _analytics_cache_key("churn", params, service_id)
+    cached = _to_namespace_row(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
     sf_churn_active = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_churn_rows = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
     db = SessionLocal()
     try:
-        return db.execute(text(f"""
+        row = db.execute(text(f"""
             WITH active_start AS (
                 SELECT COUNT(DISTINCT s.id) AS active_count
                 FROM subscriptions s
@@ -119,11 +206,23 @@ def _summary_churn_block(params: dict, service_id: Optional[str]):
                 )                                                                AS churn_rate_month_pct
             FROM churn_rows
         """), params).fetchone()
+        if row is not None:
+            cache_set_json(
+                cache_key,
+                dict(row._mapping),
+                settings.ANALYTICS_CACHE_TTL_SECONDS,
+            )
+        return row
     finally:
         db.close()
 
 
 def _summary_revenue_block(params: dict, service_id: Optional[str]):
+    cache_key = _analytics_cache_key("revenue", params, service_id)
+    cached = _to_namespace_row(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
     sf_rev = "AND srv.id = CAST(:service_id AS uuid)" if service_id else ""
     revenue_query = text(f"""
             SELECT
@@ -155,23 +254,36 @@ def _summary_revenue_block(params: dict, service_id: Optional[str]):
     db = SessionLocal()
     try:
         try:
-            return db.execute(revenue_query, params).fetchone()
+            row = db.execute(revenue_query, params).fetchone()
         except OperationalError as exc:
             # Keep /analytics/summary resilient when the DB enforces short statement_timeout.
             if "statement timeout" not in str(exc).lower():
                 raise
             db.rollback()
             db.execute(text("SET LOCAL statement_timeout = 0"))
-            return db.execute(revenue_query, params).fetchone()
+            row = db.execute(revenue_query, params).fetchone()
+
+        if row is not None:
+            cache_set_json(
+                cache_key,
+                dict(row._mapping),
+                settings.ANALYTICS_CACHE_TTL_SECONDS,
+            )
+        return row
     finally:
         db.close()
 
 
 def _summary_engagement_block(params: dict, service_id: Optional[str]):
+    cache_key = _analytics_cache_key("engagement", params, service_id)
+    cached = _to_namespace_row(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
     sf_eng = "AND service_id = CAST(:service_id AS uuid)" if service_id else ""
     db = SessionLocal()
     try:
-        return db.execute(text(f"""
+        row = db.execute(text(f"""
             SELECT
                 COUNT(DISTINCT user_id) FILTER (
                     WHERE activity_datetime BETWEEN :usage_day_start_dt AND :usage_day_end_dt
@@ -185,36 +297,64 @@ def _summary_engagement_block(params: dict, service_id: Optional[str]):
             FROM user_activities
             WHERE 1=1 {sf_eng}
         """), params).fetchone()
+        if row is not None:
+            cache_set_json(
+                cache_key,
+                dict(row._mapping),
+                settings.ANALYTICS_CACHE_TTL_SECONDS,
+            )
+        return row
     finally:
         db.close()
 
 
-def _summary_top_services_block():
+def _summary_top_services_block(params: dict, service_id: Optional[str]):
+    cache_key = _analytics_cache_key("top_services", params, service_id)
+    cached = _to_namespace_rows(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
+    sf_top = "WHERE s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     db = SessionLocal()
     try:
-        return db.execute(text("""
+        rows = db.execute(text(f"""
             SELECT
                 srv.name                                             AS service_name,
+                COUNT(*)                                             AS total,
                 COUNT(*) FILTER (WHERE s.status = 'active')         AS active_subs,
-                COUNT(*) FILTER (WHERE s.status = 'cancelled')      AS churned_subs,
+                COUNT(*) FILTER (WHERE s.status = 'billing_failed') AS billing_failed,
+                COUNT(*) FILTER (WHERE s.status = 'cancelled')      AS cancelled,
+                COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'active') AS active_users,
                 ROUND(
                     COUNT(*) FILTER (WHERE s.status = 'cancelled') * 100.0
-                    / NULLIF(COUNT(*), 0), 1
+                    / NULLIF(COUNT(*) FILTER (WHERE s.status != 'pending'), 0), 1
                 )                                                    AS churn_rate_pct
             FROM subscriptions s
             JOIN services srv ON srv.id = s.service_id
+            {sf_top}
             GROUP BY srv.name
-            ORDER BY active_subs DESC
-        """), {}).fetchall()
+            ORDER BY total DESC
+        """), params).fetchall()
+        cache_set_json(
+            cache_key,
+            [dict(row._mapping) for row in rows],
+            settings.ANALYTICS_CACHE_TTL_SECONDS,
+        )
+        return rows
     finally:
         db.close()
 
 
 def _summary_sms_block(params: dict, service_id: Optional[str]):
+    cache_key = _analytics_cache_key("sms", params, service_id)
+    cached = _to_namespace_row(cache_get_json(cache_key))
+    if cached is not None:
+        return cached
+
     sf_sms = "AND se.service_id = CAST(:service_id AS uuid)" if service_id else ""
     db = SessionLocal()
     try:
-        return db.execute(text(f"""
+        row = db.execute(text(f"""
             WITH anchor AS (
                 SELECT MAX(event_datetime) AS ts
                 FROM sms_events
@@ -278,6 +418,13 @@ def _summary_sms_block(params: dict, service_id: Optional[str]):
             FROM cur_rates cr
             CROSS JOIN prev_rates pr
         """), params).fetchone()
+        if row is not None:
+            cache_set_json(
+                cache_key,
+                dict(row._mapping),
+                settings.ANALYTICS_CACHE_TTL_SECONDS,
+            )
+        return row
     finally:
         db.close()
 
@@ -320,17 +467,20 @@ async def get_summary(
         _run_in_thread(_summary_churn_block, params, service_id),
         _run_in_thread(_summary_revenue_block, params, service_id),
         _run_in_thread(_summary_engagement_block, params, service_id),
-        _run_in_thread(_summary_top_services_block),
+        _run_in_thread(_summary_top_services_block, params, service_id),
         _run_in_thread(_summary_sms_block, params, service_id),
     )
 
     dau        = engagement.dau_today         or 0
     mau        = engagement.mau_current_month or 0
     stickiness = round((dau / mau * 100), 1)  if mau > 0 else 0.0
-    failure_data_note = (
-        "N/A - aucun echec enregistre dans la source"
-        if int(revenue.non_success_events or 0) == 0 and int(revenue.success_events or 0) > 0
-        else None
+    billing_failed_from_subs = int(subs.billing_failed or 0)
+    billing_success = int(revenue.success_events or 0)
+    failed_denominator = billing_success + billing_failed_from_subs
+    failed_pct = (
+        round((billing_failed_from_subs * 100.0) / failed_denominator, 1)
+        if failed_denominator > 0
+        else 0.0
     )
 
     return {
@@ -343,10 +493,16 @@ async def get_summary(
         },
         "subscriptions": {
             "total":               subs.total,
+            "total_with_pending":  subs.total_with_pending,
             "active":              subs.active,
-            "trial":               subs.trial,
-            "expired":             subs.expired,
+            "billing_failed":      subs.billing_failed,
             "cancelled":           subs.cancelled,
+            "pending":             subs.pending,
+            "active_users":        subs.active_users,
+            "at_risk_users":       subs.at_risk_users,
+            "new_last_30_days":    subs.new_last_30_days,
+            "trial":               subs.pending,
+            "expired":             subs.billing_failed,
             "conversion_rate_pct": float(subs.conversion_rate_pct or 0),
         },
         "churn": {
@@ -366,10 +522,10 @@ async def get_summary(
             "total_revenue":      float(revenue.total_revenue      or 0),
             "mrr":                float(revenue.mrr                or 0),
             "arpu_current_month": float(revenue.arpu_current_month or 0),
-            "billing_success":    revenue.success_events,
-            "billing_failed":     revenue.failed_events,
-            "failed_pct":         None if failure_data_note else float(revenue.failed_pct or 0),
-            "failure_data_note":  failure_data_note,
+            "billing_success":    billing_success,
+            "billing_failed":     billing_failed_from_subs,
+            "failed_pct":         failed_pct,
+            "failure_data_note":  None,
         },
         "engagement": {
             "dau_today":         dau,
@@ -389,8 +545,12 @@ async def get_summary(
         "top_services": [
             {
                 "name":           row.service_name,
+                "total":          row.total,
                 "active_subs":    row.active_subs,
-                "churned_subs":   row.churned_subs,
+                "billing_failed":  row.billing_failed,
+                "cancelled":      row.cancelled,
+                "active_users":   row.active_users,
+                "churned_subs":   row.cancelled,
                 "churn_rate_pct": float(row.churn_rate_pct or 0),
             }
             for row in top_services
@@ -401,15 +561,15 @@ async def get_summary(
 # ══════════════════════════════════════════════════════════════════
 # GET /analytics/overview  — données filtrées par date + service
 # ══════════════════════════════════════════════════════════════════
-@router.get("/overview")
-def get_overview(
-    db:         Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=None),
-    end_date:   Optional[date] = Query(default=None),
-    service_id: Optional[str]  = Query(default=None),
+def _compute_overview_payload(
+    db: Session,
+    *,
+    start_dt: date,
+    end_dt: date,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    service_id: Optional[str],
 ):
-    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="analytics")
-
     usage_day_start, usage_day_end = get_day_window(db, source="usage")
     usage_week_start, usage_week_end = get_week_window(db, source="usage")
     usage_month_start, usage_month_end = get_month_window(db, source="usage")
@@ -457,29 +617,30 @@ def get_overview(
         FROM users
     """), params).fetchone()
 
-    subs = db.execute(text(f"""
+    subs_query = text(f"""
         SELECT
-            COUNT(*)                                               AS total,
+            COUNT(*) FILTER (WHERE s.status != 'pending')         AS total,
+            COUNT(*)                                               AS total_with_pending,
             COUNT(*) FILTER (WHERE s.status = 'active')           AS active,
-            COUNT(*) FILTER (WHERE s.status = 'trial')            AS trial,
-            COUNT(*) FILTER (WHERE s.status = 'expired')          AS expired,
+            COUNT(*) FILTER (WHERE s.status = 'billing_failed')   AS billing_failed,
             COUNT(*) FILTER (WHERE s.status = 'cancelled')        AS cancelled,
+            COUNT(*) FILTER (WHERE s.status = 'pending')          AS pending,
+            COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'active')         AS active_users,
+            COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'billing_failed') AS at_risk_users,
+            COUNT(*) FILTER (
+                WHERE s.subscription_start_date BETWEEN :start_dt AND :end_dt
+                  AND s.status != 'pending'
+            ) AS new_last_30_days,
             ROUND(
                 COUNT(*) FILTER (WHERE s.status = 'active') * 100.0
-                / NULLIF(
-                    COUNT(*) FILTER (WHERE s.status IN ('active','expired'))
-                    + COUNT(*) FILTER (
-                        WHERE s.status = 'cancelled'
-                        AND (s.subscription_end_date - s.subscription_start_date)
-                            <= INTERVAL '3 days'
-                    ), 0
-                ), 1
+                / NULLIF(COUNT(*) FILTER (WHERE s.status != 'pending'), 0), 1
             )                                                      AS conversion_rate_pct
         FROM subscriptions s
         {sj_subs}
         WHERE s.subscription_start_date BETWEEN :start_dt AND :end_dt
         {sf_subs}
-    """), params).fetchone()
+    """)
+    subs = _exec_with_timeout_retry(db, subs_query, params).fetchone()
 
     churn = db.execute(text(f"""
                 WITH active_start AS (
@@ -570,30 +731,36 @@ def get_overview(
         {sf_eng}
     """), params).fetchone()
 
-    dau        = engagement.dau_today         or 0
-    mau        = engagement.mau_current_month or 0
-    stickiness = round((dau / mau * 100), 1)  if mau > 0 else 0.0
-    failure_data_note = (
-        "N/A - aucun echec enregistre dans la source"
-        if int(revenue.non_success_events or 0) == 0 and int(revenue.success_events or 0) > 0
-        else None
+    dau = engagement.dau_today or 0
+    mau = engagement.mau_current_month or 0
+    stickiness = round((dau / mau * 100), 1) if mau > 0 else 0.0
+    billing_failed_from_subs = int(subs.billing_failed or 0)
+    billing_success = int(revenue.success_events or 0)
+    failed_denominator = billing_success + billing_failed_from_subs
+    failed_pct = (
+        round((billing_failed_from_subs * 100.0) / failed_denominator, 1)
+        if failed_denominator > 0
+        else 0.0
     )
 
     top_services = db.execute(text(f"""
         SELECT
             srv.name                                             AS service_name,
+            COUNT(*)                                             AS total,
             COUNT(*) FILTER (WHERE s.status = 'active')         AS active_subs,
-            COUNT(*) FILTER (WHERE s.status = 'cancelled')      AS churned_subs,
+            COUNT(*) FILTER (WHERE s.status = 'billing_failed') AS billing_failed,
+            COUNT(*) FILTER (WHERE s.status = 'cancelled')      AS cancelled,
+            COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'active') AS active_users,
             ROUND(
                 COUNT(*) FILTER (WHERE s.status = 'cancelled') * 100.0
-                / NULLIF(COUNT(*), 0), 1
+                / NULLIF(COUNT(*) FILTER (WHERE s.status != 'pending'), 0), 1
             )                                                    AS churn_rate_pct
         FROM subscriptions s
         JOIN services srv ON srv.id = s.service_id
         WHERE s.subscription_start_date BETWEEN :start_dt AND :end_dt
         {sf_top}
         GROUP BY srv.name
-        ORDER BY active_subs DESC
+        ORDER BY total DESC
     """), params).fetchall()
 
     sms = db.execute(text(f"""
@@ -666,29 +833,35 @@ def get_overview(
         "data_anchor": data_anchor.strftime("%Y-%m-%d"),
         "filters_applied": {
             "start_date": start_dt.isoformat(),
-            "end_date":   end_dt.isoformat(),
+            "end_date": end_dt.isoformat(),
             "service_id": service_id,
         },
         "users": {
-            "total":            users.total_users,
-            "active":           users.active_users,
-            "inactive":         users.inactive_users,
+            "total": users.total_users,
+            "active": users.active_users,
+            "inactive": users.inactive_users,
             "new_last_30_days": users.new_last_30_days,
         },
         "subscriptions": {
-            "total":               subs.total,
-            "active":              subs.active,
-            "trial":               subs.trial,
-            "expired":             subs.expired,
-            "cancelled":           subs.cancelled,
+            "total": subs.total,
+            "total_with_pending": subs.total_with_pending,
+            "active": subs.active,
+            "billing_failed": subs.billing_failed,
+            "cancelled": subs.cancelled,
+            "pending": subs.pending,
+            "active_users": subs.active_users,
+            "at_risk_users": subs.at_risk_users,
+            "new_last_30_days": subs.new_last_30_days,
+            "trial": subs.pending,
+            "expired": subs.billing_failed,
             "conversion_rate_pct": float(subs.conversion_rate_pct or 0),
         },
         "churn": {
-            "total":                churn.total_unsubs,
-            "voluntary":            churn.voluntary,
-            "technical":            churn.technical,
-            "voluntary_pct":        float(churn.voluntary_pct        or 0),
-            "technical_pct":        float(churn.technical_pct        or 0),
+            "total": churn.total_unsubs,
+            "voluntary": churn.voluntary,
+            "technical": churn.technical,
+            "voluntary_pct": float(churn.voluntary_pct or 0),
+            "technical_pct": float(churn.technical_pct or 0),
             "churn_rate_month_pct": float(churn.churn_rate_month_pct or 0),
             "dropoff": {
                 "day1": churn.dropoff_day1,
@@ -697,36 +870,84 @@ def get_overview(
             },
         },
         "revenue": {
-            "total_revenue":      float(revenue.total_revenue      or 0),
-            "mrr":                float(revenue.mrr                or 0),
+            "total_revenue": float(revenue.total_revenue or 0),
+            "mrr": float(revenue.mrr or 0),
             "arpu_current_month": float(revenue.arpu_current_month or 0),
-            "billing_success":    revenue.success_events,
-            "billing_failed":     revenue.failed_events,
-            "failed_pct":         None if failure_data_note else float(revenue.failed_pct or 0),
-            "failure_data_note":  failure_data_note,
+            "billing_success": billing_success,
+            "billing_failed": billing_failed_from_subs,
+            "failed_pct": failed_pct,
+            "failure_data_note": None,
         },
         "engagement": {
-            "dau_today":         dau,
-            "wau_current_week":  engagement.wau_current_week or 0,
+            "dau_today": dau,
+            "wau_current_week": engagement.wau_current_week or 0,
             "mau_current_month": mau,
-            "stickiness_pct":    stickiness,
+            "stickiness_pct": stickiness,
         },
         "sms": {
-            "otp_templates_pct":         float(sms.otp_templates_pct or 0),
-            "activation_templates_pct":  float(sms.activation_templates_pct or 0),
-            "otp_rate_trend_pct":        float(sms.otp_rate_trend_pct or 0),
+            "otp_templates_pct": float(sms.otp_templates_pct or 0),
+            "activation_templates_pct": float(sms.activation_templates_pct or 0),
+            "otp_rate_trend_pct": float(sms.otp_rate_trend_pct or 0),
             "activation_rate_trend_pct": float(sms.activation_rate_trend_pct or 0),
-            "templates_per_service":     float(sms.templates_per_service or 0),
-            "total_templates":           int(sms.total_templates or 0),
-            "total_services":            int(sms.total_services or 0),
+            "templates_per_service": float(sms.templates_per_service or 0),
+            "total_templates": int(sms.total_templates or 0),
+            "total_services": int(sms.total_services or 0),
         },
         "top_services": [
             {
-                "name":           row.service_name,
-                "active_subs":    row.active_subs,
-                "churned_subs":   row.churned_subs,
+                "name": row.service_name,
+                "total": row.total,
+                "active_subs": row.active_subs,
+                "billing_failed": row.billing_failed,
+                "cancelled": row.cancelled,
+                "active_users": row.active_users,
+                "churned_subs": row.cancelled,
                 "churn_rate_pct": float(row.churn_rate_pct or 0),
             }
             for row in top_services
         ],
+    }
+
+
+@router.get("/overview")
+def get_overview(
+    db: Session = Depends(get_db),
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    service_id: Optional[str] = Query(default=None),
+):
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="analytics")
+
+    cache_key = build_cache_key(
+        "overview",
+        {
+            "start_date": start_dt.isoformat(),
+            "end_date": end_dt.isoformat(),
+            "service_id": service_id or "all",
+        },
+    )
+
+    return cache_or_compute(
+        cache_key,
+        settings.OVERVIEW_CACHE_TTL_SECONDS,
+        compute_function=lambda: _compute_overview_payload(
+            db,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            start_date=start_date,
+            end_date=end_date,
+            service_id=service_id,
+        ),
+    )
+
+
+@router.post("/cache/invalidate")
+def invalidate_analytics(
+    service_id: Optional[str] = Query(default=None),
+    _: object = Depends(require_admin),
+):
+    deleted = invalidate_analytics_cache(service_id=service_id)
+    return {
+        "deleted_keys": deleted,
+        "service_id": service_id,
     }

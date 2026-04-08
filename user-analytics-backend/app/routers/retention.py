@@ -7,11 +7,50 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.date_ranges import DATA_START_DATE, resolve_date_range
+from app.core.cache import cached_endpoint
+from app.core.config import settings
 from app.models.cohorts import Cohort
 from app.models.services import Service
 
 
 router = APIRouter(prefix="/analytics", tags=["Retention"])
+
+
+def _retention_range_payload(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    service_id: Optional[str] = None,
+    **_: object,
+) -> dict:
+    return {
+        "start_date": start_date.isoformat() if start_date else DATA_START_DATE.isoformat(),
+        "end_date": end_date.isoformat() if end_date else "auto",
+        "service_id": service_id or "all",
+    }
+
+
+def _retention_heatmap_payload(
+    service_id: Optional[str] = None,
+    last_n_months: int = 6,
+    **_: object,
+) -> dict:
+    return {
+        "service_id": service_id or "all",
+        "last_n_months": int(last_n_months),
+    }
+
+
+def _retention_cohorts_payload(
+    service_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10,
+    **_: object,
+) -> dict:
+    return {
+        "service_id": service_id or "all",
+        "page": int(page),
+        "page_size": int(page_size),
+    }
 
 
 def _parse_date_range(
@@ -25,6 +64,11 @@ def _parse_date_range(
 
 
 @router.get("/retention/kpis")
+@cached_endpoint(
+    "retention_kpis",
+    settings.RETENTION_CACHE_TTL_SECONDS,
+    key_builder=_retention_range_payload,
+)
 def get_retention_kpis(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(default=DATA_START_DATE),
@@ -79,6 +123,11 @@ def get_retention_kpis(
 
 
 @router.get("/retention/heatmap")
+@cached_endpoint(
+    "retention_heatmap",
+    settings.RETENTION_CACHE_TTL_SECONDS,
+    key_builder=_retention_heatmap_payload,
+)
 def get_retention_heatmap(
     db: Session = Depends(get_db),
     service_id: Optional[str] = Query(default=None),
@@ -121,6 +170,11 @@ def get_retention_heatmap(
 
 
 @router.get("/retention/curve")
+@cached_endpoint(
+    "retention_curve",
+    settings.RETENTION_CACHE_TTL_SECONDS,
+    key_builder=_retention_range_payload,
+)
 def get_retention_curve(
     db: Session = Depends(get_db),
     start_date: Optional[date] = Query(default=DATA_START_DATE),
@@ -161,6 +215,11 @@ def get_retention_curve(
 
 
 @router.get("/retention/cohorts-list")
+@cached_endpoint(
+    "retention_cohorts_list",
+    settings.RETENTION_CACHE_TTL_SECONDS,
+    key_builder=_retention_cohorts_payload,
+)
 def get_retention_cohorts_list(
     db: Session = Depends(get_db),
     service_id: Optional[str] = Query(default=None),

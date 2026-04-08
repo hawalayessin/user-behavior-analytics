@@ -13,6 +13,7 @@ import {
   Upload,
   UserCog,
   Settings,
+  AlertTriangle,
 } from 'lucide-react'
 
 import { Squares2X2Icon } from "@heroicons/react/24/outline"
@@ -63,6 +64,11 @@ export const navigationConfig = [
   {
     section: 'AI INSIGHTS',
     items: [
+      {
+        label: 'Anomaly Detection',
+        icon: AlertTriangle,
+        route: '/analytics/anomalies',
+      },
       {
         label: 'Churn Prediction',
         icon: BrainCircuit,

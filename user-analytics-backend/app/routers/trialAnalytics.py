@@ -7,6 +7,8 @@ import uuid
 
 from app.core.database import get_db
 from app.core.date_ranges import resolve_date_range
+from app.core.cache import build_cache_key, cache_or_compute
+from app.core.config import settings
 from app.utils.temporal import get_data_anchor
 
 router = APIRouter(prefix="/analytics", tags=["Trial Analytics"])
@@ -23,6 +25,34 @@ def get_trial_kpis(
     service_id: Optional[str]  = Query(default=None),
 ):
     start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+
+    cache_key = build_cache_key(
+        "trial_kpis",
+        {
+            "start_date": start_dt.isoformat(),
+            "end_date": end_dt.isoformat(),
+            "service_id": service_id or "all",
+        },
+    )
+
+    return cache_or_compute(
+        cache_key,
+        settings.TRIAL_KPIS_CACHE_TTL_SECONDS,
+        compute_function=lambda: _compute_trial_kpis(
+            db=db,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            service_id=service_id,
+        ),
+    )
+
+
+def _compute_trial_kpis(
+    db: Session,
+    start_dt: date,
+    end_dt: date,
+    service_id: Optional[str],
+):
     anchor_dt = get_data_anchor(db, source="subscription")
 
     valid_service_id = None
@@ -53,10 +83,10 @@ def get_trial_kpis(
     # ── 2. Conversion & status breakdown ───────────────────────
     conversion_data = db.execute(text(f"""
         SELECT
-            COUNT(*)                                         AS total_all,
-            COUNT(*) FILTER (WHERE status = 'active')       AS active_subs,
-            COUNT(*) FILTER (WHERE status = 'cancelled')    AS cancelled_subs,
-            COUNT(*) FILTER (WHERE status = 'trial')        AS trial_subs
+            COUNT(*) FILTER (WHERE status IN ('trial', 'pending', 'active', 'cancelled', 'expired')) AS total_all,
+                        COUNT(*) FILTER (WHERE status = 'active')       AS active_subs,
+                        COUNT(*) FILTER (WHERE status IN ('cancelled', 'expired')) AS dropped_subs,
+            COUNT(*) FILTER (WHERE status IN ('trial', 'pending')) AS trial_subs
         FROM subscriptions
         WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
           AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
@@ -145,7 +175,9 @@ def get_trial_kpis(
         "trial_only_users":  trial_only_users,
         "trial_only_rate":   trial_only_rate,
         "active_trials":     int(conversion_data.trial_subs or 0),
-        "cancelled_trials":  int(conversion_data.cancelled_subs or 0),
+        "converted_trials":  int(conversion_data.active_subs or 0),
+        "cancelled_trials":  int(conversion_data.dropped_subs or 0),
+        "dropped_trials":    int(conversion_data.dropped_subs or 0),
     }
 
 

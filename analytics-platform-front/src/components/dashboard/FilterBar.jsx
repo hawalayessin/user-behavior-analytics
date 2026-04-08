@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { ChevronDown, Users, CreditCard } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import PropTypes from "prop-types";
+import { useQuery } from "@tanstack/react-query";
 import api from "../../services/api";
 
 function formatDate(d) {
@@ -80,30 +81,6 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
   );
 }
 
-// ── Badge stat global ──────────────────────────────────────────────────────────
-function GlobalStatBadge({ icon: Icon, iconColor, label, value, loading }) {
-  return (
-    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-full">
-      <Icon size={13} color={iconColor} />
-      <span className="text-xs text-slate-400">{label}</span>
-      {loading ? (
-        <span className="w-8 h-3 bg-slate-700 animate-pulse rounded" />
-      ) : (
-        <span className="text-xs font-bold text-slate-200">
-          {value?.toLocaleString() ?? "—"}
-        </span>
-      )}
-    </div>
-  );
-}
-GlobalStatBadge.propTypes = {
-  icon: PropTypes.elementType.isRequired,
-  iconColor: PropTypes.string.isRequired,
-  label: PropTypes.string.isRequired,
-  value: PropTypes.number,
-  loading: PropTypes.bool,
-};
-
 // ── FilterBar ─────────────────────────────────────────────────────────────────
 export default function FilterBar({ onApply, defaultPeriod = "all" }) {
   const today = formatDate(new Date());
@@ -116,27 +93,13 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
   const [customEnd, setCustomEnd] = useState(today);
   const [openPeriod, setOpenPeriod] = useState(false);
   const [openService, setOpenService] = useState(false);
-  const [services, setServices] = useState([]);
-
-  // ── Stats globales (sans filtre) ──
-  const [globalStats, setGlobalStats] = useState(null);
-  const [globalStatsLoading, setGlobalStatsLoading] = useState(true);
-
-  useEffect(() => {
-    api
-      .get("/services")
-      .then((res) => setServices(res.data ?? []))
-      .catch(() => setServices([]));
-  }, []);
-
-  // Appel unique au montage — pas de dépendance sur les filtres
-  useEffect(() => {
-    api
-      .get("/analytics/summary")
-      .then((res) => setGlobalStats(res.data))
-      .catch(() => setGlobalStats(null))
-      .finally(() => setGlobalStatsLoading(false));
-  }, []);
+  const { data: services = [] } = useQuery({
+    queryKey: ["services", "all"],
+    queryFn: async () => {
+      const res = await api.get("/services");
+      return res.data ?? [];
+    },
+  });
 
   const serviceOptions = [
     { value: null, label: "All services" },
@@ -161,42 +124,7 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
 
   return (
     <div className="space-y-3">
-      {/* ── Ligne 1 : badges stats globales ── */}
-      <div className="flex flex-wrap items-center gap-2 px-1">
-        <span className="text-xs text-slate-500 font-medium mr-1">
-          All-time totals:
-        </span>
-        <GlobalStatBadge
-          icon={Users}
-          iconColor="#6366F1"
-          label="Users"
-          value={globalStats?.users?.total}
-          loading={globalStatsLoading}
-        />
-        <GlobalStatBadge
-          icon={CreditCard}
-          iconColor="#10B981"
-          label="Subscriptions"
-          value={globalStats?.subscriptions?.total}
-          loading={globalStatsLoading}
-        />
-        <GlobalStatBadge
-          icon={Users}
-          iconColor="#8B5CF6"
-          label="Active users"
-          value={globalStats?.users?.active}
-          loading={globalStatsLoading}
-        />
-        <GlobalStatBadge
-          icon={CreditCard}
-          iconColor="#F59E0B"
-          label="Active subscriptions"
-          value={globalStats?.subscriptions?.active}
-          loading={globalStatsLoading}
-        />
-      </div>
-
-      {/* ── Ligne 2 : filtres ── */}
+      {/* ── Filtres ── */}
       <div
         className="flex flex-wrap items-center gap-3 p-4 bg-[#1A1D27] border border-slate-800 rounded-xl"
         onClick={(e) => e.stopPropagation()}

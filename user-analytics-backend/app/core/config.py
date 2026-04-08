@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     analytics_conn: str | None = None
     HAWALA_CONN: str | None = Field(default=None, alias="HAWALA_CONN")
     hawala_conn: str | None = None
+    REDIS_URL: str = "redis://localhost:6379/0"
+    ANALYTICS_CACHE_TTL_SECONDS: int = 3600
+    OVERVIEW_CACHE_TTL_SECONDS: int = 60
+    TRIAL_KPIS_CACHE_TTL_SECONDS: int = 90
+    CROSS_SERVICE_CACHE_TTL_SECONDS: int = 180
+    RETENTION_CACHE_TTL_SECONDS: int = 300
+    USER_ACTIVITY_CACHE_TTL_SECONDS: int = 30
+    ML_SCORES_CACHE_TTL_SECONDS: int = 300
+    CACHE_LOCK_TTL_SECONDS: int = 30
+    CACHE_LOCK_WAIT_MS: int = 1200
+    CACHE_LOCK_POLL_INTERVAL_MS: int = 80
 
     model_config = SettingsConfigDict(
         env_file=".env",

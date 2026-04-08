@@ -1,6 +1,6 @@
 services:
   # ── Backend ────────────────────────────
-  backend:
+  analytics_backend:
     build: ./user-analytics-backend
     container_name: analytics_backend
     restart: unless-stopped
@@ -12,23 +12,49 @@ services:
       ADMIN_PASSWORD: admin123
       ADMIN_FULL_NAME: Administrator
       ADMIN_ROLE: admin
+      REDIS_URL: redis://analytics_redis:6379/0
+    depends_on:
+      analytics_redis:
+        condition: service_healthy
     volumes:
       - ./user-analytics-backend:/app
     ports:
       - "8000:8000"
+    networks:
+      - analytics_net
 
   # ── Frontend ───────────────────────────
-  frontend:
+  analytics_frontend:
     build: ./analytics-platform-front
     container_name: analytics_frontend
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      VITE_PROXY_TARGET: http://backend:8000
+      VITE_PROXY_TARGET: http://analytics_backend:8000
     volumes:
       - ./analytics-platform-front:/app
       - /app/node_modules
       - /app/.vite
     ports:
       - "5173:5173"
+    depends_on:
+      - analytics_backend
+    networks:
+      - analytics_net
+
+  analytics_redis:
+    image: redis:7-alpine
+    container_name: analytics_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - analytics_net
+
+networks:
+  analytics_net:
+    driver: bridge

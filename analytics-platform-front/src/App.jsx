@@ -16,6 +16,7 @@ import ChurnAnalysisPage from './pages/dashboard/ChurnAnalysisPage'
 import AIChurnInsights from './pages/dashboard/AIChurnInsights'
 import CrossServiceBehaviorPage from './pages/dashboard/CrossServiceBehaviorPage'
 import UserSegmentationPage from './pages/dashboard/UserSegmentationPage'
+import AnomalyDetectionPage from './pages/dashboard/AnomalyDetectionPage'
 import ManagementPage from './pages/admin/ManagementPage'
 
 function App() {
@@ -64,6 +65,10 @@ function App() {
           <Route
             path="/analytics/segmentation"
             element={<PrivateRoute><UserSegmentationPage /></PrivateRoute>}
+          />
+          <Route
+            path="/analytics/anomalies"
+            element={<PrivateRoute><AnomalyDetectionPage /></PrivateRoute>}
           />
           <Route
             path="/management/subscribers"

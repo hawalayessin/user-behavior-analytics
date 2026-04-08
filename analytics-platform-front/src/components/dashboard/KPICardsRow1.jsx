@@ -1,28 +1,43 @@
 import PropTypes from "prop-types";
-import { Users, UserCheck } from "lucide-react";
+import { Users, UserCheck, AlertTriangle, Clock3 } from "lucide-react";
 import KPICard from "./KPICard";
 
 export default function KPICardsRow1({ data, metrics }) {
+  const total = data.subscriptions.total || 0;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       <KPICard
         title="Total Users"
-        value={data.users.total.toLocaleString()}
-        subtitle={`+${data.users.new_last_30_days} new this month`}
+        value={(data.users?.total || 0).toLocaleString()}
+        subtitle="All registered users"
         icon={Users}
         iconColor="#6366F1"
-        iconBg="bg-indigo-500/20"
-        trend={5.2}
-        trendLabel="vs last month"
+        iconBg="bg-violet-500/20"
       />
       <KPICard
-        title="Active Subscribers"
-        value={data.subscriptions.active.toLocaleString()}
-        subtitle={`${data.subscriptions.trial} in free trial`}
+        title="Active Subscriptions"
+        value={(data.subscriptions.active || 0).toLocaleString()}
+        subtitle={`${total > 0 ? Math.round(((data.subscriptions.active || 0) * 100) / total) : 0}% of confirmed subs`}
         icon={UserCheck}
         iconColor="#10B981"
         iconBg="bg-emerald-500/20"
-        trend={3.1}
+      />
+      <KPICard
+        title="At Risk (Billing)"
+        value={(data.subscriptions.billing_failed || 0).toLocaleString()}
+        subtitle={`${(data.subscriptions.at_risk_users || 0).toLocaleString()} users at risk`}
+        icon={AlertTriangle}
+        iconColor="#F59E0B"
+        iconBg="bg-amber-500/20"
+      />
+      <KPICard
+        title="Pending (OTP)"
+        value={(data.subscriptions.pending || 0).toLocaleString()}
+        subtitle="OTP started, not confirmed"
+        icon={Clock3}
+        iconColor="#94A3B8"
+        iconBg="bg-slate-500/20"
       />
     </div>
   );

@@ -1,34 +1,38 @@
-import { useState, useEffect, useCallback } from "react"
-import api from "../services/api"
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { getUsersPage } from "../services/api"
 
-export function useUsers({ status, search, service_id, page = 1, limit = 10 }) {
-  const [data,    setData]    = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
+export function useUsers({ status, search, service_id, cursor = null, limit = 10 }) {
+  const normalizedCursor = useMemo(() => ({
+    created_at: cursor?.created_at ?? null,
+    id: cursor?.id ?? null,
+  }), [cursor?.created_at, cursor?.id])
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      params.set("page",      String(page))
-      params.set("page_size", String(limit))
-      if (status     && status !== "Tous") params.set("status",     status)
-      if (search)                          params.set("search",     search)
-      if (service_id)                      params.set("service_id", service_id)
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      "users",
+      status ?? null,
+      search ?? null,
+      service_id ?? null,
+      limit,
+      normalizedCursor.created_at,
+      normalizedCursor.id,
+    ],
+    queryFn: () => getUsersPage({
+      status,
+      search,
+      service_id,
+      page_size: limit,
+      cursor,
+    }),
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
 
-      const res = await api.get(`/users?${params.toString()}`)
-      setData(res.data)
-    } catch (err) {
-      setError(err.response?.data?.detail ?? err.message ?? "Erreur lors du chargement")
-    } finally {
-      setLoading(false)
-    }
-  }, [status, search, service_id, page, limit])
-
-  useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
-
-  return { data, loading, error, refetch: fetchUsers }
+  return {
+    data: data ?? null,
+    loading: isLoading,
+    error: error?.response?.data?.detail ?? error?.message ?? null,
+    refetch,
+  }
 }

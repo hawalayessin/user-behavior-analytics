@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -38,6 +39,7 @@ class ChurnPredictor:
         *,
         model_path: str | None = None,
         metrics_path: str | None = None,
+        query_timeout_ms: int | None = None,
         random_state: int = 42,
     ):
         self.feature_names = [
@@ -61,13 +63,26 @@ class ChurnPredictor:
             random_state=random_state,
             max_iter=2000,
         )
+        # Training/scoring feature SQL can be expensive on large datasets.
+        # Allow a higher per-request timeout than the DB default.
+        self.query_timeout_ms = int(
+            query_timeout_ms
+            if query_timeout_ms is not None
+            else os.getenv("CHURN_SQL_TIMEOUT_MS", "120000")
+        )
 
     # -----------------------------
     # SQL Feature Engineering
     # -----------------------------
     def _read_sql_to_df(self, db_session: Session, query: str, params: dict[str, Any] | None = None) -> pd.DataFrame:
         from sqlalchemy import text
-        return pd.read_sql(text(query), db_session.bind, params=params or {})
+
+        conn = db_session.connection()
+        conn.exec_driver_sql(f"SET statement_timeout = {self.query_timeout_ms}")
+        try:
+            return pd.read_sql(text(query), conn, params=params or {})
+        finally:
+            conn.exec_driver_sql("SET statement_timeout = DEFAULT")
 
     def _base_features_sql(self) -> str:
         """

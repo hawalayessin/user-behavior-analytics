@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
-import api from "../../services/api";
 import AppLayout from "../../components/layout/AppLayout";
 import FilterBar from "../../components/dashboard/FilterBar";
 import TabNavigation from "../../components/dashboard/TabNavigation";
@@ -9,6 +8,7 @@ import EngagementTab from "../../components/dashboard/tabs/EngagementTab";
 import RevenueTab from "../../components/dashboard/tabs/RevenueTab";
 import TrialChurnTab from "../../components/dashboard/tabs/TrialChurnTab";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
+import { useOverview } from "../../hooks/useOverview";
 
 const DEFAULT_FILTERS = DEFAULT_ANALYTICS_FILTERS;
 
@@ -58,41 +58,27 @@ function DashboardError({ message, onRetry }) {
 export default function DashboardPage() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [activeTab, setActiveTab] = useState(0);
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const normalizedFilters = useMemo(
+    () => ({
+      start_date: filters.start_date ?? null,
+      end_date: filters.end_date ?? null,
+      service_id: filters.service_id ?? null,
+    }),
+    [filters.end_date, filters.service_id, filters.start_date],
+  );
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const { data, loading, error, refetch } = useOverview(normalizedFilters);
 
-      const params = new URLSearchParams();
-
-      if (filters.start_date) params.append("start_date", filters.start_date);
-      if (filters.end_date) params.append("end_date", filters.end_date);
-      if (filters.service_id) params.append("service_id", filters.service_id);
-
-      const qs = params.toString();
-      const res = await api.get(`/analytics/overview${qs ? `?${qs}` : ""}`);
-      setData(res.data);
-    } catch (err) {
-      console.error("[DashboardPage] fetch error:", err?.response?.data ?? err);
-      setError("Impossible de charger les données.");
-    } finally {
-      setLoading(false);
-    }
-  }, [filters.end_date, filters.service_id, filters.start_date]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const errorMessage =
+    error?.response?.data?.detail ??
+    error?.message ??
+    "Impossible de charger les données.";
 
   return (
     <AppLayout pageTitle="Analytics Overview" hasNotifications showExportButton>
       <div className="space-y-5 pb-6">
         {/* Filter Bar — toujours visible */}
-        <FilterBar onApply={setFilters} />
+        <FilterBar onApply={setFilters} appliedFilters={filters} />
 
         {/* Tab Navigation */}
         <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
@@ -101,7 +87,7 @@ export default function DashboardPage() {
         {loading && <DashboardSkeleton />}
 
         {!loading && error && (
-          <DashboardError message={error} onRetry={fetchData} />
+          <DashboardError message={errorMessage} onRetry={refetch} />
         )}
 
         {!loading && !error && data && (

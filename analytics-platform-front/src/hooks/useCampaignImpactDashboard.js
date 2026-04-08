@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react"
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { getWithCache } from "../services/api"
 
 /**
@@ -8,40 +9,39 @@ import { getWithCache } from "../services/api"
  * Supports date range filtering
  */
 export function useCampaignImpactDashboard(filters = {}) {
-  const [data, setData] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const normalizedFilters = useMemo(() => ({
+    start_date: filters?.start_date ?? null,
+    end_date: filters?.end_date ?? null,
+    service_id: filters?.service_id ?? null,
+  }), [filters?.end_date, filters?.service_id, filters?.start_date])
 
-  const fetchDashboard = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      // Build query string from filters
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      "analytics",
+      "campaigns",
+      "dashboard",
+      normalizedFilters.start_date,
+      normalizedFilters.end_date,
+      normalizedFilters.service_id,
+    ],
+    queryFn: async () => {
       const params = new URLSearchParams()
-      if (filters?.start_date) params.set("start_date", filters.start_date)
-      if (filters?.end_date) params.set("end_date", filters.end_date)
-      if (filters?.service_id) params.set("service_id", filters.service_id)
-      
+      if (normalizedFilters.start_date) params.set("start_date", normalizedFilters.start_date)
+      if (normalizedFilters.end_date) params.set("end_date", normalizedFilters.end_date)
+      if (normalizedFilters.service_id) params.set("service_id", normalizedFilters.service_id)
+
       const qs = params.toString()
       const url = `/analytics/campaigns/dashboard${qs ? `?${qs}` : ""}`
-      
-      // Use getWithCache with proper options parameter (object with ttlMs)
-      const result = await getWithCache(url, { ttlMs: 30000 })
-      setData(result)
-    } catch (err) {
-      const errorMsg = err.response?.data?.detail ?? err.message ?? "Erreur lors du chargement du dashboard"
-      setError(errorMsg)
-      setData(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [filters])  // Use entire filters object as dependency
+      return await getWithCache(url, { ttlMs: 30000 })
+    },
+  })
 
-  useEffect(() => {
-    fetchDashboard()
-  }, [fetchDashboard])
-
-  return { data, isLoading, error, refetch: fetchDashboard }
+  return {
+    data,
+    isLoading,
+    error: error?.response?.data?.detail ?? error?.message ?? null,
+    refetch,
+  }
 }
 
 /**
@@ -56,14 +56,20 @@ export function useCampaignList({
   page = 1,
   limit = 10,
 } = {}) {
-  const [data, setData] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  const fetchList = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      "analytics",
+      "campaigns",
+      "list",
+      status,
+      campaign_type,
+      start_date,
+      end_date,
+      service_id,
+      page,
+      limit,
+    ],
+    queryFn: async () => {
       const params = new URLSearchParams()
       if (status && status !== "all") params.set("status", status)
       if (campaign_type && campaign_type !== "all") params.set("campaign_type", campaign_type)
@@ -75,22 +81,14 @@ export function useCampaignList({
 
       const qs = params.toString()
       const url = `/analytics/campaigns/list${qs ? `?${qs}` : ""}`
-      
-      // Use getWithCache with proper options parameter (object with ttlMs)
-      const res = await getWithCache(url, { ttlMs: 10000 })  // 10s cache
-      setData(res)
-    } catch (err) {
-      const errorMsg = err.response?.data?.detail ?? err.message ?? "Erreur lors du chargement de la liste"
-      setError(errorMsg)
-      setData(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [status, campaign_type, start_date, end_date, service_id, page, limit])
+      return await getWithCache(url, { ttlMs: 10000 })
+    },
+  })
 
-  useEffect(() => {
-    fetchList()
-  }, [fetchList])
-
-  return { data, isLoading, error, refetch: fetchList }
+  return {
+    data,
+    isLoading,
+    error: error?.response?.data?.detail ?? error?.message ?? null,
+    refetch,
+  }
 }

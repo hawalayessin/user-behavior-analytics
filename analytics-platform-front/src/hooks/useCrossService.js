@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react"
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
 /**
@@ -8,49 +9,41 @@ import api from "../services/api"
  * Returns { overview, coSubscriptions, migrations, distribution, loading, error, refetch }
  */
 export function useCrossService({ start_date, end_date, service_id } = {}) {
-    const [overview, setOverview] = useState(null)
-    const [coSubscriptions, setCoSubscriptions] = useState(null)
-    const [migrations, setMigrations] = useState(null)
-    const [distribution, setDistribution] = useState(null)
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState(null)
+    const normalized = useMemo(() => ({
+        start_date: start_date ?? null,
+        end_date: end_date ?? null,
+        service_id: service_id ?? null,
+    }), [start_date, end_date, service_id])
 
-    const fetchAll = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const params = new URLSearchParams()
-            if (start_date) params.set("start_date", start_date)
-            if (end_date) params.set("end_date", end_date)
-            if (service_id) params.set("service_id", service_id)
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: [
+            "analytics",
+            "cross-service",
+            normalized.start_date,
+            normalized.end_date,
+            normalized.service_id,
+        ],
+        queryFn: async () => {
+            const res = await api.get("/analytics/cross-service/all", {
+                params: {
+                    start_date: normalized.start_date,
+                    end_date: normalized.end_date,
+                    service_id: normalized.service_id,
+                },
+            })
+            return res.data ?? null
+        },
+        staleTime: 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+    })
 
-            const qs = params.toString()
-            const suffix = qs ? `?${qs}` : ""
-
-            const [ovRes, coRes, migRes, distRes] = await Promise.all([
-                api.get(`/analytics/cross-service/overview${suffix}`),
-                api.get(`/analytics/cross-service/co-subscriptions${suffix}`),
-                api.get(`/analytics/cross-service/migrations${suffix}`),
-                api.get(`/analytics/cross-service/distribution${suffix}`),
-            ])
-            setOverview(ovRes.data)
-            setCoSubscriptions(coRes.data)
-            setMigrations(migRes.data)
-            setDistribution(distRes.data)
-        } catch (err) {
-            setError(err.response?.data?.detail ?? err.message ?? "Erreur lors du chargement")
-            setOverview(null)
-            setCoSubscriptions(null)
-            setMigrations(null)
-            setDistribution(null)
-        } finally {
-            setLoading(false)
-        }
-    }, [start_date, end_date, service_id])
-
-    useEffect(() => {
-        fetchAll()
-    }, [fetchAll])
-
-    return { overview, coSubscriptions, migrations, distribution, loading, error, refetch: fetchAll }
+    return {
+        overview: data?.overview ?? null,
+        coSubscriptions: data?.co_subscriptions ?? null,
+        migrations: data?.migrations ?? null,
+        distribution: data?.distribution ?? null,
+        loading: isLoading,
+        error: error?.response?.data?.detail ?? error?.message ?? null,
+        refetch,
+    }
 }

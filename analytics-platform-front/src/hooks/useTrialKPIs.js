@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react"
+import { useMemo } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import api from "../services/api"
 
 /**
  * Hook to fetch Free Trial KPIs
@@ -6,40 +8,46 @@ import { useState, useEffect, useCallback } from "react"
  * @returns {Object} { data, loading, error, refetch }
  */
 export function useTrialKPIs(filters = {}) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const normalized = useMemo(
+    () => ({
+      start_date: filters?.start_date ?? null,
+      end_date: filters?.end_date ?? null,
+      service_id: filters?.service_id ?? null,
+    }),
+    [filters?.end_date, filters?.service_id, filters?.start_date],
+  )
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams()
-      if (filters?.start_date) params.append("start_date", filters.start_date)
-      if (filters?.end_date) params.append("end_date", filters.end_date)
-      if (filters?.service_id) params.append("service_id", filters.service_id)
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: [
+      "analytics",
+      "trial-kpis",
+      normalized.start_date,
+      normalized.end_date,
+      normalized.service_id,
+    ],
+    queryFn: async () => {
+      const res = await api.get("/analytics/trial/kpis", {
+        params: {
+          start_date: normalized.start_date,
+          end_date: normalized.end_date,
+          service_id: normalized.service_id,
+        },
+      })
+      return res.data ?? null
+    },
+    staleTime: 90 * 1000,
+    gcTime: 10 * 60 * 1000,
+    cacheTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
+    placeholderData: keepPreviousData,
+  })
 
-      const res = await window.fetch(`/api/analytics/trial/kpis?${params.toString()}`)
-      
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
-      }
-
-      const json = await res.json()
-      setData(json)
-      setError(null)
-    } catch (err) {
-      console.error("KPI fetch error:", err)
-      setError(err.message || "Failed to fetch trial KPIs")
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [filters?.start_date, filters?.end_date, filters?.service_id])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
-
-  return { data, loading, error, refetch: fetchData }
+  return {
+    data,
+    loading: isLoading,
+    error: error?.response?.data?.detail ?? error?.message ?? null,
+    refetch,
+  }
 }

@@ -35,12 +35,14 @@ USER_NS = uuid.UUID("11111111-1111-1111-1111-111111111111")
 SUB_NS = uuid.UUID("22222222-2222-2222-2222-222222222222")
 SERVICE_NS = uuid.UUID("44444444-4444-4444-4444-444444444444")
 
-SUB_STATUS_MAP = {
-    1: "active",
-    0: "trial",
-    -1: "cancelled",
-    -2: "expired",
-}
+def map_status(status_int: int) -> str:
+    mapping = {
+        1: "active",
+        -1: "cancelled",
+        -2: "billing_failed",
+        0: "pending",
+    }
+    return mapping.get(status_int, "unknown")
 
 
 @dataclass
@@ -203,10 +205,10 @@ def run_fix(source_engine: Engine, target_engine: Engine, args: argparse.Namespa
         """
         INSERT INTO subscriptions (
             id, user_id, service_id, campaign_id,
-            subscription_start_date, subscription_end_date, status
+            subscription_start_date, subscription_end_date, status, created_at
         ) VALUES (
             :id, :user_id, :service_id, NULL,
-            :subscription_start_date, :subscription_end_date, :status
+            :subscription_start_date, :subscription_end_date, :status, :created_at
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -214,7 +216,8 @@ def run_fix(source_engine: Engine, target_engine: Engine, args: argparse.Namespa
             service_id = EXCLUDED.service_id,
             subscription_start_date = EXCLUDED.subscription_start_date,
             subscription_end_date = EXCLUDED.subscription_end_date,
-            status = EXCLUDED.status
+            status = EXCLUDED.status,
+            created_at = EXCLUDED.created_at
         """
     )
 
@@ -268,7 +271,8 @@ def run_fix(source_engine: Engine, target_engine: Engine, args: argparse.Namespa
 
             start_date = parse_dt(getattr(rec, "subscription_start_date", None))
             if start_date is None:
-                start_date = datetime.now(timezone.utc)
+                metrics.skipped_rows += 1
+                continue
             end_date = parse_dt(getattr(rec, "subscription_end_date", None))
 
             rows.append(
@@ -278,7 +282,8 @@ def run_fix(source_engine: Engine, target_engine: Engine, args: argparse.Namespa
                     "service_id": target_service_id,
                     "subscription_start_date": start_date,
                     "subscription_end_date": end_date,
-                    "status": SUB_STATUS_MAP.get(source_status, "trial"),
+                    "status": map_status(source_status),
+                    "created_at": start_date,
                 }
             )
 

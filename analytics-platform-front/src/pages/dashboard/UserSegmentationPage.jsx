@@ -63,79 +63,6 @@ const ChartContainerCard = ({
   </div>
 );
 
-// Mock data generators
-function generateMockClusters() {
-  const clusters = {
-    "Power Users": { center: [8, 9], count: 15 },
-    "Regular Loyals": { center: [5, 6], count: 15 },
-    "Occasional Users": { center: [2, 3], count: 15 },
-    "Trial Only": { center: [0.5, 0.5], count: 15 },
-  };
-
-  const data = [];
-  for (const [segment, { center, count }] of Object.entries(clusters)) {
-    for (let i = 0; i < count; i++) {
-      const noise = Math.random() * 0.5 - 0.25;
-      data.push({
-        x: Math.max(0, center[0] + noise),
-        y: Math.max(0, center[1] + noise),
-        segment,
-      });
-    }
-  }
-  return data;
-}
-
-function generateMockKPIs() {
-  return {
-    total_segments: 4,
-    dominant_segment: "Regular Loyals",
-    dominant_pct: 42,
-    high_value_segment: "Power Users",
-    arpu_premium: 110,
-    risk_segment: "Trial Only",
-    risk_churn_rate: -42.4,
-  };
-}
-
-function generateMockDistribution() {
-  return [
-    { name: "Regular Loyals", percentage: 42 },
-    { name: "Power Users", percentage: 18 },
-    { name: "Occasional Users", percentage: 25 },
-    { name: "Trial Only", percentage: 15 },
-  ];
-}
-
-function generateMockProfiles() {
-  return [
-    {
-      segment: "Power Users",
-      avg_duration: "4h / day",
-      arpu: 10.5,
-      churn_rate: 1.2,
-    },
-    {
-      segment: "Regular Loyals",
-      avg_duration: "1.2h / day",
-      arpu: 5.0,
-      churn_rate: 4.5,
-    },
-    {
-      segment: "Occasional Users",
-      avg_duration: "0.3h / day",
-      arpu: 2.1,
-      churn_rate: 19.2,
-    },
-    {
-      segment: "Trial Only",
-      avg_duration: "0h / day",
-      arpu: 0.0,
-      churn_rate: 42.4,
-    },
-  ];
-}
-
 export default function UserSegmentationPage() {
   const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS);
   const [recalculateLoading, setRecalculateLoading] = useState(false);
@@ -159,25 +86,44 @@ export default function UserSegmentationPage() {
     refetch: refetchProfiles,
   } = useSegmentationProfiles(filters);
 
-  // Mock data fallback
   const kpis = useMemo(() => {
-    if (kpiData) return kpiData;
-    return generateMockKPIs();
+    return (
+      kpiData ?? {
+        total_segments: 0,
+        dominant_segment: "—",
+        dominant_pct: 0,
+        high_value_segment: "—",
+        arpu_premium: 0,
+        risk_segment: "—",
+        risk_churn_rate: 0,
+      }
+    );
   }, [kpiData]);
 
   const clusterPoints = useMemo(() => {
-    if (clusterData?.clusters) return clusterData.clusters;
-    return generateMockClusters();
+    return clusterData?.clusters ?? [];
   }, [clusterData]);
 
+  const clusterPointsBySegment = useMemo(() => {
+    const grouped = {
+      "Power Users": [],
+      "Regular Loyals": [],
+      "Occasional Users": [],
+      "Trial Only": [],
+    };
+    for (const point of clusterPoints) {
+      const segment = point?.segment;
+      if (grouped[segment]) grouped[segment].push(point);
+    }
+    return grouped;
+  }, [clusterPoints]);
+
   const distribution = useMemo(() => {
-    if (clusterData?.distribution) return clusterData.distribution;
-    return generateMockDistribution();
+    return clusterData?.distribution ?? [];
   }, [clusterData]);
 
   const profiles = useMemo(() => {
-    if (profileData?.profiles) return profileData.profiles;
-    return generateMockProfiles();
+    return profileData?.profiles ?? [];
   }, [profileData]);
 
   const handleRecalculate = async () => {
@@ -217,11 +163,7 @@ export default function UserSegmentationPage() {
     URL.revokeObjectURL(url);
   };
 
-  const userCount = 1.2e6;
-  const totalUsers = distribution.reduce(
-    (sum, d) => sum + (d.count || 0),
-    userCount,
-  );
+  const totalUsers = distribution.reduce((sum, d) => sum + (d.count || 0), 0);
 
   // Radar data for behavioral profile
   const radarData = [
@@ -413,8 +355,9 @@ export default function UserSegmentationPage() {
                     <Scatter
                       key={segment}
                       name={segment}
-                      data={clusterPoints.filter((p) => p.segment === segment)}
+                      data={clusterPointsBySegment[segment] ?? []}
                       fill={color}
+                      isAnimationActive={false}
                     />
                   ))}
                 </ScatterChart>
@@ -486,6 +429,7 @@ export default function UserSegmentationPage() {
                       outerRadius={70}
                       paddingAngle={3}
                       dataKey="percentage"
+                      isAnimationActive={false}
                     >
                       {distribution.map((item, index) => (
                         <Cell
@@ -499,7 +443,9 @@ export default function UserSegmentationPage() {
 
                 <div className="flex-1 space-y-3">
                   <div className="text-center mb-3">
-                    <p className="text-2xl font-bold text-slate-100">1.2M</p>
+                    <p className="text-2xl font-bold text-slate-100">
+                      {Number(totalUsers || 0).toLocaleString()}
+                    </p>
                     <p className="text-xs text-slate-400">users</p>
                   </div>
                   <div className="space-y-2 text-xs">

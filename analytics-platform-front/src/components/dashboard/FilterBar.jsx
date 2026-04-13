@@ -8,8 +8,15 @@ function formatDate(d) {
   return d.toISOString().split("T")[0];
 }
 
-function computeDates(period, customStart, customEnd) {
-  const today = new Date();
+function parseIsoDateToLocal(isoDate) {
+  if (!isoDate) return null;
+  const [y, m, d] = String(isoDate).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0, 0);
+}
+
+function computeDates(period, customStart, customEnd, anchorDate) {
+  const today = parseIsoDateToLocal(anchorDate) ?? new Date();
   switch (period) {
     case "all":
       return { start: null, end: null };
@@ -82,13 +89,18 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
 }
 
 // ── FilterBar ─────────────────────────────────────────────────────────────────
-export default function FilterBar({ onApply, defaultPeriod = "all" }) {
-  const today = formatDate(new Date());
+export default function FilterBar({
+  onApply,
+  defaultPeriod = "all",
+  anchorDate = null,
+}) {
+  const effectiveToday = parseIsoDateToLocal(anchorDate) ?? new Date();
+  const today = formatDate(effectiveToday);
 
   const [period, setPeriod] = useState(defaultPeriod);
   const [serviceId, setServiceId] = useState(null);
   const [customStart, setCustomStart] = useState(
-    formatDate(new Date(Date.now() - 7 * 864e5)),
+    formatDate(new Date(effectiveToday.getTime() - 7 * 864e5)),
   );
   const [customEnd, setCustomEnd] = useState(today);
   const [openPeriod, setOpenPeriod] = useState(false);
@@ -107,7 +119,12 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
   ];
 
   const handleApply = () => {
-    const { start, end } = computeDates(period, customStart, customEnd);
+    const { start, end } = computeDates(
+      period,
+      customStart,
+      customEnd,
+      anchorDate,
+    );
     setOpenPeriod(false);
     setOpenService(false);
     onApply({ start_date: start, end_date: end, service_id: serviceId });
@@ -118,7 +135,7 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
     setServiceId(null);
     setOpenPeriod(false);
     setOpenService(false);
-    const { start, end } = computeDates(defaultPeriod, null, null);
+    const { start, end } = computeDates(defaultPeriod, null, null, anchorDate);
     onApply({ start_date: start, end_date: end, service_id: null });
   };
 
@@ -203,6 +220,7 @@ export default function FilterBar({ onApply, defaultPeriod = "all" }) {
 
 FilterBar.propTypes = {
   onApply: PropTypes.func.isRequired,
+  anchorDate: PropTypes.string,
   defaultPeriod: PropTypes.oneOf([
     "all",
     "today",

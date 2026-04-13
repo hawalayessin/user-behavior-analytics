@@ -19,22 +19,23 @@ def get_churn_dashboard(
     db: Session,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
+    service_id: Optional[str] = None,
 ) -> dict:
     """Retourne tous les KPIs + données charts pour le dashboard churn."""
 
     if not start_date or not end_date:
         start_date, end_date = get_default_window(db, days=30, source="billing")
 
-    cache_key = (start_date.isoformat(), end_date.isoformat())
+    cache_key = (start_date.isoformat(), end_date.isoformat(), service_id or "all")
     cached = _dashboard_cache.get(cache_key)
     now = time.monotonic()
     if cached and now - cached[0] < _DASHBOARD_CACHE_TTL_SECONDS:
         return cached[1]
 
-    global_metrics = churn_repo.get_global_churn_rate(db, start_date, end_date)
-    monthly_metrics = churn_repo.get_monthly_churn_rate(db, start_date, end_date)
-    avg_lifetime_days = churn_repo.get_avg_lifetime_days(db, start_date, end_date)
-    churn_breakdown = churn_repo.get_churn_breakdown(db, start_date, end_date)
+    global_metrics = churn_repo.get_global_churn_rate(db, start_date, end_date, service_id=service_id)
+    monthly_metrics = churn_repo.get_monthly_churn_rate(db, start_date, end_date, service_id=service_id)
+    avg_lifetime_days = churn_repo.get_avg_lifetime_days_filtered(db, start_date, end_date, service_id=service_id)
+    churn_breakdown = churn_repo.get_churn_breakdown(db, start_date, end_date, service_id=service_id)
 
     payload = {
         "kpis": {
@@ -56,10 +57,10 @@ def get_churn_dashboard(
             "churn_breakdown": churn_breakdown,
         },
         "charts": {
-            "daily_trend": churn_repo.get_churn_trend_daily(db, start_date, end_date),
-            "by_service": churn_repo.get_churn_by_service(db, start_date, end_date),
-            "lifetime_distribution": churn_repo.get_lifetime_distribution(db, start_date, end_date),
-            "retention_cohort": churn_repo.get_retention_cohort(db, start_date, end_date),
+            "daily_trend": churn_repo.get_churn_trend_daily(db, start_date, end_date, service_id=service_id),
+            "by_service": churn_repo.get_churn_by_service(db, start_date, end_date, service_id=service_id),
+            "lifetime_distribution": churn_repo.get_lifetime_distribution(db, start_date, end_date, service_id=service_id),
+            "retention_cohort": churn_repo.get_retention_cohort(db, start_date, end_date, service_id=service_id),
         },
         "meta": {
             "period_start": start_date.isoformat(),

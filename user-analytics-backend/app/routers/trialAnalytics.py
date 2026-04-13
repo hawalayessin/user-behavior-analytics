@@ -10,6 +10,7 @@ from app.core.date_ranges import resolve_date_range
 from app.core.cache import build_cache_key, cache_or_compute
 from app.core.config import settings
 from app.utils.temporal import get_data_anchor
+from app.services.business_rules import build_trial_exception_summary
 
 router = APIRouter(prefix="/analytics", tags=["Trial Analytics"])
 
@@ -167,6 +168,34 @@ def _compute_trial_kpis(
     trial_only_users = int(trial_only.trial_only_users or 0)
     trial_only_rate = float(trial_only.trial_only_rate or 0.0)
 
+    # ── 6. Business exceptions (promotion / trial extension) ──────────
+    exceptions_row = db.execute(text(f"""
+        SELECT
+            COUNT(*) FILTER (
+                WHERE c.campaign_type = 'promotion'
+            ) AS promotion_trials,
+            COUNT(*) FILTER (
+                WHERE (
+                    EXTRACT(DAY FROM COALESCE(sub.subscription_end_date, CAST(:anchor_dt AS timestamp)) - sub.subscription_start_date)
+                    > COALESCE(st.trial_duration_days, 0)
+                )
+            ) AS trial_extensions
+        FROM subscriptions sub
+        JOIN services sv ON sv.id = sub.service_id
+        JOIN service_types st ON st.id = sv.service_type_id
+        LEFT JOIN campaigns c ON c.id = sub.campaign_id
+        WHERE sub.subscription_start_date >= CAST(:start_dt AS timestamp)
+          AND sub.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+          AND sub.subscription_start_date <= CAST(:anchor_dt AS timestamp)
+        {"AND sub.service_id = CAST(:service_id AS uuid)" if valid_service_id else ""}
+    """), params).fetchone()
+
+    exception_summary = build_trial_exception_summary(
+        total_trials=int(total_trials),
+        promotion_trials=int(exceptions_row.promotion_trials or 0),
+        trial_extensions=int(exceptions_row.trial_extensions or 0),
+    )
+
     return {
         "total_trials":      int(total_trials),
         "conversion_rate":   float(conversion_rate),
@@ -178,6 +207,7 @@ def _compute_trial_kpis(
         "converted_trials":  int(conversion_data.active_subs or 0),
         "cancelled_trials":  int(conversion_data.dropped_subs or 0),
         "dropped_trials":    int(conversion_data.dropped_subs or 0),
+        "business_exception_rules": exception_summary,
     }
 
 
@@ -464,6 +494,226 @@ def get_trial_dropoff_by_day(
         "day1": int(row.day1 or 0),
         "day2": int(row.day2 or 0),
         "day3": int(row.day3 or 0),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
+# GET /analytics/trial/dropoff-causes — causal explanation for 4.2
+# ══════════════════════════════════════════════════════════════════
+@router.get("/trial/dropoff-causes")
+def get_trial_dropoff_causes(
+    db: Session = Depends(get_db),
+    start_date: Optional[date] = Query(default=None),
+    end_date:   Optional[date] = Query(default=None),
+    service_id: Optional[str]  = Query(default=None),
+):
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+
+    cache_key = build_cache_key(
+        "trial_dropoff_causes",
+        {
+            "start_date": start_dt.isoformat(),
+            "end_date": end_dt.isoformat(),
+            "service_id": service_id or "all",
+            "v": "v1",
+        },
+    )
+
+    return cache_or_compute(
+        cache_key,
+        settings.TRIAL_KPIS_CACHE_TTL_SECONDS,
+        compute_function=lambda: _compute_trial_dropoff_causes(
+            db=db,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            service_id=service_id,
+        ),
+    )
+
+
+def _compute_trial_dropoff_causes(
+    db: Session,
+    start_dt: date,
+    end_dt: date,
+    service_id: Optional[str],
+):
+    anchor_dt = get_data_anchor(db, source="subscription")
+
+    valid_service_id = None
+    if service_id:
+        try:
+            valid_service_id = str(uuid.UUID(service_id))
+        except ValueError:
+            valid_service_id = None
+
+    params = {
+        "start_dt": start_dt,
+        "end_dt": end_dt,
+        "service_id": valid_service_id,
+        "anchor_dt": anchor_dt,
+    }
+
+    sf = "AND s.service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
+
+    summary = db.execute(text(f"""
+        WITH base AS (
+            SELECT
+                s.id AS subscription_id,
+                COALESCE(
+                    u.days_since_subscription,
+                    GREATEST(
+                        0,
+                        EXTRACT(DAY FROM (
+                            COALESCE(u.unsubscription_datetime, s.subscription_end_date, CAST(:anchor_dt AS timestamp))
+                            - s.subscription_start_date
+                        ))
+                    )::int
+                ) AS dropoff_days,
+                UPPER(COALESCE(u.churn_type, '')) AS churn_type,
+                NULLIF(TRIM(COALESCE(u.churn_reason, '')), '') AS churn_reason
+            FROM subscriptions s
+            LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
+            WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
+              AND s.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+              AND s.subscription_start_date <= CAST(:anchor_dt AS timestamp)
+              AND s.status IN ('cancelled', 'expired')
+              {sf}
+        )
+        SELECT
+            COUNT(*) AS total_dropoffs,
+            COUNT(*) FILTER (WHERE dropoff_days <= 3) AS early_dropoffs_3d,
+            COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL') AS technical_dropoffs,
+            COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY') AS voluntary_dropoffs
+        FROM base
+    """), params).fetchone()
+
+    total_dropoffs = int(summary.total_dropoffs or 0)
+    early_dropoffs_3d = int(summary.early_dropoffs_3d or 0)
+    technical_dropoffs = int(summary.technical_dropoffs or 0)
+    voluntary_dropoffs = int(summary.voluntary_dropoffs or 0)
+
+    cause_rows = db.execute(text(f"""
+        WITH base AS (
+            SELECT
+                COALESCE(
+                    u.days_since_subscription,
+                    GREATEST(
+                        0,
+                        EXTRACT(DAY FROM (
+                            COALESCE(u.unsubscription_datetime, s.subscription_end_date, CAST(:anchor_dt AS timestamp))
+                            - s.subscription_start_date
+                        ))
+                    )::int
+                ) AS dropoff_days,
+                UPPER(COALESCE(u.churn_type, '')) AS churn_type
+            FROM subscriptions s
+            LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
+            WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
+              AND s.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+              AND s.subscription_start_date <= CAST(:anchor_dt AS timestamp)
+              AND s.status IN ('cancelled', 'expired')
+              {sf}
+        )
+        SELECT
+            cause,
+            COUNT(*) AS cnt
+        FROM (
+            SELECT
+                CASE
+                    WHEN churn_type = 'TECHNICAL' THEN 'Technical / billing friction'
+                    WHEN churn_type = 'VOLUNTARY' THEN 'Voluntary opt-out'
+                    WHEN dropoff_days <= 1 THEN 'No immediate value (D0-D1)'
+                    WHEN dropoff_days <= 3 THEN 'Weak early engagement (D2-D3)'
+                    ELSE 'Other / unclassified'
+                END AS cause
+            FROM base
+        ) mapped
+        GROUP BY cause
+        ORDER BY cnt DESC
+    """), params).fetchall()
+
+    reason_rows = db.execute(text(f"""
+        WITH base AS (
+            SELECT
+                NULLIF(TRIM(COALESCE(u.churn_reason, '')), '') AS churn_reason,
+                UPPER(COALESCE(u.churn_type, '')) AS churn_type
+            FROM subscriptions s
+            LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
+            WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
+              AND s.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+              AND s.subscription_start_date <= CAST(:anchor_dt AS timestamp)
+              AND s.status IN ('cancelled', 'expired')
+              {sf}
+        )
+        SELECT
+            COALESCE(
+                churn_reason,
+                CASE
+                    WHEN churn_type = 'TECHNICAL' THEN 'Technical issue (unspecified)'
+                    WHEN churn_type = 'VOLUNTARY' THEN 'User choice (unspecified)'
+                    ELSE 'Reason not captured'
+                END
+            ) AS reason,
+            COUNT(*) AS cnt
+        FROM base
+        GROUP BY reason
+        ORDER BY cnt DESC
+        LIMIT 5
+    """), params).fetchall()
+
+    cause_breakdown = []
+    for row in cause_rows:
+        pct = round((int(row.cnt or 0) * 100.0 / total_dropoffs), 1) if total_dropoffs > 0 else 0.0
+        priority = "high" if pct >= 35 else "medium" if pct >= 15 else "low"
+        cause_breakdown.append(
+            {
+                "cause": row.cause,
+                "count": int(row.cnt or 0),
+                "pct": pct,
+                "priority": priority,
+            }
+        )
+
+    top_reasons = []
+    for row in reason_rows:
+        pct = round((int(row.cnt or 0) * 100.0 / total_dropoffs), 1) if total_dropoffs > 0 else 0.0
+        top_reasons.append(
+            {
+                "reason": row.reason,
+                "count": int(row.cnt or 0),
+                "pct": pct,
+            }
+        )
+
+    early_dropoff_rate_pct = round((early_dropoffs_3d * 100.0 / total_dropoffs), 1) if total_dropoffs > 0 else 0.0
+    technical_share_pct = round((technical_dropoffs * 100.0 / total_dropoffs), 1) if total_dropoffs > 0 else 0.0
+    voluntary_share_pct = round((voluntary_dropoffs * 100.0 / total_dropoffs), 1) if total_dropoffs > 0 else 0.0
+
+    notes = [
+        f"{early_dropoff_rate_pct}% of drop-offs happen in the first 3 days.",
+        f"Technical/billing friction represents {technical_share_pct}% of total drop-offs.",
+        f"Voluntary opt-out represents {voluntary_share_pct}% of total drop-offs.",
+    ]
+
+    if cause_breakdown:
+        top_cause = cause_breakdown[0]
+        notes.append(
+            f"Top driver: {top_cause['cause']} ({top_cause['pct']}% / {top_cause['count']} users)."
+        )
+
+    return {
+        "summary": {
+            "total_dropoffs": total_dropoffs,
+            "early_dropoffs_3d": early_dropoffs_3d,
+            "early_dropoff_rate_pct": early_dropoff_rate_pct,
+            "technical_dropoffs": technical_dropoffs,
+            "technical_share_pct": technical_share_pct,
+            "voluntary_dropoffs": voluntary_dropoffs,
+            "voluntary_share_pct": voluntary_share_pct,
+        },
+        "cause_breakdown": cause_breakdown,
+        "top_reasons": top_reasons,
+        "management_notes": notes,
     }
 
 

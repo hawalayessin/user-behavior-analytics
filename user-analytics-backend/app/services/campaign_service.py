@@ -49,8 +49,35 @@ def get_campaign_dashboard(
 		service_id=service_id,
 	)
 
+	total_targeted = float(kpis.get("total_targeted") or 0)
+	qualified_targeted = float(kpis.get("qualified_targeted") or 0)
+	total_messages_sent = float(kpis.get("total_messages_sent") or 0)
+	total_messages_delivered = float(kpis.get("total_messages_delivered") or 0)
+
+	target_coverage_pct = round((qualified_targeted * 100.0 / total_targeted), 1) if total_targeted > 0 else 0.0
+	sms_coverage_pct = round((total_messages_sent * 100.0 / total_targeted), 1) if total_targeted > 0 else 0.0
+	delivery_success_pct = round((total_messages_delivered * 100.0 / total_messages_sent), 1) if total_messages_sent > 0 else 0.0
+
+	quality_score = round((0.45 * target_coverage_pct) + (0.25 * min(sms_coverage_pct, 100.0)) + (0.30 * delivery_success_pct), 1)
+	if quality_score >= 85:
+		quality_status = "excellent"
+	elif quality_score >= 70:
+		quality_status = "good"
+	elif quality_score >= 50:
+		quality_status = "fair"
+	else:
+		quality_status = "poor"
+
 	return {
 		"kpis": kpis,
+		"data_quality": {
+			"quality_score": quality_score,
+			"quality_status": quality_status,
+			"target_coverage_pct": target_coverage_pct,
+			"sms_coverage_pct": sms_coverage_pct,
+			"delivery_success_pct": delivery_success_pct,
+			"quality_formula": "0.45*target_coverage+0.25*min(sms_coverage,100)+0.30*delivery_success",
+		},
 		"charts": {
 			"by_type": by_type,
 			"monthly_trend": monthly_trend,

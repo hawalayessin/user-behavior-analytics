@@ -175,6 +175,28 @@ def get_churn_model_metrics():
     return metrics
 
 
+@router.get("/governance")
+def get_churn_model_governance(
+    db: Session = Depends(get_db),
+):
+    cache_key = build_cache_key("ml:churn:governance", {"v": "governance-v1"})
+
+    def _compute() -> dict[str, Any]:
+        predictor = ChurnPredictor()
+        try:
+            return predictor.governance_report(db)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    return cache_or_compute(
+        cache_key,
+        settings.ML_METRICS_CACHE_TTL_SECONDS,
+        compute_function=lambda: jsonable_encoder(_compute()),
+    )
+
+
 @router.get("/scores", response_model=ChurnScoresResponse)
 def get_churn_scores(
     db: Session = Depends(get_db),

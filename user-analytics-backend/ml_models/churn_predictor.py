@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import brier_score_loss, classification_report, roc_auc_score
 from sklearn.model_selection import train_test_split
 
 
@@ -70,6 +70,127 @@ class ChurnPredictor:
             if query_timeout_ms is not None
             else os.getenv("CHURN_SQL_TIMEOUT_MS", "120000")
         )
+
+    def _feature_profile_from_df(self, df: pd.DataFrame) -> dict[str, dict[str, float]]:
+        profile: dict[str, dict[str, float]] = {}
+        for feature in self.feature_names:
+            if feature not in df.columns:
+                continue
+            s = pd.to_numeric(df[feature], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+            if s.empty:
+                profile[feature] = {
+                    "mean": 0.0,
+                    "std": 0.0,
+                    "p10": 0.0,
+                    "p50": 0.0,
+                    "p90": 0.0,
+                }
+                continue
+            profile[feature] = {
+                "mean": float(s.mean()),
+                "std": float(s.std(ddof=0)),
+                "p10": float(s.quantile(0.10)),
+                "p50": float(s.quantile(0.50)),
+                "p90": float(s.quantile(0.90)),
+            }
+        return profile
+
+    def _calibration_summary(self, y_true: pd.Series, y_proba: np.ndarray, bins: int = 10) -> dict[str, Any]:
+        if len(y_true) == 0:
+            return {"brier_score": None, "ece": None, "bins": []}
+
+        y_true_arr = np.asarray(y_true).astype(float)
+        y_proba_arr = np.asarray(y_proba).astype(float)
+        brier = float(brier_score_loss(y_true_arr, y_proba_arr))
+
+        edges = np.linspace(0.0, 1.0, bins + 1)
+        total = len(y_true_arr)
+        weighted_abs_gap = 0.0
+        rows: list[dict[str, Any]] = []
+
+        for i in range(bins):
+            lo = float(edges[i])
+            hi = float(edges[i + 1])
+            mask = (y_proba_arr >= lo) & (y_proba_arr < hi if i < bins - 1 else y_proba_arr <= hi)
+            count = int(mask.sum())
+            if count == 0:
+                rows.append(
+                    {
+                        "bin": f"{lo:.1f}-{hi:.1f}",
+                        "count": 0,
+                        "avg_pred": None,
+                        "empirical_rate": None,
+                        "abs_gap": None,
+                    }
+                )
+                continue
+
+            avg_pred = float(y_proba_arr[mask].mean())
+            empirical = float(y_true_arr[mask].mean())
+            abs_gap = abs(avg_pred - empirical)
+            weighted_abs_gap += abs_gap * (count / total)
+            rows.append(
+                {
+                    "bin": f"{lo:.1f}-{hi:.1f}",
+                    "count": count,
+                    "avg_pred": round(avg_pred, 4),
+                    "empirical_rate": round(empirical, 4),
+                    "abs_gap": round(abs_gap, 4),
+                }
+            )
+
+        return {
+            "brier_score": round(brier, 4),
+            "ece": round(float(weighted_abs_gap), 4),
+            "bins": rows,
+        }
+
+    def _compute_feature_drift(
+        self,
+        train_profile: dict[str, dict[str, float]],
+        current_profile: dict[str, dict[str, float]],
+    ) -> dict[str, Any]:
+        features: list[dict[str, Any]] = []
+        high_count = 0
+        medium_count = 0
+
+        for feature in self.feature_names:
+            t = train_profile.get(feature) or {}
+            c = current_profile.get(feature) or {}
+            train_mean = float(t.get("mean") or 0.0)
+            train_std = float(t.get("std") or 0.0)
+            current_mean = float(c.get("mean") or 0.0)
+
+            scale = train_std if train_std > 1e-9 else max(abs(train_mean), 1.0)
+            z_shift = abs(current_mean - train_mean) / scale if scale > 0 else 0.0
+
+            severity = "low"
+            if z_shift >= 1.5:
+                severity = "high"
+                high_count += 1
+            elif z_shift >= 1.0:
+                severity = "medium"
+                medium_count += 1
+
+            features.append(
+                {
+                    "feature": feature,
+                    "train_mean": round(train_mean, 4),
+                    "current_mean": round(current_mean, 4),
+                    "z_shift": round(float(z_shift), 4),
+                    "severity": severity,
+                }
+            )
+
+        features.sort(key=lambda x: x["z_shift"], reverse=True)
+        avg_shift = float(np.mean([f["z_shift"] for f in features])) if features else 0.0
+
+        return {
+            "average_z_shift": round(avg_shift, 4),
+            "high_drift_features": high_count,
+            "medium_drift_features": medium_count,
+            "features": features,
+        }
 
     # -----------------------------
     # SQL Feature Engineering
@@ -367,6 +488,20 @@ class ChurnPredictor:
                 "n_positive": n_positive,
                 "n_negative": n_negative,
                 "warning": warning,
+                "governance": {
+                  "protocol": {
+                    "version": "churn-governance-v1",
+                    "evaluation_split": "stratified train_test_split(test_size=0.2, random_state=42)",
+                    "default_decision_threshold": 0.4,
+                    "recalibration_cadence_days": 30,
+                  },
+                  "calibration": {
+                    "brier_score": None,
+                    "ece": None,
+                    "bins": [],
+                  },
+                  "feature_profile_train": self._feature_profile_from_df(X),
+                },
             }
             self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
             joblib.dump(metrics, self.metrics_path)
@@ -409,6 +544,16 @@ class ChurnPredictor:
           "n_positive": n_positive,
           "n_negative": n_negative,
             "warning": None,
+            "governance": {
+              "protocol": {
+                "version": "churn-governance-v1",
+                "evaluation_split": "stratified train_test_split(test_size=0.2, random_state=42)",
+                "default_decision_threshold": 0.4,
+                "recalibration_cadence_days": 30,
+              },
+              "calibration": self._calibration_summary(y_test, y_proba),
+              "feature_profile_train": self._feature_profile_from_df(X_train),
+            },
         }
 
         # Persist model + metrics.
@@ -497,4 +642,71 @@ class ChurnPredictor:
             df_store.to_sql("churn_predictions", db_session.bind, if_exists="replace", index=False)
 
         return ChurnPredictionResult(df=df, distribution=distribution)
+
+    def governance_report(self, db_session: Session, *, recalibration_cadence_days: int = 30) -> dict[str, Any]:
+        metrics = self.load_metrics()
+        if metrics is None:
+            raise FileNotFoundError("Model metrics not found. Train the model first.")
+
+        gov = metrics.get("governance") or {}
+        train_profile = gov.get("feature_profile_train") or {}
+        calibration = gov.get("calibration") or {}
+        protocol = gov.get("protocol") or {}
+
+        if not self.load():
+            raise FileNotFoundError("Model not trained yet. Call /ml/churn/train first.")
+
+        current = self.predict_active_subscriptions(db_session, threshold=0.4, store_predictions=False)
+        current_df = current.df
+        current_profile = self._feature_profile_from_df(current_df) if not current_df.empty else {}
+
+        drift = self._compute_feature_drift(train_profile, current_profile) if train_profile else {
+            "average_z_shift": 0.0,
+            "high_drift_features": 0,
+            "medium_drift_features": 0,
+            "features": [],
+        }
+
+        trained_at_raw = metrics.get("trained_at")
+        trained_at = pd.to_datetime(trained_at_raw, utc=True) if trained_at_raw else pd.Timestamp.now(tz="UTC")
+        now = pd.Timestamp.now(tz="UTC")
+        days_since_training = int(max((now - trained_at).days, 0))
+
+        cadence = int(protocol.get("recalibration_cadence_days") or recalibration_cadence_days)
+        calibration_due = days_since_training >= cadence
+        retrain_due = calibration_due or int(drift.get("high_drift_features") or 0) >= 2
+
+        if retrain_due:
+            status = "retrain_required"
+        elif int(drift.get("medium_drift_features") or 0) >= 2:
+            status = "watch"
+        else:
+            status = "stable"
+
+        return {
+            "status": status,
+            "trained_at": trained_at.isoformat(),
+            "evaluated_at": now.isoformat(),
+            "days_since_training": days_since_training,
+            "calibration_due": calibration_due,
+            "retrain_due": retrain_due,
+            "protocol": {
+                "version": protocol.get("version") or "churn-governance-v1",
+                "evaluation_split": protocol.get("evaluation_split") or "stratified train_test_split(test_size=0.2, random_state=42)",
+                "default_decision_threshold": float(protocol.get("default_decision_threshold") or 0.4),
+                "recalibration_cadence_days": cadence,
+            },
+            "calibration": {
+                "brier_score": calibration.get("brier_score"),
+                "ece": calibration.get("ece"),
+                "bins": calibration.get("bins") or [],
+            },
+            "drift": drift,
+            "scored_population": int(current_df["user_id"].nunique()) if not current_df.empty and "user_id" in current_df.columns else 0,
+            "recommendations": [
+                "Review high-drift features and upstream data contracts before retraining.",
+                "Recalibrate threshold policy if ECE exceeds 0.08 or Brier score degrades over two cycles.",
+                "Run monthly stable evaluation protocol and archive governance snapshots for auditability.",
+            ],
+        }
 

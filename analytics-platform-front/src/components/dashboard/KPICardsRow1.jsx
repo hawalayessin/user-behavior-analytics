@@ -4,6 +4,8 @@ import KPICard from "./KPICard";
 
 export default function KPICardsRow1({ data, metrics }) {
   const total = data.subscriptions.total || 0;
+  const pending = data.subscriptions.pending || 0;
+  const totalWithPending = data.subscriptions.total_with_pending || total;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -32,9 +34,9 @@ export default function KPICardsRow1({ data, metrics }) {
         iconBg="bg-amber-500/20"
       />
       <KPICard
-        title="Pending (OTP)"
-        value={(data.subscriptions.pending || 0).toLocaleString()}
-        subtitle="OTP started, not confirmed"
+        title="Pending OTP"
+        value={pending.toLocaleString()}
+        subtitle={`${totalWithPending > 0 ? Math.round((pending * 100) / totalWithPending) : 0}% of total pipeline`}
         icon={Clock3}
         iconColor="#94A3B8"
         iconBg="bg-slate-500/20"

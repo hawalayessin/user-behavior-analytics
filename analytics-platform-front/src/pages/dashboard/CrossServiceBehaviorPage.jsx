@@ -112,6 +112,69 @@ export default function CrossServiceBehaviorPage() {
     return m;
   }, [coSubscriptions]);
 
+  const standardizedPaths = useMemo(() => {
+    if (migrations?.standardized_paths?.length)
+      return migrations.standardized_paths;
+    if (!migrations?.migrations?.length) return [];
+
+    return migrations.migrations.slice(0, 5).map((m, idx) => {
+      const rate = Number(m.migration_rate ?? 0);
+      const users = Number(m.user_count ?? 0);
+
+      let priority = "low";
+      let businessSignal = "long_tail_path";
+      let action =
+        "Monitor this path and test lightweight campaigns before scaling.";
+
+      if (rate >= 5 || users >= 10000) {
+        priority = "high";
+        businessSignal = "strong_substitution";
+        action =
+          "Activate retention and cross-sell journey within 72h on users exiting source service.";
+      } else if (rate >= 2 || users >= 3000) {
+        priority = "medium";
+        businessSignal = "emerging_path";
+        action =
+          "Launch bundle recommendation between source and destination services.";
+      }
+
+      return {
+        rank: idx + 1,
+        path_code: `${m.from_service}->${m.to_service}`,
+        from_service: m.from_service,
+        to_service: m.to_service,
+        user_count: users,
+        migration_rate: rate,
+        priority,
+        business_signal: businessSignal,
+        recommended_action: action,
+      };
+    });
+  }, [migrations]);
+
+  const managementNotes = useMemo(() => {
+    if (migrations?.management_notes?.length)
+      return migrations.management_notes;
+    if (!standardizedPaths.length) return [];
+
+    const top3 = standardizedPaths.slice(0, 3);
+    const total = standardizedPaths.reduce(
+      (acc, p) => acc + Number(p.user_count ?? 0),
+      0,
+    );
+    const top3Users = top3.reduce(
+      (acc, p) => acc + Number(p.user_count ?? 0),
+      0,
+    );
+    const top3Pct = total > 0 ? ((top3Users / total) * 100).toFixed(1) : "0.0";
+
+    return [
+      `Top 3 migration paths concentrate ${top3Pct}% of observed migrations in this scope.`,
+      "Prioritize high-priority paths for immediate retention playbooks.",
+      "Track monthly conversion lift by A->B path to validate business impact.",
+    ];
+  }, [migrations?.management_notes, standardizedPaths]);
+
   /* ── build recommendations from actual data ── */
   const recommendations = useMemo(() => {
     const recs = [];
@@ -531,7 +594,85 @@ export default function CrossServiceBehaviorPage() {
         </div>
 
         {/* ═══════════════════════════════════════════════
-            SECTION 5 — Recommendations Panel
+            SECTION 5 — Standardized A->B Journeys (Management)
+           ═══════════════════════════════════════════════ */}
+        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">
+              Standardized A to B Journeys
+            </h3>
+            <p className="text-sm text-slate-400">
+              Management-ready migration playbooks with business interpretation
+            </p>
+          </div>
+
+          {loading ? (
+            <SkeletonBlock h="h-52" />
+          ) : !standardizedPaths.length ? (
+            <div className="text-center py-12 text-slate-500">
+              No standardized journey available
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {standardizedPaths.map((path) => (
+                <div
+                  key={path.path_code}
+                  className="rounded-xl border border-slate-700/40 bg-slate-900/40 p-4 space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-bold text-slate-100 truncate">
+                      #{path.rank} {path.from_service} {"->"} {path.to_service}
+                    </p>
+                    <span
+                      className={`px-2 py-1 rounded text-[10px] uppercase font-semibold border ${
+                        path.priority === "high"
+                          ? "bg-red-500/15 text-red-300 border-red-500/30"
+                          : path.priority === "medium"
+                            ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                            : "bg-slate-500/15 text-slate-300 border-slate-500/30"
+                      }`}
+                    >
+                      {path.priority}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>
+                      {Number(path.user_count ?? 0).toLocaleString()} users
+                    </span>
+                    <span>{Number(path.migration_rate ?? 0).toFixed(2)}%</span>
+                  </div>
+
+                  <p className="text-xs text-indigo-300 uppercase tracking-wide">
+                    {path.business_signal?.replaceAll("_", " ")}
+                  </p>
+                  <p className="text-sm text-slate-300 leading-relaxed">
+                    {path.recommended_action}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loading && managementNotes.length > 0 && (
+            <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <GitBranch size={16} className="text-indigo-300" />
+                <h4 className="text-sm font-bold text-indigo-200 uppercase tracking-wide">
+                  Management Notes
+                </h4>
+              </div>
+              {managementNotes.map((note, idx) => (
+                <p key={idx} className="text-sm text-slate-200">
+                  {note}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ═══════════════════════════════════════════════
+            SECTION 6 — Recommendations Panel
            ═══════════════════════════════════════════════ */}
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 space-y-4">
           <div className="flex items-center gap-2">

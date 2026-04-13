@@ -13,9 +13,10 @@ import FilterBar from "../../components/dashboard/FilterBar";
 import KPICard from "../../components/dashboard/KPICard";
 import TrialDropoffChart from "../../components/dashboard/TrialDropoffChart";
 import SubscriptionDonutChart from "../../components/dashboard/SubscriptionDonutChart";
-import EngagementHealthPanel from "../../components/dashboard/EngagementHealthPanel";
 import { useTrialKPIs } from "../../hooks/useTrialKPIs";
 import { useTrialUsers } from "../../hooks/useTrialUsers";
+import { useTrialDropoffByDay } from "../../hooks/useTrialDropoffByDay";
+import { useTrialDropoffCauses } from "../../hooks/useTrialDropoffCauses";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 import {
   TrendingDown,
@@ -113,9 +114,32 @@ export default function FreeTrialBehaviorPage() {
   } = useTrialUsers({
     status: statusFilter || undefined,
     search: search || undefined,
+    start_date: filters.start_date || undefined,
+    end_date: filters.end_date || undefined,
     service_id: filters.service_id || undefined,
     page,
     limit: ITEMS_PER_PAGE,
+  });
+
+  const {
+    data: dropoffByDayData,
+    loading: dropoffByDayLoading,
+    refetch: refetchDropoffByDay,
+  } = useTrialDropoffByDay({
+    start_date: filters.start_date,
+    end_date: filters.end_date,
+    service_id: filters.service_id,
+  });
+
+  const {
+    data: dropoffCausesData,
+    loading: dropoffCausesLoading,
+    error: dropoffCausesError,
+    refetch: refetchDropoffCauses,
+  } = useTrialDropoffCauses({
+    start_date: filters.start_date,
+    end_date: filters.end_date,
+    service_id: filters.service_id,
   });
 
   const kpis = useMemo(() => {
@@ -137,6 +161,35 @@ export default function FreeTrialBehaviorPage() {
   const trialUsers = trialUsersData?.data ?? [];
   const totalCount = trialUsersData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+
+  const dropoffChartData = useMemo(() => {
+    if (!dropoffByDayData) {
+      return [
+        { label: "Day 1\n(0-24h)", value: 0, fill: "#EF4444" },
+        { label: "Day 2\n(24-48h)", value: 0, fill: "#F97316" },
+        { label: "Day 3\n(48-72h)", value: 0, fill: "#FBBF24" },
+      ];
+    }
+    return [
+      {
+        label: "Day 1\n(0-24h)",
+        value: Number(dropoffByDayData.day1 ?? 0),
+        fill: "#EF4444",
+      },
+      {
+        label: "Day 2\n(24-48h)",
+        value: Number(dropoffByDayData.day2 ?? 0),
+        fill: "#F97316",
+      },
+      {
+        label: "Day 3\n(48-72h)",
+        value: Number(dropoffByDayData.day3 ?? 0),
+        fill: "#FBBF24",
+      },
+    ];
+  }, [dropoffByDayData]);
+
+  const managementNotes = dropoffCausesData?.management_notes ?? [];
 
   const sortedTrialUsers = useMemo(() => {
     return [...trialUsers].sort((a, b) => {
@@ -206,6 +259,8 @@ export default function FreeTrialBehaviorPage() {
       const params = new URLSearchParams();
       if (statusFilter) params.append("status", statusFilter);
       if (search) params.append("search", search);
+      if (filters.start_date) params.append("start_date", filters.start_date);
+      if (filters.end_date) params.append("end_date", filters.end_date);
       if (filters.service_id) params.append("service_id", filters.service_id);
       params.append("export", "true");
 
@@ -315,8 +370,8 @@ export default function FreeTrialBehaviorPage() {
         {/* ── KPI Cards (2x2 Grid) ──────────────────────────── */}
         {!kpiError && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {kpiLoading ? (
-              Array.from({ length: 5 }).map((_, i) => <KPISkeleton key={i} />)
+            {kpiLoading || dropoffCausesLoading ? (
+              Array.from({ length: 8 }).map((_, i) => <KPISkeleton key={i} />)
             ) : kpis ? (
               <>
                 <KPICard
@@ -378,6 +433,31 @@ export default function FreeTrialBehaviorPage() {
                   trendLabel="risk"
                   alert={kpis.trial_only_rate > 30}
                 />
+                <KPICard
+                  title="Total Drop-offs"
+                  value={`${dropoffCausesData?.summary?.total_dropoffs ?? 0}`}
+                  subtitle="Cancelled and expired in selected period"
+                  icon={TrendingDown}
+                  iconColor="#EF4444"
+                  iconBg="bg-red-500/10"
+                  trend={-1}
+                  trendLabel="risk"
+                  alert={(dropoffCausesData?.summary?.total_dropoffs ?? 0) > 0}
+                />
+                <KPICard
+                  title="Early Drop-offs (D0-D3)"
+                  value={`${dropoffCausesData?.summary?.early_dropoff_rate_pct ?? 0}%`}
+                  subtitle="Share of drop-offs in first 3 days"
+                  icon={Clock}
+                  iconColor="#F59E0B"
+                  iconBg="bg-amber-500/10"
+                  trend={-1}
+                  trendLabel="warning"
+                  alert={
+                    (dropoffCausesData?.summary?.early_dropoff_rate_pct ?? 0) >
+                    50
+                  }
+                />
               </>
             ) : null}
           </div>
@@ -388,16 +468,10 @@ export default function FreeTrialBehaviorPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Row 1: TrialDropoffChart + SubscriptionDonutChart */}
             <div>
-              {kpiLoading ? (
+              {kpiLoading || dropoffByDayLoading ? (
                 <ChartSkeleton />
               ) : (
-                <TrialDropoffChart
-                  data={[
-                    { label: "Day 1\n(0-24h)", value: 45, fill: "#EF4444" },
-                    { label: "Day 2\n(24-48h)", value: 32, fill: "#F97316" },
-                    { label: "Day 3\n(48-72h)", value: 28, fill: "#FBBF24" },
-                  ]}
-                />
+                <TrialDropoffChart data={dropoffChartData} />
               )}
             </div>
 
@@ -427,76 +501,7 @@ export default function FreeTrialBehaviorPage() {
               )}
             </div>
 
-            {/* Row 2: EngagementHealthPanel + TrialUsersTable */}
-            <div>
-              {kpiLoading ? (
-                <ChartSkeleton />
-              ) : (
-                <EngagementHealthPanel
-                  bars={[
-                    {
-                      label: "Trial Completion",
-                      value: 42,
-                      sublabel: "completed full trial",
-                      color: "#3B82F6",
-                      target: 50,
-                    },
-                    {
-                      label: "Day 1 Retention",
-                      value: 78,
-                      sublabel: "return after signup",
-                      color: "#10B981",
-                      target: 80,
-                    },
-                    {
-                      label: "Day 3 Retention",
-                      value: 38,
-                      sublabel: "active at 72 hours",
-                      color: "#F59E0B",
-                      target: 50,
-                    },
-                  ]}
-                />
-              )}
-            </div>
-
-            <div>
-              {trialUsersLoading ? (
-                <ChartSkeleton />
-              ) : (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
-                  <h3 className="text-lg font-bold text-slate-100">
-                    Trial Summary Stats
-                  </h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Total in trial:</span>
-                      <span className="text-slate-100 font-medium">
-                        {trialUsers.filter((u) => u.status === "active").length}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Converted:</span>
-                      <span className="text-emerald-400 font-medium">
-                        {
-                          trialUsers.filter((u) => u.status === "converted")
-                            .length
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Dropped:</span>
-                      <span className="text-red-400 font-medium">
-                        {
-                          trialUsers.filter((u) => u.status === "dropped")
-                            .length
-                        }
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Row 2 panel removed by request */}
           </div>
         )}
 
@@ -589,6 +594,8 @@ export default function FreeTrialBehaviorPage() {
               onClick={() => {
                 refetchTrialUsers();
                 refetchKPIs();
+                refetchDropoffByDay();
+                refetchDropoffCauses();
               }}
               className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded transition"
             >
@@ -764,6 +771,45 @@ export default function FreeTrialBehaviorPage() {
                   »
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 4.2 Management Causal Narrative ───────────────── */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-bold text-slate-100">
+              Drop-off Causal Narrative
+            </h2>
+            {dropoffCausesError && (
+              <button
+                onClick={refetchDropoffCauses}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition"
+              >
+                <RotateCcw size={12} /> Retry causal insights
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+              <h3 className="text-sm font-semibold text-slate-100 mb-3">
+                Management Notes
+              </h3>
+              <ul className="space-y-2 text-sm text-slate-300">
+                {managementNotes.length ? (
+                  managementNotes.map((note, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="mt-1 text-violet-300">•</span>
+                      <span>{note}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-slate-500">
+                    No causal notes for selected filters.
+                  </li>
+                )}
+              </ul>
             </div>
           </div>
         </div>

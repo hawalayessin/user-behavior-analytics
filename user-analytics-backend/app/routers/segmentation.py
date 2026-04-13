@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Optional
 
 from app.core.database import get_db
+from app.core.cache import cache_invalidate_prefix, cached_endpoint
+from app.core.config import settings
 from app.services import segmentation_service
 from app.schemas.segmentation import (
     KPIResponse,
@@ -17,8 +19,29 @@ from app.schemas.segmentation import (
 
 router = APIRouter(prefix="/analytics/segmentation", tags=["Segmentation"])
 
+SEGMENTATION_CACHE_VERSION = "2026-04-10-v1"
+
+
+def _segmentation_cache_payload(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    service_id: Optional[str] = None,
+    **_: object,
+) -> dict:
+    return {
+        "v": SEGMENTATION_CACHE_VERSION,
+        "start_date": start_date or "auto",
+        "end_date": end_date or "auto",
+        "service_id": service_id or "all",
+    }
+
 
 @router.get("/kpis", response_model=KPIResponse)
+@cached_endpoint(
+    "segmentation_kpis",
+    settings.SEGMENTATION_CACHE_TTL_SECONDS,
+    key_builder=_segmentation_cache_payload,
+)
 def get_kpis(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -56,6 +79,11 @@ def get_kpis(
 
 
 @router.get("/clusters", response_model=ClustersResponse)
+@cached_endpoint(
+    "segmentation_clusters",
+    settings.SEGMENTATION_CACHE_TTL_SECONDS,
+    key_builder=_segmentation_cache_payload,
+)
 def get_clusters(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -88,6 +116,11 @@ def get_clusters(
 
 
 @router.get("/profiles", response_model=ProfilesResponse)
+@cached_endpoint(
+    "segmentation_profiles",
+    settings.SEGMENTATION_CACHE_TTL_SECONDS,
+    key_builder=_segmentation_cache_payload,
+)
 def get_profiles(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -153,4 +186,6 @@ def train_model(
         except:
             pass
     
-    return segmentation_service.train_segmentation_model(db, start, end, service_id)
+    result = segmentation_service.train_segmentation_model(db, start, end, service_id)
+    cache_invalidate_prefix("analytics:v2:segmentation_")
+    return result

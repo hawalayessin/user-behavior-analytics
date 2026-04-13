@@ -2,6 +2,8 @@ import { useMemo } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
+const LONG_CACHE_MS = 24 * 60 * 60 * 1000
+
 /**
  * Hook to fetch Free Trial KPIs
  * @param {Object} filters - Filter object with start_date, end_date, service_id
@@ -35,11 +37,12 @@ export function useTrialKPIs(filters = {}) {
       })
       return res.data ?? null
     },
-    staleTime: 90 * 1000,
-    gcTime: 10 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: LONG_CACHE_MS,
+    cacheTime: LONG_CACHE_MS,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     keepPreviousData: true,
     placeholderData: keepPreviousData,
   })

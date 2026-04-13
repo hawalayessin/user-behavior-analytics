@@ -20,6 +20,7 @@ export function useCampaignImpactDashboard(filters = {}) {
       "analytics",
       "campaigns",
       "dashboard",
+      "sms-kpis-v2",
       normalizedFilters.start_date,
       normalizedFilters.end_date,
       normalizedFilters.service_id,
@@ -29,11 +30,14 @@ export function useCampaignImpactDashboard(filters = {}) {
       if (normalizedFilters.start_date) params.set("start_date", normalizedFilters.start_date)
       if (normalizedFilters.end_date) params.set("end_date", normalizedFilters.end_date)
       if (normalizedFilters.service_id) params.set("service_id", normalizedFilters.service_id)
+      params.set("_cb", String(Date.now()))
 
       const qs = params.toString()
       const url = `/analytics/campaigns/dashboard${qs ? `?${qs}` : ""}`
-      return await getWithCache(url, { ttlMs: 30000 })
+      return await getWithCache(url, { ttlMs: 0, force: true })
     },
+    staleTime: 0,
+    gcTime: 0,
   })
 
   return {

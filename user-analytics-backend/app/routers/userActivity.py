@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta
 from typing import Optional
 import uuid
 
@@ -9,9 +9,11 @@ from app.core.database import get_db
 from app.core.date_ranges import resolve_date_range
 from app.core.cache import cached_endpoint
 from app.core.config import settings
-from app.utils.temporal import get_data_anchor
+from app.utils.temporal import get_data_anchor, get_day_window, get_week_window, get_month_window
 
 router = APIRouter(prefix="/analytics", tags=["User Activity"])
+
+USER_ACTIVITY_CACHE_VERSION = "2026-04-10-usage-window-v2"
 
 
 def _user_activity_cache_payload(
@@ -21,6 +23,7 @@ def _user_activity_cache_payload(
     **_: object,
 ) -> dict:
     return {
+        "v": USER_ACTIVITY_CACHE_VERSION,
         "start_date": start_date.isoformat() if start_date else "auto",
         "end_date": end_date.isoformat() if end_date else "auto",
         "service_id": service_id or "all",
@@ -47,7 +50,29 @@ def get_user_activity(
     if (end_dt - start_dt).days > MAX_TREND_DAYS:
         start_dt = end_dt - timedelta(days=MAX_TREND_DAYS)
 
+    # Align KPI windows with overview logic across the platform.
+    # - No explicit filter: anchor-based global windows.
+    # - Explicit filter: windows derived from selected range end.
+    if start_date is None and end_date is None:
+        usage_day_start, usage_day_end = get_day_window(db, source="usage")
+        usage_week_start, usage_week_end = get_week_window(db, source="usage")
+        usage_month_start, usage_month_end = get_month_window(db, source="usage")
+    else:
+        end_dt_ts = datetime.combine(end_dt, time.max)
+        start_dt_ts = datetime.combine(start_dt, time.min)
+
+        usage_day_end = end_dt_ts
+        usage_day_start = max(start_dt_ts, end_dt_ts - timedelta(hours=24))
+
+        usage_week_end = end_dt_ts
+        usage_week_start = max(start_dt_ts, end_dt_ts - timedelta(days=7))
+
+        month_start = end_dt_ts.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        usage_month_start = max(start_dt_ts, month_start)
+        usage_month_end = end_dt_ts
+
     subscription_anchor_dt = get_data_anchor(db, source="subscription")
+    usage_anchor_dt = get_data_anchor(db, source="usage")
 
     valid_service_id = None
     if service_id:
@@ -59,6 +84,12 @@ def get_user_activity(
     params = {
         "start_dt":   start_dt,
         "end_dt":     end_dt,
+        "usage_day_start_dt": usage_day_start,
+        "usage_day_end_dt": usage_day_end,
+        "usage_week_start_dt": usage_week_start,
+        "usage_week_end_dt": usage_week_end,
+        "usage_month_start_dt": usage_month_start,
+        "usage_month_end_dt": usage_month_end,
         "service_id": valid_service_id,
         "subscription_anchor_dt": subscription_anchor_dt,
     }
@@ -78,23 +109,19 @@ def get_user_activity(
     kpis = db.execute(text(f"""
         SELECT
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime >= CAST(:end_dt AS timestamp)
-                  AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+                                WHERE activity_datetime BETWEEN :usage_day_start_dt AND :usage_day_end_dt
             ) AS dau_today,
 
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime >= CAST(:end_dt AS timestamp) - INTERVAL '7 days'
-                  AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+                                WHERE activity_datetime BETWEEN :usage_week_start_dt AND :usage_week_end_dt
             ) AS wau_current_week,
 
             COUNT(DISTINCT user_id) FILTER (
-                WHERE activity_datetime >= CAST(:start_dt AS timestamp)
-                  AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+                                WHERE activity_datetime BETWEEN :usage_month_start_dt AND :usage_month_end_dt
             ) AS mau_current_month
 
         FROM user_activities
-        WHERE activity_datetime >= CAST(:start_dt AS timestamp)
-          AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+                WHERE activity_datetime BETWEEN :usage_month_start_dt AND :usage_month_end_dt
         {sf_ua}
     """), params).fetchone()
 
@@ -102,18 +129,48 @@ def get_user_activity(
     mau        = kpis.mau_current_month or 0
     stickiness = round((dau / mau * 100), 1) if mau > 0 else 0.0
 
-    # ── 2. Inactive users ─────────────────────────────────────
-    # ✅ CORRIGÉ : inactif = pas d'activité depuis 7j (peu importe status)
+    # ── 2. Inactive users + scoped population ─────────────────
+    # A user is considered inactive when no activity is detected in the last 7 days.
     inactive = db.execute(text(f"""
-        SELECT COUNT(DISTINCT u.id) AS inactive_count
-        FROM users u
-        LEFT JOIN user_activities ua
-            ON  ua.user_id = u.id
-            AND ua.activity_datetime >= CAST(:end_dt AS timestamp) - INTERVAL '7 days'
-        WHERE ua.user_id IS NULL
-          AND u.status NOT IN ('churned', 'cancelled')
-        {sf_inactive}
+        WITH scoped_users AS (
+            SELECT DISTINCT u.id
+            FROM users u
+            WHERE u.status NOT IN ('churned', 'cancelled')
+            {sf_inactive}
+        ),
+        active_7d AS (
+            SELECT DISTINCT ua.user_id
+            FROM user_activities ua
+            JOIN scoped_users su ON su.id = ua.user_id
+            WHERE ua.activity_datetime >= CAST(:end_dt AS timestamp) - INTERVAL '7 days'
+              AND ua.activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+        )
+        SELECT
+            (SELECT COUNT(*) FROM scoped_users) AS scoped_users_count,
+            (SELECT COUNT(*) FROM scoped_users su
+             LEFT JOIN active_7d a ON a.user_id = su.id
+             WHERE a.user_id IS NULL) AS inactive_count
     """), params).fetchone()
+
+    scoped_users_count = int(inactive.scoped_users_count or 0)
+    inactive_count = int(inactive.inactive_count or 0)
+    inactivity_rate = round((inactive_count * 100.0 / scoped_users_count), 1) if scoped_users_count > 0 else 0.0
+
+    # ── 2b. Official engagement score ────────────────────────
+    # Formula:
+    # - Stickiness contribution (65%): normalized vs target of 30%
+    # - Inactivity health (35%): 100 - inactivity_rate
+    stickiness_target_pct = 30.0
+    stickiness_component = min((stickiness / stickiness_target_pct) * 100.0, 100.0) if stickiness_target_pct > 0 else 0.0
+    inactivity_health = max(0.0, 100.0 - inactivity_rate)
+    engagement_score = round((0.65 * stickiness_component) + (0.35 * inactivity_health), 1)
+
+    if engagement_score >= 70:
+        engagement_level = "high"
+    elif engagement_score >= 45:
+        engagement_level = "medium"
+    else:
+        engagement_level = "low"
 
     # ── 3. Average lifetime ───────────────────────────────────
     lifetime = db.execute(text(f"""
@@ -339,6 +396,7 @@ def get_user_activity(
     ]
 
     return {
+        "data_anchor": usage_anchor_dt.strftime("%Y-%m-%d"),
         "filters_applied": {
             "start_date": start_dt.isoformat(),
             "end_date":   end_dt.isoformat(),
@@ -349,7 +407,17 @@ def get_user_activity(
             "wau_current_week":  kpis.wau_current_week  or 0,
             "mau_current_month": mau,
             "stickiness_pct":    stickiness,
-            "inactive_count":    inactive.inactive_count or 0,
+            "inactive_count":    inactive_count,
+            "inactivity_rate_pct": inactivity_rate,
+            "scoped_users_count": scoped_users_count,
+            "engagement_score":  engagement_score,
+            "engagement_level":  engagement_level,
+            "engagement_thresholds": {
+                "high": 70,
+                "medium": 45,
+                "low": 0,
+            },
+            "engagement_formula": "0.65*min(stickiness/30*100,100)+0.35*(100-inactivity_rate)",
             "avg_lifetime_days": float(lifetime.avg_lifetime_days or 0),
         },
         "dau_trend":        dau_trend,

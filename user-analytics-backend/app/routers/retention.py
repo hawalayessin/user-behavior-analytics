@@ -6,11 +6,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.date_ranges import DATA_START_DATE, resolve_date_range
+from app.core.date_ranges import resolve_date_range
 from app.core.cache import cached_endpoint
 from app.core.config import settings
 from app.models.cohorts import Cohort
 from app.models.services import Service
+from app.utils.temporal import get_data_bounds
 
 
 router = APIRouter(prefix="/analytics", tags=["Retention"])
@@ -23,7 +24,7 @@ def _retention_range_payload(
     **_: object,
 ) -> dict:
     return {
-        "start_date": start_date.isoformat() if start_date else DATA_START_DATE.isoformat(),
+        "start_date": start_date.isoformat() if start_date else "auto",
         "end_date": end_date.isoformat() if end_date else "auto",
         "service_id": service_id or "all",
     }
@@ -59,8 +60,7 @@ def _parse_date_range(
     *,
     db: Session,
 ) -> tuple[date, date]:
-    _ = db
-    return resolve_date_range(start_date, end_date)
+    return resolve_date_range(start_date, end_date, db=db, source="subscription")
 
 
 @router.get("/retention/kpis")
@@ -71,7 +71,7 @@ def _parse_date_range(
 )
 def get_retention_kpis(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -133,7 +133,8 @@ def get_retention_heatmap(
     service_id: Optional[str] = Query(default=None),
     last_n_months: int = Query(default=6, ge=1, le=24),
 ):
-    end_dt = date.today()
+    _, data_end_dt = get_data_bounds(db, source="subscription")
+    end_dt = data_end_dt.date()
     start_dt = end_dt.replace(day=1) - timedelta(days=last_n_months * 30)
 
     query = (
@@ -177,7 +178,7 @@ def get_retention_heatmap(
 )
 def get_retention_curve(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):

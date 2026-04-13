@@ -71,10 +71,14 @@ def get_user_segments(
                     COUNT(DISTINCT DATE(be.event_datetime)) AS active_days,
                     COUNT(DISTINCT s.id) AS sub_count
                 FROM subscriptions s
-                JOIN billing_events be ON be.subscription_id = s.id
+                                LEFT JOIN billing_events be
+                                    ON be.subscription_id = s.id
+                                 AND be.event_datetime BETWEEN :start AND :end
                 JOIN services sv ON sv.id = s.service_id
                 JOIN service_types st ON st.id = sv.service_type_id
-                WHERE be.event_datetime BETWEEN :start AND :end
+                                WHERE 1=1
+                                    AND s.subscription_start_date <= :end
+                                    AND (s.subscription_end_date IS NULL OR s.subscription_end_date >= :start)
                   {service_filter}
                 GROUP BY s.user_id
             ),
@@ -161,10 +165,14 @@ def get_segment_distribution(
                         0
                     ) AS revenue
                 FROM subscriptions s
-                JOIN billing_events be ON be.subscription_id = s.id
+                                LEFT JOIN billing_events be
+                                    ON be.subscription_id = s.id
+                                 AND be.event_datetime BETWEEN :start AND :end
                 JOIN services sv ON sv.id = s.service_id
                 JOIN service_types st ON st.id = sv.service_type_id
-                WHERE be.event_datetime BETWEEN :start AND :end
+                                WHERE 1=1
+                                    AND s.subscription_start_date <= :end
+                                    AND (s.subscription_end_date IS NULL OR s.subscription_end_date >= :start)
                   {service_filter}
                 GROUP BY s.user_id
             ),
@@ -251,6 +259,7 @@ def get_segment_kpis(
     """Return dashboard KPIs in one SQL request."""
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
+    churn_service_filter = _service_filter(service_id, alias="subc")
 
     row = db.execute(
         text(
@@ -264,10 +273,14 @@ def get_segment_kpis(
                         0
                     ) AS revenue
                 FROM subscriptions s
-                JOIN billing_events be ON be.subscription_id = s.id
+                                LEFT JOIN billing_events be
+                                    ON be.subscription_id = s.id
+                                 AND be.event_datetime BETWEEN :start AND :end
                 JOIN services sv ON sv.id = s.service_id
                 JOIN service_types st ON st.id = sv.service_type_id
-                WHERE be.event_datetime BETWEEN :start AND :end
+                                WHERE 1=1
+                                    AND s.subscription_start_date <= :end
+                                    AND (s.subscription_end_date IS NULL OR s.subscription_end_date >= :start)
                   {service_filter}
                 GROUP BY s.user_id
             ),
@@ -311,15 +324,23 @@ def get_segment_kpis(
                 SELECT COALESCE(SUM(cnt), 0) AS total
                 FROM stats
             ),
+            user_churn AS (
+                SELECT
+                    subc.user_id,
+                    MAX(CASE WHEN subc.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
+                FROM subscriptions subc
+                WHERE 1=1
+                  AND subc.subscription_start_date <= :end
+                  AND (subc.subscription_end_date IS NULL OR subc.subscription_end_date >= :start)
+                  {churn_service_filter}
+                GROUP BY subc.user_id
+            ),
             churn_stats AS (
                 SELECT
                     seg.segment,
-                    (
-                        COUNT(DISTINCT sub.id) FILTER (WHERE sub.status IN ('cancelled', 'expired'))::float
-                        / NULLIF(COUNT(DISTINCT sub.id), 0)
-                    ) * 100 AS churn_pct
+                    AVG(COALESCE(uc.has_churn, 0)::float) * 100 AS churn_pct
                 FROM segmented seg
-                JOIN subscriptions sub ON sub.user_id = seg.user_id
+                LEFT JOIN user_churn uc ON uc.user_id = seg.user_id
                 GROUP BY seg.segment
             )
             SELECT
@@ -384,6 +405,7 @@ def get_segment_profiles(
     """Return profiles with ARPU, usage duration and churn per segment."""
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
+    churn_service_filter = _service_filter(service_id, alias="subc")
 
     rows = db.execute(
         text(
@@ -398,10 +420,14 @@ def get_segment_profiles(
                     ) AS revenue,
                     COUNT(DISTINCT DATE(be.event_datetime)) AS active_days
                 FROM subscriptions s
-                JOIN billing_events be ON be.subscription_id = s.id
+                                LEFT JOIN billing_events be
+                                    ON be.subscription_id = s.id
+                                 AND be.event_datetime BETWEEN :start AND :end
                 JOIN services sv ON sv.id = s.service_id
                 JOIN service_types st ON st.id = sv.service_type_id
-                WHERE be.event_datetime BETWEEN :start AND :end
+                                WHERE 1=1
+                                    AND s.subscription_start_date <= :end
+                                    AND (s.subscription_end_date IS NULL OR s.subscription_end_date >= :start)
                   {service_filter}
                 GROUP BY s.user_id
             ),
@@ -433,15 +459,23 @@ def get_segment_profiles(
                 FROM user_stats us
                 CROSS JOIN pct
             ),
+            user_churn AS (
+                SELECT
+                    subc.user_id,
+                    MAX(CASE WHEN subc.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
+                FROM subscriptions subc
+                WHERE 1=1
+                  AND subc.subscription_start_date <= :end
+                  AND (subc.subscription_end_date IS NULL OR subc.subscription_end_date >= :start)
+                  {churn_service_filter}
+                GROUP BY subc.user_id
+            ),
             churn AS (
                 SELECT
                     seg.segment,
-                    (
-                        COUNT(DISTINCT sub.id) FILTER (WHERE sub.status IN ('cancelled', 'expired'))::float
-                        / NULLIF(COUNT(DISTINCT sub.id), 0)
-                    ) * 100 AS churn_rate
+                    AVG(COALESCE(uc.has_churn, 0)::float) * 100 AS churn_rate
                 FROM segmented seg
-                JOIN subscriptions sub ON sub.user_id = seg.user_id
+                LEFT JOIN user_churn uc ON uc.user_id = seg.user_id
                 GROUP BY seg.segment
             ),
             profile_stats AS (

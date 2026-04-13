@@ -15,14 +15,16 @@ export function useTrialUsers(filters = {}) {
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (filters?.status)     params.append("status",     String(filters.status))
-      if (filters?.search)     params.append("search",     String(filters.search))
+      if (filters?.status) params.append("status", String(filters.status))
+      if (filters?.search) params.append("search", String(filters.search))
+      if (filters?.start_date) params.append("start_date", String(filters.start_date))
+      if (filters?.end_date) params.append("end_date", String(filters.end_date))
       if (filters?.service_id) params.append("service_id", String(filters.service_id))
-      if (filters?.page)       params.append("page",       String(filters.page))
-      if (filters?.limit)      params.append("page_size",  String(filters.limit))
+      if (filters?.page) params.append("page", String(filters.page))
+      if (filters?.limit) params.append("page_size", String(filters.limit))
 
       const res = await window.fetch(`/api/users/trial?${params.toString()}`)
-      
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
@@ -37,7 +39,15 @@ export function useTrialUsers(filters = {}) {
     } finally {
       setLoading(false)
     }
-  }, [filters?.status, filters?.search, filters?.service_id, filters?.page, filters?.limit])
+  }, [
+    filters?.status,
+    filters?.search,
+    filters?.start_date,
+    filters?.end_date,
+    filters?.service_id,
+    filters?.page,
+    filters?.limit,
+  ])
 
   useEffect(() => {
     fetchData()

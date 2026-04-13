@@ -15,11 +15,11 @@ from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import Session
 
 from app.repositories import segmentation_repo
-from app.utils.temporal import get_default_window
+from app.utils.temporal import get_data_bounds
 
 
 _DASHBOARD_CACHE_TTL_SECONDS = 30
-_MAX_CLUSTER_POINTS = 3000
+_MAX_CLUSTER_POINTS = 1500
 _MODEL_PATH = Path(__file__).resolve().parents[2] / "ml_models" / "segmentation_kmeans.joblib"
 
 _kpis_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
@@ -34,7 +34,8 @@ def _to_window(
 ) -> tuple[datetime, datetime]:
     if start_date and end_date:
         return start_date, end_date
-    return get_default_window(db, days=30, source="billing")
+    # Default "All time" for segmentation should cover the full DB range.
+    return get_data_bounds(db, source="subscription")
 
 
 def _cache_key(
@@ -130,6 +131,7 @@ def get_segmentation_clusters(
 
     segments = segmentation_repo.get_user_segments(db, start_date, end_date, service_id)
     sampled_segments = _sample_cluster_points(segments)
+    distribution_payload = segmentation_repo.get_segment_distribution(db, start_date, end_date, service_id)
 
     clusters = [
         {
@@ -142,7 +144,7 @@ def get_segmentation_clusters(
 
     payload = {
         "clusters": clusters,
-        "distribution": _distribution_from_segments(segments),
+        "distribution": distribution_payload.get("distribution", _distribution_from_segments(segments)),
     }
     _clusters_cache[key] = (now, payload)
     return payload

@@ -3,12 +3,14 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 from app.core.database import get_db
+from app.core.date_ranges import resolve_date_range
 from app.models import User
 from app.schemas.users import UserDetailResponse
+from app.utils.temporal import get_data_anchor
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -25,7 +27,7 @@ def _exec_with_timeout_retry(db: Session, sql_text, params: dict):
 
 
 # ─────────────────────────────────────────────
-# ✅ GET /users  (LIST USERS + CAMPAIGN)
+# ✅ GET /users  (LIST USERS + LAST ACTIVITY TYPE)
 # ─────────────────────────────────────────────
 
 @router.get("", response_model=None)
@@ -103,6 +105,7 @@ def list_users(
     where_sql = " AND ".join(where_clauses)
     paging_where_sql = " AND ".join(paging_where_clauses)
     sf_unsub = "AND un.service_id = CAST(:service_id AS uuid)" if service_id else ""
+    sf_ua = "AND ua.service_id = CAST(:service_id AS uuid)" if service_id else ""
 
     # ── requête principale optimisée ──────────
     # 1) Paginer d'abord la table users
@@ -127,14 +130,27 @@ def list_users(
             pu.phone_number,
             pu.status,
             pu.created_at,
-            lu.last_activity_at,
+            COALESCE(la.last_activity_at, lu.last_unsub_at, pu.created_at) AS last_activity_at,
             COALESCE(ss.services, '[]'::jsonb) AS services,
             COALESCE(ss.total_subscriptions, 0) AS total_subscriptions,
             COALESCE(ss.active_subscriptions, 0) AS active_subscriptions,
-            camp.campaign_name
+            COALESCE(
+                la.activity_type,
+                CASE WHEN lu.last_unsub_at IS NOT NULL THEN 'unsubscription' ELSE 'registration' END
+            ) AS activity_type
         FROM paged_users pu
         LEFT JOIN LATERAL (
-            SELECT MAX(un.unsubscription_datetime) AS last_activity_at
+            SELECT
+                ua.activity_datetime AS last_activity_at,
+                ua.activity_type
+            FROM user_activities ua
+            WHERE ua.user_id = pu.id
+            {sf_ua}
+            ORDER BY ua.activity_datetime DESC
+            LIMIT 1
+        ) la ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT MAX(un.unsubscription_datetime) AS last_unsub_at
             FROM unsubscriptions un
             WHERE un.user_id = pu.id
             {sf_unsub}
@@ -152,15 +168,6 @@ def list_users(
             LEFT JOIN services srv ON srv.id = s.service_id
             WHERE s.user_id = pu.id
         ) ss ON TRUE
-        LEFT JOIN LATERAL (
-            SELECT c.name AS campaign_name
-            FROM subscriptions sub
-            JOIN campaigns c ON c.id = sub.campaign_id
-            WHERE sub.user_id = pu.id
-              AND c.status = 'sent'
-            ORDER BY c.send_datetime DESC
-            LIMIT 1
-        ) camp ON TRUE
         ORDER BY pu.created_at DESC, pu.id DESC
     """)
     rows = _exec_with_timeout_retry(db, users_query, params).fetchall()
@@ -186,7 +193,8 @@ def list_users(
             "services":             r.services or [],
             "total_subscriptions":  r.total_subscriptions or 0,
             "active_subscriptions": r.active_subscriptions or 0,
-            "campaign_name":        r.campaign_name,
+            "activity_type":        r.activity_type,
+            "campaign_name":        r.activity_type,
         })
 
     next_cursor = None
@@ -215,6 +223,8 @@ def list_users(
 def list_trial_users(
     status:     Optional[str]      = Query(None),
     search:     Optional[str]      = Query(None),
+    start_date: Optional[date]     = Query(default=None),
+    end_date:   Optional[date]     = Query(default=None),
     service_id: Optional[str]      = Query(None),
     page:       int                = Query(1, ge=1),
     page_size:  int                = Query(20, ge=1, le=200),
@@ -234,15 +244,26 @@ def list_trial_users(
         offset = (page - 1) * page_size
 
     # ── filtres dynamiques ────────────────────
-    where_clauses = ["1=1"]
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+    anchor_dt = get_data_anchor(db, source="subscription")
+
+    where_clauses = [
+        "sub.subscription_start_date >= CAST(:start_dt AS timestamp)",
+        "sub.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'",
+        "sub.subscription_start_date <= CAST(:anchor_dt AS timestamp)",
+    ]
     params: dict  = {
+        "start_dt": start_dt,
+        "end_dt": end_dt,
+        "anchor_dt": anchor_dt,
         "limit":  limit,
         "offset": offset,
     }
 
     # Map frontend status to subscription status
     status_map = {
-        "active":    "trial",
+        "active":    ["trial", "pending"],
+        "trial":     ["trial", "pending"],
         "converted": "active",
         "dropped":   ["cancelled", "expired"],
     }
@@ -282,7 +303,7 @@ def list_trial_users(
             sub.status,
             EXTRACT(DAY FROM COALESCE(sub.subscription_end_date, NOW()) - sub.subscription_start_date)::integer AS trial_duration_days,
             CASE
-                WHEN sub.status = 'trial' THEN 'active'
+                WHEN sub.status IN ('trial', 'pending') THEN 'active'
                 WHEN sub.status = 'active' THEN 'converted'
                 WHEN sub.status IN ('cancelled', 'expired') THEN 'dropped'
                 ELSE 'unknown'

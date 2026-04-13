@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 from app.core.database import SessionLocal, get_db
+from app.core.dependencies import get_current_user
 from app.services import churn_service
 
 router = APIRouter(prefix="/analytics/churn", tags=["Churn Analysis"])
@@ -62,21 +63,27 @@ def _kpi_churn_breakdown():
 def get_churn_dashboard(
     start_date: Optional[datetime] = Query(None),
     end_date:   Optional[datetime] = Query(None),
+    service_id: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    return churn_service.get_churn_dashboard(db, start_date, end_date)
+    return churn_service.get_churn_dashboard(db, start_date, end_date, service_id=service_id)
 
 
 @router.get("/kpis")
-async def get_kpis(db: Session = Depends(get_db)):
-    _ = db
+async def get_kpis(
+    db: Session = Depends(get_db),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    service_id: Optional[str] = Query(None),
+):
+    from app.repositories import churn_repo
 
-    global_churn_rate, monthly_churn_rate, avg_lifetime_days, churn_breakdown = await asyncio.gather(
-        _run_in_thread(_kpi_global_churn_rate),
-        _run_in_thread(_kpi_monthly_churn_rate),
-        _run_in_thread(_kpi_avg_lifetime_days),
-        _run_in_thread(_kpi_churn_breakdown),
-    )
+    global_churn_rate = churn_repo.get_global_churn_rate(db, start_date, end_date, service_id=service_id)
+    monthly_churn_rate = churn_repo.get_monthly_churn_rate(db, start_date, end_date, service_id=service_id)
+    avg_lifetime_days = {
+        "avg_days": churn_repo.get_avg_lifetime_days_filtered(db, start_date, end_date, service_id=service_id),
+    }
+    churn_breakdown = churn_repo.get_churn_breakdown(db, start_date, end_date, service_id=service_id)
 
     return {
         "global_churn_rate": global_churn_rate,
@@ -84,6 +91,44 @@ async def get_kpis(db: Session = Depends(get_db)):
         "avg_lifetime_days": avg_lifetime_days,
         "churn_breakdown": churn_breakdown,
     }
+
+
+@router.get("/reactivation/kpis")
+def get_reactivation_kpis(
+    db: Session = Depends(get_db),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    service_id: Optional[str] = Query(None),
+    _current_user=Depends(get_current_user),
+):
+    from app.repositories import churn_repo
+
+    return churn_repo.get_reactivation_kpis(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        service_id=service_id,
+    )
+
+
+@router.get("/reactivation/by-service")
+def get_reactivation_by_service(
+    db: Session = Depends(get_db),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    service_id: Optional[str] = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+    _current_user=Depends(get_current_user),
+):
+    from app.repositories import churn_repo
+
+    return churn_repo.get_reactivation_by_service(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        service_id=service_id,
+        limit=limit,
+    )
 
 
 @router.get("/trend")

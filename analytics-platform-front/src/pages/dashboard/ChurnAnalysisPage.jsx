@@ -20,6 +20,8 @@ import AppLayout from "../../components/layout/AppLayout";
 import FilterBar from "../../components/dashboard/FilterBar";
 import KPICard from "../../components/dashboard/KPICard";
 import { useChurnDashboard } from "../../hooks/useChurnDashboard";
+import { useReactivationKPIs } from "../../hooks/useReactivationKPIs";
+import { useReactivationByService } from "../../hooks/useReactivationByService";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 
 const COLORS = {
@@ -41,9 +43,27 @@ export default function ChurnAnalysisPage() {
   const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS);
 
   const { data, isLoading, error, refetch } = useChurnDashboard(filters);
+  const {
+    data: reactivationKpis,
+    isLoading: reactivationKpisLoading,
+    error: reactivationKpisError,
+  } = useReactivationKPIs(filters);
+  const {
+    data: reactivationByService,
+    isLoading: reactivationByServiceLoading,
+    error: reactivationByServiceError,
+  } = useReactivationByService(filters);
 
   const dashboard = data || {};
   const { kpis, charts, meta } = dashboard;
+  const reactivationRate = Number(reactivationKpis?.reactivation_rate ?? 0);
+  const reactivationRateLabel =
+    reactivationRate > 0 && reactivationRate < 1
+      ? `${reactivationRate.toFixed(2)}%`
+      : `${reactivationRate.toFixed(1)}%`;
+  const reactivationChartData = [...(reactivationByService || [])]
+    .sort((a, b) => (b.reactivated_users || 0) - (a.reactivated_users || 0))
+    .slice(0, 10);
 
   return (
     <AppLayout pageTitle="Churn Analysis">
@@ -200,6 +220,144 @@ export default function ChurnAnalysisPage() {
                 </PieChart>
               </ResponsiveContainer>
             )}
+          </div>
+        </div>
+
+        {/* Reactivation after Churn */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-100">
+              Reactivation after Churn
+            </h2>
+            <p className="text-sm text-slate-400">
+              Users who subscribed again after churn, overall and by service
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {reactivationKpisLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <KPISkeleton key={`reactivation-kpi-${i}`} />
+              ))
+            ) : (
+              <>
+                <KPICard
+                  title="Reactivated Users"
+                  value={(
+                    reactivationKpis?.reactivated_users ?? 0
+                  ).toLocaleString()}
+                  subtitle="Unique churned users re-subscribed"
+                  icon={RotateCcw}
+                  iconColor="#01696f"
+                  iconBg="bg-teal-500/10"
+                />
+                <KPICard
+                  title="Reactivation Rate"
+                  value={reactivationRateLabel}
+                  subtitle="Reactivated / churned users"
+                  icon={RotateCcw}
+                  iconColor="#a12c7b"
+                  iconBg="bg-red-500/10"
+                />
+                <KPICard
+                  title="Avg Days to Re-subscribe"
+                  value={`${Number(reactivationKpis?.avg_days_to_resubscribe ?? 0).toFixed(1)}d`}
+                  subtitle="Delay between churn and resubscription"
+                  icon={RotateCcw}
+                  iconColor="#964219"
+                  iconBg="bg-orange-500/10"
+                />
+                <KPICard
+                  title="Recovered Revenue"
+                  value={`$${Number(reactivationKpis?.recovered_revenue ?? 0).toLocaleString()}`}
+                  subtitle="Post-reactivation successful billing"
+                  icon={RotateCcw}
+                  iconColor="#7a7974"
+                  iconBg="bg-slate-500/10"
+                />
+              </>
+            )}
+          </div>
+
+          {reactivationKpisError && (
+            <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
+              <p className="text-sm text-red-200">{reactivationKpisError}</p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+            <h3 className="text-sm font-semibold text-slate-100 mb-4">
+              Reactivation by Service
+            </h3>
+
+            {reactivationByServiceLoading ? (
+              <ChartSkeleton />
+            ) : reactivationByServiceError ? (
+              <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-200">
+                  {reactivationByServiceError}
+                </p>
+              </div>
+            ) : reactivationChartData.length === 0 ? (
+              <div className="h-56 flex items-center justify-center text-slate-400 text-sm border border-slate-800 rounded-lg">
+                No reactivation data available for the selected period
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={reactivationChartData}
+                  layout="vertical"
+                  margin={{ top: 6, right: 24, left: 120, bottom: 6 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--color-border)"
+                  />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: "#94A3B8" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="service_name"
+                    width={120}
+                    tick={{ fontSize: 11, fill: "#94A3B8" }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1E293B",
+                      border: "1px solid #334155",
+                      borderRadius: 8,
+                    }}
+                    formatter={(value, name, item) => {
+                      if (name === "reactivated_users") {
+                        const rate = Number(
+                          item?.payload?.reactivation_rate ?? 0,
+                        );
+                        const rateLabel =
+                          rate > 0 && rate < 1
+                            ? rate.toFixed(2)
+                            : rate.toFixed(1);
+                        return [`${value}`, `Reactivated (${rateLabel}%)`];
+                      }
+                      return [value, name];
+                    }}
+                  />
+                  <Bar
+                    dataKey="reactivated_users"
+                    fill={COLORS.new}
+                    radius={[0, 6, 6, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+
+            <p className="mt-3 text-xs text-slate-500">
+              A reactivated user is a churned user who later subscribed again to
+              the same service.
+            </p>
           </div>
         </div>
 

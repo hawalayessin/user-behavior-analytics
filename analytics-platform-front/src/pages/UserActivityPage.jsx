@@ -1,8 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import {
-  AlertCircle,
-  RotateCcw,
-} from "lucide-react";
+import { useState, useMemo } from "react";
+import { AlertCircle, RotateCcw } from "lucide-react";
 import AppLayout from "../components/layout/AppLayout";
 import FilterBar from "../components/dashboard/FilterBar";
 import KPICard from "../components/dashboard/KPICard";
@@ -22,7 +19,6 @@ import {
   Clock,
 } from "lucide-react";
 
-
 function getDefaultFilters() {
   return { ...DEFAULT_ANALYTICS_FILTERS };
 }
@@ -36,8 +32,6 @@ const ChartSkeleton = () => (
 
 export default function UserActivityPage() {
   const [filters, setFilters] = useState(getDefaultFilters());
-  const [toastMsg, setToastMsg] = useState(null);
-
 
   const {
     data: activityData,
@@ -45,7 +39,6 @@ export default function UserActivityPage() {
     error: activityError,
     refetch: refetchActivity,
   } = useUserActivity(filters);
-
 
   const kpis = useMemo(() => {
     if (!activityData?.kpis) return null;
@@ -59,15 +52,8 @@ export default function UserActivityPage() {
     };
   }, [activityData?.kpis]);
 
-
   const handleApplyFilters = (f) => {
     setFilters(f);
-  };
-
-  // ── Toast ─────────────────────────────────────────────────
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
   };
 
   return (
@@ -84,7 +70,11 @@ export default function UserActivityPage() {
         </div>
 
         {/* ── Filter Bar ────────────────────────────────────── */}
-        <FilterBar onApply={handleApplyFilters} appliedFilters={filters} />
+        <FilterBar
+          onApply={handleApplyFilters}
+          appliedFilters={filters}
+          anchorDate={activityData?.data_anchor ?? null}
+        />
 
         {/* ── Erreur analytics ──────────────────────────────── */}
         {activityError && (
@@ -108,9 +98,9 @@ export default function UserActivityPage() {
             ) : kpis ? (
               <>
                 <KPICard
-                  title="DAU (Today)"
+                  title="DAU (Last 24h)"
                   value={kpis.dau_today.toLocaleString()}
-                  subtitle="Active users today"
+                  subtitle="Unique active users in last 24h"
                   icon={Users}
                   iconColor="#7C3AED"
                   iconBg="bg-purple-500/10"
@@ -128,9 +118,9 @@ export default function UserActivityPage() {
                   trendLabel="stable"
                 />
                 <KPICard
-                  title="MAU (Last 30 days)"
+                  title="MAU (Current month)"
                   value={kpis.mau_current_month.toLocaleString()}
-                  subtitle="Active users in last 30 days"
+                  subtitle="Unique active users in current month window"
                   icon={Calendar}
                   iconColor="#10B981"
                   iconBg="bg-green-500/10"
@@ -222,13 +212,6 @@ export default function UserActivityPage() {
           </div>
         )}
       </div>
-
-      {/* ── Toast ─────────────────────────────────────────────── */}
-      {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-600 bg-slate-800 text-sm text-slate-100 shadow-xl">
-          {toastMsg}
-        </div>
-      )}
     </AppLayout>
   );
 }

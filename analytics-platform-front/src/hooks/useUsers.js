@@ -11,6 +11,7 @@ export function useUsers({ status, search, service_id, cursor = null, limit = 10
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       "users",
+      "activity-v2",
       status ?? null,
       search ?? null,
       service_id ?? null,
@@ -27,6 +28,7 @@ export function useUsers({ status, search, service_id, cursor = null, limit = 10
     }),
     staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnMount: "always",
   })
 
   return {

@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import { Users, Activity, Zap, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, ShieldAlert, Users } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -72,49 +72,47 @@ CustomTooltip.propTypes = {
 export default function EngagementTab({ data }) {
   if (!data) return null;
 
-  const { engagement, users, subscriptions } = data;
+  const { engagement, subscriptions } = data;
 
-  const dau = engagement?.dau_today ?? 0;
-  const wau = engagement?.wau_current_week ?? 0;
-  const mau = engagement?.mau_current_month ?? 0;
-  const stickiness = engagement?.stickiness_pct ?? 0;
-  const isStickinessLow = stickiness < 20;
+  const engagementScore = Number(engagement?.engagement_score ?? 0);
+  const engagementLevel = String(engagement?.engagement_level ?? "low");
+  const inactivityRate = Number(engagement?.inactivity_rate_pct ?? 0);
+  const active7d = Number(engagement?.active_7d_users ?? 0);
+  const atRiskUsers = Number(subscriptions?.at_risk_users ?? 0);
+  const engagementTrend = Array.isArray(engagement?.trend)
+    ? engagement.trend.slice(-30).map((row) => ({
+        date: row.date,
+        dau: Number(row.dau ?? 0),
+        wau_7d_avg: Number(row.wau_7d_avg ?? 0),
+      }))
+    : [];
 
-  // ── Sparkline DAU/WAU/MAU (simulé sur 14 jours à partir des valeurs réelles) ──
-  const sparkData = Array.from({ length: 14 }, (_, i) => ({
-    day: `J-${13 - i}`,
-    DAU: Math.round(dau * (0.7 + Math.random() * 0.6)),
-    WAU: Math.round(wau * (0.8 + Math.random() * 0.4)),
-    MAU: Math.round(mau * (0.9 + Math.random() * 0.2)),
-  }));
+  const levelColor =
+    engagementLevel === "high"
+      ? "#10B981"
+      : engagementLevel === "medium"
+        ? "#F59E0B"
+        : "#EF4444";
 
   // ── Engagement par service (top_services) ─────────────────
   const serviceBar = (data.top_services ?? []).map((s) => ({
     name: s.name,
-    actifs: s.active_subs,
-    churn: s.churned_subs,
+    active_users: s.active_users,
+    churn_rate_pct: Number(s.churn_rate_pct ?? 0),
   }));
 
-  // ── Stickiness bar ────────────────────────────────────────
-  const stickinessMetrics = [
+  const healthMetrics = [
     {
-      label: "DAU / MAU Stickiness",
-      value: stickiness,
-      target: 20,
-      color: isStickinessLow ? "#EF4444" : "#10B981",
+      label: "Engagement Score",
+      value: engagementScore,
+      target: 70,
+      color: levelColor,
     },
     {
-      label: "Pipeline OTP Pending",
-      value:
-        (subscriptions.total_with_pending || subscriptions.total) > 0
-          ? Math.round(
-              ((subscriptions.pending ?? 0) /
-                (subscriptions.total_with_pending || subscriptions.total)) *
-                100,
-            )
-          : 0,
-      target: null,
-      color: "#94A3B8",
+      label: "Inactivity Rate (7d)",
+      value: inactivityRate,
+      target: 25,
+      color: inactivityRate > 25 ? "#EF4444" : "#10B981",
     },
   ];
 
@@ -128,82 +126,77 @@ export default function EngagementTab({ data }) {
                          text-indigo-300 text-xs font-medium"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          Données filtrées — engagement utilisateurs
+          Filtered data - user engagement
         </span>
       </div>
 
       {/* ── KPI Row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="DAU — Aujourd'hui"
-          value={dau.toLocaleString()}
-          subtitle="Utilisateurs actifs aujourd'hui"
+          title="Engagement Score"
+          value={`${engagementScore.toFixed(1)}/100`}
+          subtitle={`Level: ${engagementLevel.toUpperCase()}`}
           icon={Activity}
-          iconColor="#8B5CF6"
+          iconColor={levelColor}
         />
         <KPICard
-          title="WAU — Cette semaine"
-          value={wau.toLocaleString()}
-          subtitle="7 derniers jours"
-          icon={TrendingUp}
-          iconColor="#6366F1"
-        />
-        <KPICard
-          title="MAU — Ce mois"
-          value={mau.toLocaleString()}
-          subtitle="30 derniers jours"
+          title="Active Users (7d)"
+          value={active7d.toLocaleString()}
+          subtitle="Active population over 7 days"
           icon={Users}
-          iconColor="#10B981"
+          iconColor="#3B82F6"
         />
         <KPICard
-          title="Stickiness DAU/MAU"
-          value={`${stickiness}%`}
-          subtitle="Cible ≥ 20%"
-          icon={Zap}
-          iconColor={isStickinessLow ? "#EF4444" : "#10B981"}
-          alert={isStickinessLow}
+          title="Inactivity Rate"
+          value={`${inactivityRate.toFixed(1)}%`}
+          subtitle="Users with no activity over 7 days"
+          icon={AlertTriangle}
+          iconColor={inactivityRate > 25 ? "#EF4444" : "#10B981"}
+          alert={inactivityRate > 25}
+        />
+        <KPICard
+          title="At-Risk Subscribers"
+          value={atRiskUsers.toLocaleString()}
+          subtitle="Subscribers at risk (billing failed)"
+          icon={ShieldAlert}
+          iconColor={atRiskUsers > 0 ? "#F59E0B" : "#10B981"}
         />
       </div>
 
-      {/* ── Line chart DAU / WAU / MAU ── */}
+      {/* ── Real engagement line chart ── */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
         <h3 className="text-sm font-semibold text-slate-200 mb-1">
-          Évolution DAU / WAU / MAU
+          Engagement Trend (last 30 days)
         </h3>
         <p className="text-xs text-slate-500 mb-4">
-          Tendances basées sur les valeurs actuelles
+          Real DAU data and 7-day moving average
         </p>
         <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={sparkData}>
+          <LineChart data={engagementTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
             <XAxis
-              dataKey="day"
+              dataKey="date"
               tick={{ fill: "#64748B", fontSize: 11 }}
-              interval={2}
+              interval={4}
             />
             <YAxis tick={{ fill: "#64748B", fontSize: 11 }} />
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12, color: "#94A3B8" }} />
             <Line
               type="monotone"
-              dataKey="DAU"
+              dataKey="dau"
               stroke="#8B5CF6"
               strokeWidth={2}
               dot={false}
+              name="DAU"
             />
             <Line
               type="monotone"
-              dataKey="WAU"
-              stroke="#6366F1"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="MAU"
+              dataKey="wau_7d_avg"
               stroke="#10B981"
               strokeWidth={2}
               dot={false}
+              name="7-day moving average"
             />
           </LineChart>
         </ResponsiveContainer>
@@ -211,13 +204,13 @@ export default function EngagementTab({ data }) {
 
       {/* ── Section basse ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Actifs par service */}
+        {/* Engagement by service */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h3 className="text-sm font-semibold text-slate-200 mb-4">
-            Abonnés actifs / churned par service
+            Engagement by Service
           </h3>
           {serviceBar.length === 0 ? (
-            <p className="text-slate-500 text-xs">Aucune donnée disponible.</p>
+            <p className="text-slate-500 text-xs">No data available.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={serviceBar} layout="vertical">
@@ -243,20 +236,30 @@ export default function EngagementTab({ data }) {
                   labelStyle={{ color: "#CBD5E1" }}
                 />
                 <Legend wrapperStyle={{ fontSize: 12, color: "#94A3B8" }} />
-                <Bar dataKey="actifs" fill="#10B981" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="churn" fill="#EF4444" radius={[0, 4, 4, 0]} />
+                <Bar
+                  dataKey="active_users"
+                  name="Active users"
+                  fill="#3B82F6"
+                  radius={[0, 4, 4, 0]}
+                />
+                <Bar
+                  dataKey="churn_rate_pct"
+                  name="Churn rate %"
+                  fill="#EF4444"
+                  radius={[0, 4, 4, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Stickiness health bars */}
+        {/* Engagement health bars */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h3 className="text-sm font-semibold text-slate-200 mb-4">
-            Indicateurs de santé engagement
+            Engagement Health Indicators
           </h3>
           <div className="space-y-5">
-            {stickinessMetrics.map((m, i) => (
+            {healthMetrics.map((m, i) => (
               <div key={i}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-slate-400">{m.label}</span>
@@ -275,7 +278,7 @@ export default function EngagementTab({ data }) {
                 </div>
                 {m.target && (
                   <p className="text-xs text-slate-600 mt-0.5 text-right">
-                    cible {m.target}%
+                    Target {m.target}%
                   </p>
                 )}
               </div>

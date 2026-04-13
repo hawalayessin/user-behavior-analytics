@@ -8,7 +8,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.date_ranges import DATA_START_DATE, resolve_date_range
+from app.core.cache import cached_endpoint
+from app.core.date_ranges import resolve_date_range
+from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.services.campaign_service import get_campaign_dashboard, get_campaign_list
 from app.repositories.campaign_repo import CampaignRepository
@@ -17,12 +19,52 @@ from app.repositories.campaign_repo import CampaignRepository
 router = APIRouter(prefix="/analytics/campaigns", tags=["Campaign Impact"])
 
 
+def _campaign_dashboard_cache_payload(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    service_id: Optional[str] = None,
+    **_: object,
+) -> dict:
+    return {
+        "v": "campaign-dashboard-sms-kpis-v2",
+        "start_date": start_date.isoformat() if start_date else "all",
+        "end_date": end_date.isoformat() if end_date else "all",
+        "service_id": service_id or "all",
+    }
+
+
+def _campaign_list_cache_payload(
+    status: Optional[str] = None,
+    campaign_type: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    service_id: Optional[str] = None,
+    page: int = 1,
+    limit: int = 10,
+    **_: object,
+) -> dict:
+    return {
+        "status": status or "all",
+        "campaign_type": campaign_type or "all",
+        "start_date": start_date.isoformat() if start_date else "all",
+        "end_date": end_date.isoformat() if end_date else "all",
+        "service_id": service_id or "all",
+        "page": int(page),
+        "limit": int(limit),
+    }
+
+
 # ============================================================================
 # NEW Campaign Dashboard Endpoints (using service layer)
 # ============================================================================
 
 
 @router.get("/dashboard")
+@cached_endpoint(
+    "campaign_dashboard",
+    settings.CAMPAIGN_CACHE_TTL_SECONDS,
+    key_builder=_campaign_dashboard_cache_payload,
+)
 def get_campaign_impact_dashboard(
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
@@ -45,6 +87,11 @@ def get_campaign_impact_dashboard(
 
 
 @router.get("/list")
+@cached_endpoint(
+    "campaign_list",
+    settings.CAMPAIGN_CACHE_TTL_SECONDS,
+    key_builder=_campaign_list_cache_payload,
+)
 def get_campaigns_list(
     status: Optional[str] = Query(None, description="Filter by status: all|completed|sent|scheduled"),
     campaign_type: Optional[str] = Query(None, description="Filter by type: all|welcome|promotion|retention|reactivation"),
@@ -137,15 +184,14 @@ def _resolve_date_range(
     end_date: Optional[date],
     service_id: Optional[str],
 ) -> tuple[date, date]:
-    _ = db
     _ = service_id
-    return resolve_date_range(start_date, end_date)
+    return resolve_date_range(start_date, end_date, db=db, source="analytics")
 
 
 @router.get("/kpis")
 def get_campaign_kpis(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -239,7 +285,7 @@ def get_campaign_kpis(
 @router.get("/performance")
 def get_campaign_performance(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -304,7 +350,7 @@ def get_campaign_performance(
 @router.get("/comparison")
 def get_campaign_comparison(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -383,11 +429,11 @@ def get_campaign_comparison(
 @router.get("/timeline")
 def get_campaign_timeline(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
-    start_dt, end_dt = resolve_date_range(start_date, end_date)
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="analytics")
 
     params = {"start_dt": start_dt, "end_dt": end_dt, "service_id": service_id}
     sf = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""

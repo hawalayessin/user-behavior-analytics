@@ -42,6 +42,7 @@ class CampaignRepository:
                 SELECT
                     c.id,
                     c.status,
+                    c.campaign_type,
                     c.service_id,
                     c.send_datetime,
                     COALESCE(c.target_size, 0) AS target_size
@@ -80,6 +81,24 @@ class CampaignRepository:
                     COUNT(DISTINCT id) AS subscriptions
                 FROM dedup_subs
                 GROUP BY matched_campaign_id
+            ),
+            sms_per_campaign AS (
+                SELECT
+                    se.campaign_id,
+                    COUNT(*) FILTER (WHERE UPPER(COALESCE(se.direction, '')) = 'OUTBOUND') AS messages_sent,
+                    COUNT(*) FILTER (
+                        WHERE UPPER(COALESCE(se.direction, '')) = 'OUTBOUND'
+                          AND UPPER(COALESCE(se.delivery_status, '')) LIKE 'DELIVERED%'
+                    ) AS messages_delivered
+                FROM sms_events se
+                JOIN filtered_campaigns fc ON fc.id = se.campaign_id
+                GROUP BY se.campaign_id
+            ),
+            eligible_campaigns AS (
+                SELECT id, target_size
+                FROM filtered_campaigns
+                WHERE status = 'completed'
+                  AND UPPER(COALESCE(campaign_type, '')) <> 'ORGANIC'
             )
             SELECT
                 COUNT(*) AS total_campaigns,
@@ -88,17 +107,42 @@ class CampaignRepository:
                 SUM(CASE WHEN fc.status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled_campaigns,
                 COALESCE(SUM(fc.target_size), 0) AS total_targeted,
                 COALESCE(SUM(spc.subscriptions), 0) AS total_subscriptions,
+                COALESCE((SELECT SUM(target_size) FROM eligible_campaigns), 0) AS qualified_targeted,
+                COALESCE((
+                    SELECT SUM(spc2.subscriptions)
+                    FROM subs_per_campaign spc2
+                    JOIN eligible_campaigns ec ON ec.id = spc2.campaign_id
+                ), 0) AS qualified_subscriptions,
+                COALESCE(SUM(smspc.messages_sent), 0) AS total_messages_sent,
+                COALESCE(SUM(smspc.messages_delivered), 0) AS total_messages_delivered,
                 ROUND(
                     (
                         CASE
-                            WHEN COALESCE(SUM(fc.target_size), 0) = 0 THEN 0
-                            ELSE (COALESCE(SUM(spc.subscriptions), 0)::FLOAT / NULLIF(SUM(fc.target_size), 0)) * 100
+                            WHEN COALESCE((SELECT SUM(target_size) FROM eligible_campaigns), 0) = 0 THEN 0
+                            ELSE (
+                                COALESCE((
+                                    SELECT SUM(spc2.subscriptions)
+                                    FROM subs_per_campaign spc2
+                                    JOIN eligible_campaigns ec ON ec.id = spc2.campaign_id
+                                ), 0)::FLOAT
+                                / NULLIF((SELECT SUM(target_size) FROM eligible_campaigns), 0)
+                            ) * 100
                         END
                     )::numeric,
                     2
-                ) AS conversion_rate
+                ) AS conversion_rate,
+                ROUND(
+                    (
+                        CASE
+                            WHEN COALESCE(SUM(smspc.messages_sent), 0) = 0 THEN 0
+                            ELSE (COALESCE(SUM(spc.subscriptions), 0)::FLOAT / NULLIF(SUM(smspc.messages_sent), 0)) * 1000
+                        END
+                    )::numeric,
+                    2
+                ) AS subscriptions_per_1000_sms
             FROM filtered_campaigns fc
             LEFT JOIN subs_per_campaign spc ON spc.campaign_id = fc.id
+            LEFT JOIN sms_per_campaign smspc ON smspc.campaign_id = fc.id
         """), params).fetchone()
 
         if not result:
@@ -119,7 +163,12 @@ class CampaignRepository:
             "scheduled_campaigns": int(result[3]) if result[3] else 0,
             "total_targeted": int(result[4]) if result[4] else 0,
             "total_subscriptions": int(result[5]) if result[5] else 0,
-            "conversion_rate": float(result[6]) if result[6] else 0.0,
+            "qualified_targeted": int(result[6]) if result[6] else 0,
+            "qualified_subscriptions": int(result[7]) if result[7] else 0,
+            "total_messages_sent": int(result[8]) if result[8] else 0,
+            "total_messages_delivered": int(result[9]) if result[9] else 0,
+            "conversion_rate": float(result[10]) if result[10] else 0.0,
+            "subscriptions_per_1000_sms": float(result[11]) if result[11] else 0.0,
         }
 
     @staticmethod
@@ -173,9 +222,11 @@ class CampaignRepository:
                 c.target_size,
                 c.cost,
                 c.send_datetime,
+                sv.name AS service_name,
                 COUNT(DISTINCT s.id) as subscriptions_acquired,
                 COALESCE(SUM(CASE WHEN b.is_first_charge THEN 1 ELSE 0 END), 0) as first_charges,
                 COUNT(DISTINCT b.id) as total_billing_events,
+                COALESCE(SUM(CASE WHEN UPPER(TRIM(COALESCE(b.status, ''))) = 'SUCCESS' THEN COALESCE(st.price, 0) ELSE 0 END), 0) AS total_revenue,
                 ROUND(
                     (CASE 
                         WHEN NULLIF(c.target_size, 0) IS NULL THEN 0
@@ -188,6 +239,8 @@ class CampaignRepository:
             FROM campaigns c
             LEFT JOIN dedup_subs s ON s.matched_campaign_id = c.id
             LEFT JOIN billing_events b ON b.subscription_id = s.id
+            LEFT JOIN services sv ON sv.id = c.service_id
+            LEFT JOIN service_types st ON st.id = sv.service_type_id
             WHERE 1=1
         """)
 
@@ -224,7 +277,7 @@ class CampaignRepository:
         offset = (page - 1) * limit
         full_query = query.text + f"""
             {filter_str}
-            GROUP BY c.id, c.name, c.description, c.campaign_type, c.status, c.target_size, c.cost, c.send_datetime
+            GROUP BY c.id, c.name, c.description, c.campaign_type, c.status, c.target_size, c.cost, c.send_datetime, sv.name
             ORDER BY c.send_datetime DESC NULLS LAST
             LIMIT :limit OFFSET :offset
         """
@@ -235,7 +288,7 @@ class CampaignRepository:
         
         campaigns = []
         for row in results:
-            first_charge_rate = row[12]
+            first_charge_rate = row[14]
             if first_charge_rate is None or (isinstance(first_charge_rate, float) and row[9] == 0):
                 first_charge_rate = 0.0
             else:
@@ -250,10 +303,12 @@ class CampaignRepository:
                 "target_size": int(row[5]) if row[5] else 0,
                 "cost": float(row[6]) if row[6] else 0.0,
                 "send_datetime": row[7].isoformat() if row[7] else None,
-                "subscriptions_acquired": int(row[8]) if row[8] else 0,
-                "first_charges": int(row[9]) if row[9] else 0,
-                "total_billing_events": int(row[10]) if row[10] else 0,
-                "conversion_rate": float(row[11]) if row[11] else 0.0,
+                "service_name": row[8] or "Unknown",
+                "subscriptions_acquired": int(row[9]) if row[9] else 0,
+                "first_charges": int(row[10]) if row[10] else 0,
+                "total_billing_events": int(row[11]) if row[11] else 0,
+                "total_revenue": float(row[12]) if row[12] else 0.0,
+                "conversion_rate": float(row[13]) if row[13] else 0.0,
                 "first_charge_rate": first_charge_rate,
             })
 

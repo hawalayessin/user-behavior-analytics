@@ -175,7 +175,7 @@ export default function UserListSection({
         "Last Activity": user.last_activity_at
           ? new Date(user.last_activity_at).toLocaleDateString("en-GB")
           : "—",
-        Campaign: user.campaign_name || "None",
+        "Activity Type": user.activity_type || "—",
       };
     });
 
@@ -211,7 +211,7 @@ export default function UserListSection({
       "Services",
       "Registered On",
       "Last Activity",
-      "Campaign",
+      "Activity Type",
     ];
     const csvContent = [
       headers,
@@ -379,7 +379,7 @@ export default function UserListSection({
                 { label: "Services", field: null },
                 { label: "Registered on", field: "created_at" },
                 { label: "Last activity", field: "last_activity_at" },
-                { label: "Campaign", field: null },
+                { label: "Activity type", field: null },
               ].map(({ label, field }) => (
                 <div key={label}>
                   {field ? (
@@ -465,9 +465,9 @@ export default function UserListSection({
                             : "—"}
                         </div>
                         <div className="text-xs">
-                          {user.campaign_name ? (
-                            <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] max-w-[120px] truncate inline-block">
-                              {user.campaign_name}
+                          {user.activity_type ? (
+                            <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] max-w-[120px] truncate inline-block uppercase tracking-wide">
+                              {user.activity_type}
                             </span>
                           ) : (
                             <span className="text-slate-500">—</span>

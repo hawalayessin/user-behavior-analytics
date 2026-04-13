@@ -2,6 +2,9 @@ import { useMemo } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
+const LONG_CACHE_MS = 24 * 60 * 60 * 1000
+const USER_ACTIVITY_QUERY_VERSION = "2026-04-10-v2"
+
 export function useUserActivity({ start_date, end_date, service_id } = {}) {
   const normalized = useMemo(
     () => ({
@@ -16,6 +19,7 @@ export function useUserActivity({ start_date, end_date, service_id } = {}) {
     queryKey: [
       "analytics",
       "user-activity",
+      USER_ACTIVITY_QUERY_VERSION,
       normalized.start_date,
       normalized.end_date,
       normalized.service_id,
@@ -30,11 +34,12 @@ export function useUserActivity({ start_date, end_date, service_id } = {}) {
       })
       return res.data ?? null
     },
-    staleTime: 30 * 1000,
-    gcTime: 10 * 60 * 1000,
-    cacheTime: 10 * 60 * 1000,
-    refetchOnMount: false,
+    staleTime: 60 * 1000,
+    gcTime: LONG_CACHE_MS,
+    cacheTime: LONG_CACHE_MS,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     keepPreviousData: true,
     placeholderData: keepPreviousData,
   })

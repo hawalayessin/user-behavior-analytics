@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.date_ranges import DATA_START_DATE, resolve_date_range
+from app.core.date_ranges import resolve_date_range
 from app.core.cache import build_cache_key, cache_or_compute, cached_endpoint
 from app.core.config import settings
 
@@ -21,13 +21,14 @@ router = APIRouter(prefix="/analytics/cross-service", tags=["Cross-Service Behav
 
 
 def _cross_service_payload(
-    start_date: Optional[date] = DATA_START_DATE,
+    start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     service_id: Optional[str] = None,
     **_: object,
 ) -> dict:
     return {
-        "start_date": start_date.isoformat() if start_date else DATA_START_DATE.isoformat(),
+        "v": "cross-service-v2-journeys",
+        "start_date": start_date.isoformat() if start_date else "auto",
         "end_date": end_date.isoformat() if end_date else "auto",
         "service_id": service_id or "all",
     }
@@ -65,8 +66,7 @@ def _resolve_params(
     service_id: Optional[str],
 ) -> dict:
     """Resolve defaults and return a param dict."""
-    _ = db
-    start_dt, end_dt = resolve_date_range(start_date, end_date)
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
 
     return {
         "start_dt": start_dt,
@@ -86,7 +86,7 @@ def _resolve_params(
 )
 def get_overview(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -263,7 +263,7 @@ def get_overview(
 )
 def get_co_subscriptions(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -337,7 +337,7 @@ def get_co_subscriptions(
 )
 def get_migrations(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -383,18 +383,70 @@ def get_migrations(
         params,
     ).fetchall()
 
-    return {
-        "migrations": [
+    migration_items = [
+        {
+            "from_service": r.from_service,
+            "to_service": r.to_service,
+            "user_count": int(r.user_count or 0),
+            "migration_rate": round(
+                int(r.user_count or 0) * 100.0 / total_users, 2
+            ) if total_users > 0 else 0,
+        }
+        for r in rows
+    ]
+
+    top_paths = migration_items[:5]
+    top3_users = sum(int(x.get("user_count") or 0) for x in migration_items[:3])
+    total_migration_users = sum(int(x.get("user_count") or 0) for x in migration_items)
+    concentration_top3 = round((top3_users * 100.0 / total_migration_users), 1) if total_migration_users > 0 else 0.0
+
+    standardized_paths = []
+    for idx, m in enumerate(top_paths, start=1):
+        rate = float(m.get("migration_rate") or 0)
+        users = int(m.get("user_count") or 0)
+
+        if rate >= 5 or users >= 10000:
+            priority = "high"
+            business_signal = "strong_substitution"
+            action = "Launch targeted cross-sell within 72h after churn risk is detected on source service."
+        elif rate >= 2 or users >= 3000:
+            priority = "medium"
+            business_signal = "emerging_path"
+            action = "Create a bundled offer and in-app recommendation flow between source and destination services."
+        else:
+            priority = "low"
+            business_signal = "long_tail_path"
+            action = "Keep path in monitoring and test low-cost messaging campaigns before scaling."
+
+        standardized_paths.append(
             {
-                "from_service": r.from_service,
-                "to_service": r.to_service,
-                "user_count": int(r.user_count or 0),
-                "migration_rate": round(
-                    int(r.user_count or 0) * 100.0 / total_users, 2
-                ) if total_users > 0 else 0,
+                "rank": idx,
+                "path_code": f"{m['from_service']}->{m['to_service']}",
+                "from_service": m["from_service"],
+                "to_service": m["to_service"],
+                "user_count": users,
+                "migration_rate": rate,
+                "priority": priority,
+                "business_signal": business_signal,
+                "recommended_action": action,
             }
-            for r in rows
-        ]
+        )
+
+    management_notes = [
+        f"Top 3 paths represent {concentration_top3}% of observed migration flows.",
+        "Use high-priority paths for immediate retention playbooks and medium-priority paths for bundle experiments.",
+        "Track conversion lift from each standardized A->B playbook monthly to validate business impact.",
+    ]
+
+    return {
+        "migrations": migration_items,
+        "standardized_paths": standardized_paths,
+        "summary": {
+            "total_users_in_scope": total_users,
+            "total_migration_users": total_migration_users,
+            "top3_concentration_pct": concentration_top3,
+        },
+        "management_notes": management_notes,
     }
 
 
@@ -409,7 +461,7 @@ def get_migrations(
 )
 def get_distribution(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
@@ -454,14 +506,15 @@ def get_distribution(
 @router.get("/all")
 def get_all_cross_service(
     db: Session = Depends(get_db),
-    start_date: Optional[date] = Query(default=DATA_START_DATE),
+    start_date: Optional[date] = Query(default=None),
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
-    start_dt, end_dt = resolve_date_range(start_date, end_date)
+    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
     cache_key = build_cache_key(
         "cross-service:all",
         {
+            "v": "cross-service-v2-journeys",
             "start_date": start_dt.isoformat(),
             "end_date": end_dt.isoformat(),
             "service_id": service_id or "all",

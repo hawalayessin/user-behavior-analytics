@@ -2,6 +2,9 @@ import { useMemo } from "react"
 import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
+const LONG_CACHE_MS = 24 * 60 * 60 * 1000
+const OVERVIEW_QUERY_VERSION = "2026-04-13-engagement-trend-v4"
+
 export function useOverview(filters = {}) {
     const normalized = useMemo(
         () => ({
@@ -16,6 +19,7 @@ export function useOverview(filters = {}) {
         queryKey: [
             "analytics",
             "overview",
+            OVERVIEW_QUERY_VERSION,
             normalized.start_date,
             normalized.end_date,
             normalized.service_id,
@@ -31,10 +35,11 @@ export function useOverview(filters = {}) {
             return res.data ?? null
         },
         staleTime: 60 * 1000,
-        gcTime: 15 * 60 * 1000,
-        cacheTime: 15 * 60 * 1000,
-        refetchOnMount: false,
+        gcTime: LONG_CACHE_MS,
+        cacheTime: LONG_CACHE_MS,
+        refetchOnMount: "always",
         refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
         keepPreviousData: true,
         placeholderData: keepPreviousData,
     })

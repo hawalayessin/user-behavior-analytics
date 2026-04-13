@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 from app.core.cache import (
@@ -30,6 +30,8 @@ from app.utils.temporal import (
 )
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
+
+OVERVIEW_CACHE_VERSION = "2026-04-13-engagement-trend-v4"
 
 _summary_executor = ThreadPoolExecutor(max_workers=7)
 
@@ -570,10 +572,28 @@ def _compute_overview_payload(
     end_date: Optional[date],
     service_id: Optional[str],
 ):
-    usage_day_start, usage_day_end = get_day_window(db, source="usage")
-    usage_week_start, usage_week_end = get_week_window(db, source="usage")
-    usage_month_start, usage_month_end = get_month_window(db, source="usage")
+    # For filtered overview requests, engagement windows must follow the selected range.
+    # Without explicit filters, keep anchor-based global windows for dashboard defaults.
+    if start_date is None and end_date is None:
+        usage_day_start, usage_day_end = get_day_window(db, source="usage")
+        usage_week_start, usage_week_end = get_week_window(db, source="usage")
+        usage_month_start, usage_month_end = get_month_window(db, source="usage")
+    else:
+        end_dt_ts = datetime.combine(end_dt, time.max)
+        start_dt_ts = datetime.combine(start_dt, time.min)
+
+        usage_day_end = end_dt_ts
+        usage_day_start = max(start_dt_ts, end_dt_ts - timedelta(hours=24))
+
+        usage_week_end = end_dt_ts
+        usage_week_start = max(start_dt_ts, end_dt_ts - timedelta(days=7))
+
+        month_start = end_dt_ts.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        usage_month_start = max(start_dt_ts, month_start)
+        usage_month_end = end_dt_ts
+
     data_anchor = get_data_anchor(db, source="billing")
+    usage_anchor = get_data_anchor(db, source="usage")
 
     if start_date is None and end_date is None:
         churn_window_start, churn_window_end = get_default_window(db, days=30, source="billing")
@@ -731,9 +751,93 @@ def _compute_overview_payload(
         {sf_eng}
     """), params).fetchone()
 
+    sf_inactive = """
+        AND EXISTS (
+            SELECT 1 FROM subscriptions sub
+            WHERE sub.user_id = u.id
+              AND sub.service_id = CAST(:service_id AS uuid)
+        )
+    """ if service_id else ""
+
+    engagement_population = db.execute(text(f"""
+        WITH scoped_users AS (
+            SELECT DISTINCT u.id
+            FROM users u
+            WHERE u.status NOT IN ('churned', 'cancelled')
+            {sf_inactive}
+        ),
+        active_7d AS (
+            SELECT DISTINCT ua.user_id
+            FROM user_activities ua
+            JOIN scoped_users su ON su.id = ua.user_id
+            WHERE ua.activity_datetime BETWEEN :usage_week_start_dt AND :usage_week_end_dt
+        )
+        SELECT
+            (SELECT COUNT(*) FROM scoped_users) AS scoped_users_count,
+            (SELECT COUNT(*) FROM active_7d) AS active_7d_users,
+            (SELECT COUNT(*) FROM scoped_users su
+             LEFT JOIN active_7d a ON a.user_id = su.id
+             WHERE a.user_id IS NULL) AS inactive_7d_count
+    """), params).fetchone()
+
+    # Engagement trend must follow usage anchor when no explicit filter is provided.
+    # This prevents showing a recent empty window when billing/analytics anchors differ from usage.
+    trend_end_date = usage_month_end.date() if (start_date is None and end_date is None) else end_dt
+    trend_start_dt = max(start_dt, trend_end_date - timedelta(days=179))
+    trend_rows = db.execute(text(f"""
+        SELECT
+            DATE(activity_datetime) AS date,
+            COUNT(DISTINCT user_id) AS dau
+        FROM user_activities
+        WHERE activity_datetime >= CAST(:trend_start_dt AS timestamp)
+          AND activity_datetime < CAST(:trend_end_dt AS timestamp) + INTERVAL '1 day'
+          {sf_eng}
+        GROUP BY DATE(activity_datetime)
+        ORDER BY date ASC
+    """), {**params, "trend_start_dt": trend_start_dt, "trend_end_dt": trend_end_date}).fetchall()
+
+    dau_by_day = {str(row.date): int(row.dau or 0) for row in trend_rows}
+    trend_dates = [
+        trend_start_dt + timedelta(days=i)
+        for i in range((trend_end_date - trend_start_dt).days + 1)
+    ]
+
     dau = engagement.dau_today or 0
     mau = engagement.mau_current_month or 0
     stickiness = round((dau / mau * 100), 1) if mau > 0 else 0.0
+    scoped_users_count = int(engagement_population.scoped_users_count or 0)
+    active_7d_users = int(engagement_population.active_7d_users or 0)
+    inactive_7d_count = int(engagement_population.inactive_7d_count or 0)
+    inactivity_rate_pct = round((inactive_7d_count * 100.0 / scoped_users_count), 1) if scoped_users_count > 0 else 0.0
+
+    stickiness_target_pct = 30.0
+    stickiness_component = min((stickiness / stickiness_target_pct) * 100.0, 100.0) if stickiness_target_pct > 0 else 0.0
+    inactivity_health = max(0.0, 100.0 - inactivity_rate_pct)
+    engagement_score = round((0.65 * stickiness_component) + (0.35 * inactivity_health), 1)
+
+    if engagement_score >= 70:
+        engagement_level = "high"
+    elif engagement_score >= 45:
+        engagement_level = "medium"
+    else:
+        engagement_level = "low"
+
+    engagement_trend = []
+    rolling_window: list[int] = []
+    rolling_sum = 0
+    for d in trend_dates:
+        key = d.isoformat()
+        day_dau = dau_by_day.get(key, 0)
+        rolling_window.append(day_dau)
+        rolling_sum += day_dau
+        if len(rolling_window) > 7:
+            rolling_sum -= rolling_window.pop(0)
+        wau_7d_avg = round(rolling_sum / len(rolling_window), 1) if rolling_window else 0.0
+        engagement_trend.append({
+            "date": key,
+            "dau": day_dau,
+            "wau_7d_avg": wau_7d_avg,
+        })
     billing_failed_from_subs = int(subs.billing_failed or 0)
     billing_success = int(revenue.success_events or 0)
     failed_denominator = billing_success + billing_failed_from_subs
@@ -831,6 +935,7 @@ def _compute_overview_payload(
     return {
         "generated_at": data_anchor.isoformat(),
         "data_anchor": data_anchor.strftime("%Y-%m-%d"),
+        "usage_data_anchor": usage_anchor.strftime("%Y-%m-%d"),
         "filters_applied": {
             "start_date": start_dt.isoformat(),
             "end_date": end_dt.isoformat(),
@@ -883,6 +988,19 @@ def _compute_overview_payload(
             "wau_current_week": engagement.wau_current_week or 0,
             "mau_current_month": mau,
             "stickiness_pct": stickiness,
+            "scoped_users_count": scoped_users_count,
+            "active_7d_users": active_7d_users,
+            "inactive_7d_count": inactive_7d_count,
+            "inactivity_rate_pct": inactivity_rate_pct,
+            "engagement_score": engagement_score,
+            "engagement_level": engagement_level,
+            "engagement_thresholds": {
+                "high": 70,
+                "medium": 45,
+                "low": 0,
+            },
+            "engagement_formula": "0.65*min(stickiness/30*100,100)+0.35*(100-inactivity_rate)",
+            "trend": engagement_trend,
         },
         "sms": {
             "otp_templates_pct": float(sms.otp_templates_pct or 0),
@@ -921,6 +1039,7 @@ def get_overview(
     cache_key = build_cache_key(
         "overview",
         {
+            "v": OVERVIEW_CACHE_VERSION,
             "start_date": start_dt.isoformat(),
             "end_date": end_dt.isoformat(),
             "service_id": service_id or "all",

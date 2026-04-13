@@ -58,42 +58,50 @@ def _subscription_dedupe_key():
     )
 
 
-def get_global_churn_rate(db: Session, start_date: date | datetime | None = None, end_date: date | datetime | None = None) -> dict[str, Any]:
+def get_global_churn_rate(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+    service_id: str | None = None,
+) -> dict[str, Any]:
     if start_date is None or end_date is None:
         start, end = get_default_window(db, days=30, source="churn")
     else:
         start, end = _normalize_range(db, start_date, end_date, source="churn")
 
-    churned = (
+    churned_query = (
         db.query(func.count(Subscription.id))
         .filter(Subscription.status.in_(["cancelled", "expired"]))
         .filter(Subscription.subscription_end_date.isnot(None))
         .filter(Subscription.subscription_end_date >= start)
         .filter(Subscription.subscription_end_date <= end)
-        .scalar()
-        or 0
     )
+    if service_id:
+        churned_query = churned_query.filter(Subscription.service_id == service_id)
+    churned = churned_query.scalar() or 0
 
     if churned == 0:
-        churned = (
+        churn_fallback_query = (
             db.query(func.count(UserActivity.id))
             .filter(UserActivity.activity_type == "churn_event")
             .filter(UserActivity.activity_datetime >= start)
             .filter(UserActivity.activity_datetime <= end)
-            .scalar()
-            or 0
         )
+        if service_id:
+            churn_fallback_query = churn_fallback_query.filter(UserActivity.service_id == service_id)
+        churned = churn_fallback_query.scalar() or 0
 
-    churned_ever = (
-        db.query(func.count(Subscription.id))
-        .filter(Subscription.status.in_(["cancelled", "expired"]))
-        .scalar()
-        or 0
-    )
-    total_ever = db.query(func.count(Subscription.id)).scalar() or 1
+    churned_ever_query = db.query(func.count(Subscription.id)).filter(Subscription.status.in_(["cancelled", "expired"]))
+    total_ever_query = db.query(func.count(Subscription.id))
+    if service_id:
+        churned_ever_query = churned_ever_query.filter(Subscription.service_id == service_id)
+        total_ever_query = total_ever_query.filter(Subscription.service_id == service_id)
+
+    churned_ever = churned_ever_query.scalar() or 0
+    total_ever = total_ever_query.scalar() or 1
     snapshot_rate = round(churned_ever / total_ever * 100, 2)
 
-    monthly_metrics = _compute_monthly_churn_metrics(db, start_date, end_date)
+    monthly_metrics = _compute_monthly_churn_metrics(db, start_date, end_date, service_id=service_id)
 
     return {
         "global_churn_rate": snapshot_rate,
@@ -109,7 +117,11 @@ def _compute_monthly_churn_metrics(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> dict[str, Any]:
+    service_filter_unsubs = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
+    service_filter_subs = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
+
     if start_date is None or end_date is None:
         row = db.execute(
             text(
@@ -126,29 +138,47 @@ def _compute_monthly_churn_metrics(
                     WHERE anchor.ts IS NOT NULL
                 ),
                 unsubs AS (
-                    SELECT COUNT(*) AS cnt
+                    SELECT COUNT(DISTINCT u.subscription_id) AS cnt
                     FROM unsubscriptions u, period p
                     WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
+                      {service_filter_unsubs}
                 ),
                 active_at_start AS (
                     SELECT COUNT(DISTINCT s.id) AS cnt
                     FROM subscriptions s, period p
                     WHERE s.subscription_start_date <= p.start_ts
                       AND (s.subscription_end_date IS NULL OR s.subscription_end_date > p.start_ts)
+                      {service_filter_subs}
+                ),
+                started_in_period AS (
+                    SELECT COUNT(DISTINCT s.id) AS cnt
+                    FROM subscriptions s, period p
+                    WHERE s.subscription_start_date > p.start_ts
+                      AND s.subscription_start_date <= p.end_ts
+                      {service_filter_subs}
                 )
                 SELECT
                     COALESCE(unsubs.cnt, 0) AS unsub_count,
-                    COALESCE(active_at_start.cnt, 0) AS active_count,
+                    (COALESCE(active_at_start.cnt, 0) + COALESCE(started_in_period.cnt, 0)) AS active_count,
                     CASE
-                        WHEN COALESCE(active_at_start.cnt, 0) > 0
-                        THEN ROUND(COALESCE(unsubs.cnt, 0) * 100.0 / active_at_start.cnt, 2)
+                        WHEN (COALESCE(active_at_start.cnt, 0) + COALESCE(started_in_period.cnt, 0)) > 0
+                        THEN ROUND(
+                            COALESCE(unsubs.cnt, 0) * 100.0
+                            / (COALESCE(active_at_start.cnt, 0) + COALESCE(started_in_period.cnt, 0)),
+                            2
+                        )
                         ELSE 0
                     END AS churn_rate,
                     (SELECT start_ts FROM period LIMIT 1) AS period_start,
                     (SELECT end_ts FROM period LIMIT 1) AS period_end
-                FROM unsubs, active_at_start
-                """
+                FROM unsubs, active_at_start, started_in_period
+                """.format(
+                    service_filter_unsubs=service_filter_unsubs,
+                    service_filter_subs=service_filter_subs,
+                )
             )
+            ,
+            {"service_id": service_id} if service_id else {},
         ).fetchone()
     else:
         period_start, period_end = _normalize_range(db, start_date, end_date, source="billing")
@@ -161,30 +191,50 @@ def _compute_monthly_churn_metrics(
                         CAST(:end_dt AS timestamp) AS end_ts
                 ),
                 unsubs AS (
-                    SELECT COUNT(*) AS cnt
+                    SELECT COUNT(DISTINCT u.subscription_id) AS cnt
                     FROM unsubscriptions u, period p
                     WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
+                      {service_filter_unsubs}
                 ),
                 active_at_start AS (
                     SELECT COUNT(DISTINCT s.id) AS cnt
                     FROM subscriptions s, period p
                     WHERE s.subscription_start_date <= p.start_ts
                       AND (s.subscription_end_date IS NULL OR s.subscription_end_date > p.start_ts)
+                      {service_filter_subs}
+                ),
+                started_in_period AS (
+                    SELECT COUNT(DISTINCT s.id) AS cnt
+                    FROM subscriptions s, period p
+                    WHERE s.subscription_start_date > p.start_ts
+                      AND s.subscription_start_date <= p.end_ts
+                      {service_filter_subs}
                 )
                 SELECT
                     COALESCE(unsubs.cnt, 0) AS unsub_count,
-                    COALESCE(active_at_start.cnt, 0) AS active_count,
+                    (COALESCE(active_at_start.cnt, 0) + COALESCE(started_in_period.cnt, 0)) AS active_count,
                     CASE
-                        WHEN COALESCE(active_at_start.cnt, 0) > 0
-                        THEN ROUND(COALESCE(unsubs.cnt, 0) * 100.0 / active_at_start.cnt, 2)
+                        WHEN (COALESCE(active_at_start.cnt, 0) + COALESCE(started_in_period.cnt, 0)) > 0
+                        THEN ROUND(
+                            COALESCE(unsubs.cnt, 0) * 100.0
+                            / (COALESCE(active_at_start.cnt, 0) + COALESCE(started_in_period.cnt, 0)),
+                            2
+                        )
                         ELSE 0
                     END AS churn_rate,
                     (SELECT start_ts FROM period LIMIT 1) AS period_start,
                     (SELECT end_ts FROM period LIMIT 1) AS period_end
-                FROM unsubs, active_at_start
-                """
+                FROM unsubs, active_at_start, started_in_period
+                """.format(
+                    service_filter_unsubs=service_filter_unsubs,
+                    service_filter_subs=service_filter_subs,
+                )
             ),
-            {"start_dt": period_start, "end_dt": period_end},
+            {
+                "start_dt": period_start,
+                "end_dt": period_end,
+                **({"service_id": service_id} if service_id else {}),
+            },
         ).fetchone()
 
     if not row:
@@ -209,7 +259,17 @@ def _compute_monthly_churn_metrics(
 
 
 def get_avg_lifetime_days(db: Session, start_date: date | datetime | None = None, end_date: date | datetime | None = None) -> float:
+    return get_avg_lifetime_days_filtered(db, start_date, end_date, service_id=None)
+
+
+def get_avg_lifetime_days_filtered(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+    service_id: str | None = None,
+) -> float:
     start, end = _normalize_range(db, start_date, end_date, source="subscription")
+    service_clause = "AND service_id = CAST(:service_id AS uuid)" if service_id else ""
     result = db.execute(
         text(
             """
@@ -225,6 +285,7 @@ def get_avg_lifetime_days(db: Session, start_date: date | datetime | None = None
                     AND status IN ('cancelled', 'expired')
                     AND subscription_end_date >= :start_dt
                     AND subscription_end_date <= :end_dt
+                    {service_clause}
                 ORDER BY user_id, service_id, subscription_start_date, subscription_end_date DESC
             )
             SELECT AVG(
@@ -232,9 +293,13 @@ def get_avg_lifetime_days(db: Session, start_date: date | datetime | None = None
             )
             FROM dedup
             WHERE subscription_end_date > subscription_start_date + interval '1 day'
-            """
+            """.format(service_clause=service_clause)
         ),
-        {"start_dt": start, "end_dt": end},
+        {
+            "start_dt": start,
+            "end_dt": end,
+            **({"service_id": service_id} if service_id else {}),
+        },
     ).scalar()
 
     return round(float(result), 1) if result else 0.0
@@ -413,8 +478,9 @@ def get_monthly_churn_rate(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> dict[str, Any]:
-    metrics = _compute_monthly_churn_metrics(db, start_date, end_date)
+    metrics = _compute_monthly_churn_metrics(db, start_date, end_date, service_id=service_id)
     return {
         "rate": float(metrics.get("churn_rate", 0) or 0),
         "churned": int(metrics.get("unsub_count", 0) or 0),
@@ -427,7 +493,9 @@ def get_churn_breakdown(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> dict[str, Any]:
+    service_filter = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
     if start_date is None or end_date is None:
         row = db.execute(
             text(
@@ -457,8 +525,11 @@ def get_churn_breakdown(
                     ) AS technical_pct
                 FROM unsubscriptions u, period p
                 WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
-                """
+                  {service_filter}
+                """.format(service_filter=service_filter)
             )
+            ,
+            {"service_id": service_id} if service_id else {},
         ).fetchone()
     else:
         normalized_start, normalized_end = _normalize_range(db, start_date, end_date, source="billing")
@@ -484,9 +555,14 @@ def get_churn_breakdown(
                     ) AS technical_pct
                 FROM unsubscriptions u, period p
                 WHERE u.unsubscription_datetime BETWEEN p.start_ts AND p.end_ts
-                """
+                  {service_filter}
+                """.format(service_filter=service_filter)
             ),
-            {"start_dt": normalized_start, "end_dt": normalized_end},
+            {
+                "start_dt": normalized_start,
+                "end_dt": normalized_end,
+                **({"service_id": service_id} if service_id else {}),
+            },
         ).fetchone()
 
     total = int((row.total_unsubs if row else 0) or 0)
@@ -510,29 +586,40 @@ def get_churn_trend_daily(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> list[dict[str, Any]]:
     start, end = _normalize_range(db, start_date, end_date, source="churn")
 
-    churn_rows = (
+    churn_query = (
         db.query(
             cast(func.date_trunc("day", Unsubscription.unsubscription_datetime), String).label("day"),
             func.count(Unsubscription.id).label("churned"),
         )
         .filter(Unsubscription.unsubscription_datetime >= start)
         .filter(Unsubscription.unsubscription_datetime <= end)
-        .group_by(func.date_trunc("day", Unsubscription.unsubscription_datetime))
+    )
+    if service_id:
+        churn_query = churn_query.filter(Unsubscription.service_id == service_id)
+
+    churn_rows = (
+        churn_query.group_by(func.date_trunc("day", Unsubscription.unsubscription_datetime))
         .order_by(func.date_trunc("day", Unsubscription.unsubscription_datetime))
         .all()
     )
 
-    new_rows = (
+    new_query = (
         db.query(
             cast(func.date_trunc("day", Subscription.subscription_start_date), String).label("day"),
             func.count(Subscription.id).label("new_subs"),
         )
         .filter(Subscription.subscription_start_date >= start)
         .filter(Subscription.subscription_start_date <= end)
-        .group_by(func.date_trunc("day", Subscription.subscription_start_date))
+    )
+    if service_id:
+        new_query = new_query.filter(Subscription.service_id == service_id)
+
+    new_rows = (
+        new_query.group_by(func.date_trunc("day", Subscription.subscription_start_date))
         .order_by(func.date_trunc("day", Subscription.subscription_start_date))
         .all()
     )
@@ -555,8 +642,10 @@ def get_churn_by_service(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> list[dict[str, Any]]:
     start, end = _normalize_range(db, start_date, end_date, source="churn")
+    service_filter = "AND sub.service_id = CAST(:service_id AS uuid)" if service_id else ""
 
     rows = db.execute(
         text(
@@ -568,11 +657,17 @@ def get_churn_by_service(
               AND sub.subscription_end_date IS NOT NULL
               AND sub.subscription_end_date >= :start_dt
               AND sub.subscription_end_date <= :end_dt
+                            {service_filter}
             GROUP BY s.id, s.name
             ORDER BY churned DESC
             """
+                        .format(service_filter=service_filter)
         ),
-        {"start_dt": start, "end_dt": end},
+                {
+                        "start_dt": start,
+                        "end_dt": end,
+                        **({"service_id": service_id} if service_id else {}),
+                },
     ).fetchall()
 
     return [
@@ -585,8 +680,10 @@ def get_lifetime_distribution(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> list[dict[str, Any]]:
     start, end = _normalize_range(db, start_date, end_date, source="subscription")
+    service_clause = "AND service_id = CAST(:service_id AS uuid)" if service_id else ""
 
     row = db.execute(
         text(
@@ -605,10 +702,16 @@ def get_lifetime_distribution(
                   AND status IN ('cancelled', 'expired')
                   AND subscription_end_date >= :start_dt
                   AND subscription_end_date <= :end_dt
+                  {service_clause}
             ) t
             """
+            .format(service_clause=service_clause)
         ),
-        {"start_dt": start, "end_dt": end},
+        {
+            "start_dt": start,
+            "end_dt": end,
+            **({"service_id": service_id} if service_id else {}),
+        },
     ).fetchone()
 
     return [
@@ -624,10 +727,11 @@ def get_retention_cohort(
     db: Session,
     start_date: date | datetime | None = None,
     end_date: date | datetime | None = None,
+    service_id: str | None = None,
 ) -> list[dict[str, Any]]:
     start, end = _normalize_range(db, start_date, end_date, source="subscription")
 
-    rows = (
+    query = (
         db.query(
             Cohort.cohort_date,
             func.sum(Cohort.total_users).label("total_users"),
@@ -637,7 +741,12 @@ def get_retention_cohort(
         )
         .filter(Cohort.cohort_date >= start.date())
         .filter(Cohort.cohort_date <= end.date())
-        .group_by(Cohort.cohort_date)
+    )
+    if service_id:
+        query = query.filter(Cohort.service_id == service_id)
+
+    rows = (
+        query.group_by(Cohort.cohort_date)
         .order_by(Cohort.cohort_date.desc())
         .limit(12)
         .all()
@@ -650,6 +759,169 @@ def get_retention_cohort(
             "d7_rate": round(float(row.d7_rate or 0), 1),
             "d14_rate": round(float(row.d14_rate or 0), 1),
             "d30_rate": round(float(row.d30_rate or 0), 1),
+        }
+        for row in rows
+    ]
+
+
+def get_reactivation_kpis(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+    service_id: str | None = None,
+) -> dict[str, Any]:
+    start_dt, end_dt = _normalize_range(db, start_date, end_date, source="churn")
+    service_filter = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
+
+    row = db.execute(
+        text(
+            """
+            WITH churn_events AS (
+                SELECT
+                    u.user_id,
+                    u.service_id,
+                    u.subscription_id,
+                    u.unsubscription_datetime AS churn_date
+                FROM unsubscriptions u
+                WHERE u.unsubscription_datetime BETWEEN :start_dt AND :end_dt
+                  {service_filter}
+            ),
+            churned_users AS (
+                SELECT COUNT(DISTINCT user_id) AS total
+                FROM churn_events
+            ),
+            reactivations AS (
+                SELECT
+                    c.user_id,
+                    c.service_id,
+                    c.churn_date,
+                    MIN(s.subscription_start_date) AS resub_date
+                FROM churn_events c
+                JOIN subscriptions s
+                  ON s.user_id = c.user_id
+                 AND s.service_id = c.service_id
+                                 AND s.id <> c.subscription_id
+                                 AND s.subscription_start_date >= c.churn_date
+                GROUP BY c.user_id, c.service_id, c.churn_date
+            ),
+            recovered AS (
+                SELECT COALESCE(SUM(st.price), 0)::float AS recovered_revenue
+                FROM reactivations r
+                JOIN billing_events be
+                  ON be.user_id = r.user_id
+                 AND be.service_id = r.service_id
+                 AND be.event_datetime >= r.resub_date
+                 AND be.event_datetime <= :end_dt
+                 AND LOWER(be.status) = 'success'
+                JOIN services srv ON srv.id = be.service_id
+                JOIN service_types st ON st.id = srv.service_type_id
+            )
+            SELECT
+                COUNT(DISTINCT r.user_id) AS reactivated_users,
+                ROUND(
+                    COUNT(DISTINCT r.user_id) * 100.0
+                    / NULLIF((SELECT total FROM churned_users), 0),
+                    2
+                ) AS reactivation_rate,
+                ROUND(
+                    AVG(EXTRACT(EPOCH FROM (r.resub_date - r.churn_date)) / 86400.0)::numeric,
+                    1
+                ) AS avg_days_to_resubscribe,
+                (SELECT recovered_revenue FROM recovered) AS recovered_revenue
+            FROM reactivations r
+            """.format(service_filter=service_filter)
+        ),
+        {
+            "start_dt": start_dt,
+            "end_dt": end_dt,
+            **({"service_id": service_id} if service_id else {}),
+        },
+    ).fetchone()
+
+    return {
+        "reactivated_users": int((row.reactivated_users if row else 0) or 0),
+        "reactivation_rate": float((row.reactivation_rate if row else 0) or 0),
+        "avg_days_to_resubscribe": float((row.avg_days_to_resubscribe if row else 0) or 0),
+        "recovered_revenue": round(float((row.recovered_revenue if row else 0) or 0), 2),
+    }
+
+
+def get_reactivation_by_service(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+    service_id: str | None = None,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    start_dt, end_dt = _normalize_range(db, start_date, end_date, source="churn")
+    service_filter = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
+
+    rows = db.execute(
+        text(
+            """
+            WITH churn_events AS (
+                SELECT
+                    u.user_id,
+                    u.service_id,
+                    u.subscription_id,
+                    u.unsubscription_datetime AS churn_date
+                FROM unsubscriptions u
+                WHERE u.unsubscription_datetime BETWEEN :start_dt AND :end_dt
+                  {service_filter}
+            ),
+            churned_by_service AS (
+                SELECT service_id, COUNT(DISTINCT user_id) AS churned_users
+                FROM churn_events
+                GROUP BY service_id
+            ),
+            reactivations AS (
+                SELECT
+                    c.user_id,
+                    c.service_id,
+                    MIN(s.subscription_start_date) AS resub_date
+                FROM churn_events c
+                JOIN subscriptions s
+                  ON s.user_id = c.user_id
+                 AND s.service_id = c.service_id
+                                 AND s.id <> c.subscription_id
+                                 AND s.subscription_start_date >= c.churn_date
+                GROUP BY c.user_id, c.service_id
+            ),
+            reactivated_by_service AS (
+                SELECT service_id, COUNT(DISTINCT user_id) AS reactivated_users
+                FROM reactivations
+                GROUP BY service_id
+            )
+            SELECT
+                srv.id AS service_id,
+                srv.name AS service_name,
+                COALESCE(rbs.reactivated_users, 0) AS reactivated_users,
+                ROUND(
+                    COALESCE(rbs.reactivated_users, 0) * 100.0
+                    / NULLIF(cbs.churned_users, 0),
+                    2
+                ) AS reactivation_rate
+            FROM churned_by_service cbs
+            JOIN services srv ON srv.id = cbs.service_id
+            LEFT JOIN reactivated_by_service rbs ON rbs.service_id = cbs.service_id
+            ORDER BY reactivated_users DESC, service_name ASC
+            LIMIT :limit
+            """.format(service_filter=service_filter)
+        ),
+        {
+            "start_dt": start_dt,
+            "end_dt": end_dt,
+            "limit": int(limit),
+            **({"service_id": service_id} if service_id else {}),
+        },
+    ).fetchall()
+
+    return [
+        {
+            "service_id": str(row.service_id),
+            "service_name": row.service_name,
+            "reactivated_users": int(row.reactivated_users or 0),
+            "reactivation_rate": float(row.reactivation_rate or 0),
         }
         for row in rows
     ]

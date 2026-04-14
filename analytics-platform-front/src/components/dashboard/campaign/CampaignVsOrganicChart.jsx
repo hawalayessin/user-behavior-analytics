@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
-  YAxis,
+                background: "var(--chart-tooltip-bg)",
   Brush,
 } from "recharts"
 
@@ -27,7 +27,7 @@ export default function CampaignVsOrganicChart({ data }) {
             <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} />
             <Tooltip
               contentStyle={{
-                background: "#0F172A",
+                background: "var(--chart-tooltip-bg)",
                 border: "1px solid rgba(148,163,184,0.25)",
                 borderRadius: 12,
               }}

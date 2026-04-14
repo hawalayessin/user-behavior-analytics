@@ -2,19 +2,65 @@ from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.date_ranges import resolve_date_range
-from app.core.cache import cached_endpoint
+from app.core.cache import cached_endpoint, cache_invalidate_prefix
 from app.core.config import settings
+from app.core.dependencies import require_admin
 from app.models.cohorts import Cohort
 from app.models.services import Service
 from app.utils.temporal import get_data_bounds
+from scripts.compute_cohorts import compute_cohorts
 
 
 router = APIRouter(prefix="/analytics", tags=["Retention"])
+
+
+@router.post("/retention/recompute")
+def recompute_retention_cohorts(
+    db: Session = Depends(get_db),
+    _: object = Depends(require_admin),
+):
+    """Recompute cohorts table from subscriptions and invalidate retention caches."""
+    compute_cohorts()
+
+    invalidated = cache_invalidate_prefix("analytics:v2:retention_")
+
+    freshness_row = db.execute(
+        text("""
+        WITH latest_sub AS (
+          SELECT date_trunc('month', MAX(subscription_start_date))::date AS max_sub_month
+          FROM subscriptions
+          WHERE subscription_start_date IS NOT NULL
+        ),
+        latest_cohort AS (
+          SELECT MAX(cohort_date)::date AS max_cohort_month
+          FROM cohorts
+        )
+        SELECT
+          ls.max_sub_month,
+          lc.max_cohort_month,
+          (ls.max_sub_month = lc.max_cohort_month) AS up_to_date,
+          (SELECT COUNT(*) FROM cohorts) AS total_cohorts
+        FROM latest_sub ls
+        CROSS JOIN latest_cohort lc
+                """)
+    ).mappings().first()
+
+    return {
+        "status": "ok",
+        "message": "Cohorts recalculated successfully.",
+        "cache_invalidated": int(invalidated or 0),
+        "freshness": {
+            "max_sub_month": str(freshness_row["max_sub_month"]) if freshness_row else None,
+            "max_cohort_month": str(freshness_row["max_cohort_month"]) if freshness_row else None,
+            "up_to_date": bool(freshness_row["up_to_date"]) if freshness_row else False,
+            "total_cohorts": int(freshness_row["total_cohorts"] or 0) if freshness_row else 0,
+        },
+    }
 
 
 def _retention_range_payload(

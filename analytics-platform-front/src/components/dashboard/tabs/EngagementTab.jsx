@@ -17,21 +17,42 @@ import {
 function KPICard({ title, value, subtitle, icon: Icon, iconColor, alert }) {
   return (
     <div
-      className={`bg-slate-900 rounded-xl border p-5 flex flex-col gap-3
-      ${alert ? "border-red-500/40 bg-red-500/5" : "border-slate-800"}
-      hover:border-slate-700 transition-all`}
+      className={`rounded-xl p-5 flex flex-col gap-3 transition-all`}
+      style={{
+        backgroundColor: alert
+          ? "var(--color-danger-bg)"
+          : "var(--color-bg-card)",
+        border: `1px solid ${alert ? "var(--color-danger)" : "var(--color-border)"}`,
+        boxShadow: "var(--color-card-shadow)",
+      }}
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
+          <p
+            className="text-xs font-medium uppercase tracking-wide mb-1"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             {title}
           </p>
-          <p className="text-2xl font-bold text-slate-100">{value}</p>
+          <p
+            className="text-2xl font-bold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            {value}
+          </p>
           {subtitle && (
-            <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+            <p
+              className="text-xs mt-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              {subtitle}
+            </p>
           )}
         </div>
-        <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: "var(--color-bg-elevated)" }}
+        >
           <Icon size={18} color={iconColor} />
         </div>
       </div>
@@ -51,8 +72,19 @@ KPICard.propTypes = {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 text-xs space-y-1">
-      <p className="text-slate-300 font-semibold mb-1">{label}</p>
+    <div
+      className="rounded-lg p-3 text-xs space-y-1"
+      style={{
+        backgroundColor: "var(--chart-tooltip-bg)",
+        border: "1px solid var(--chart-tooltip-border)",
+      }}
+    >
+      <p
+        className="font-semibold mb-1"
+        style={{ color: "var(--color-text-secondary)" }}
+      >
+        {label}
+      </p>
       {payload.map((p) => (
         <p key={p.name} style={{ color: p.color }}>
           {p.name} :{" "}
@@ -164,24 +196,51 @@ export default function EngagementTab({ data }) {
       </div>
 
       {/* ── Real engagement line chart ── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-slate-200 mb-1">
+      <div
+        className="rounded-xl p-6"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
+      >
+        <h3
+          className="text-sm font-semibold mb-1"
+          style={{ color: "var(--color-text-primary)" }}
+        >
           Engagement Trend (last 30 days)
         </h3>
-        <p className="text-xs text-slate-500 mb-4">
+        <p
+          className="text-xs mb-4"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           Real DAU data and 7-day moving average
         </p>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={engagementTrend}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="date"
-              tick={{ fill: "#64748B", fontSize: 11 }}
+              tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
               interval={4}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tickLine={{ stroke: "var(--chart-grid)" }}
             />
-            <YAxis tick={{ fill: "#64748B", fontSize: 11 }} />
+            <YAxis
+              tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tickLine={{ stroke: "var(--chart-grid)" }}
+            />
             <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12, color: "#94A3B8" }} />
+            <Legend
+              formatter={(value) => (
+                <span
+                  style={{ color: "var(--color-text-muted)", fontSize: 12 }}
+                >
+                  {value}
+                </span>
+              )}
+            />
             <Line
               type="monotone"
               dataKey="dau"
@@ -205,37 +264,64 @@ export default function EngagementTab({ data }) {
       {/* ── Section basse ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Engagement by service */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-slate-200 mb-4">
+        <div
+          className="rounded-xl p-6"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
+          <h3
+            className="text-sm font-semibold mb-4"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Engagement by Service
           </h3>
           {serviceBar.length === 0 ? (
-            <p className="text-slate-500 text-xs">No data available.</p>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              No data available.
+            </p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={serviceBar} layout="vertical">
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="#1E293B"
+                  stroke="var(--chart-grid)"
                   horizontal={false}
                 />
-                <XAxis type="number" tick={{ fill: "#64748B", fontSize: 11 }} />
+                <XAxis
+                  type="number"
+                  tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                  axisLine={{ stroke: "var(--chart-grid)" }}
+                  tickLine={{ stroke: "var(--chart-grid)" }}
+                />
                 <YAxis
                   dataKey="name"
                   type="category"
-                  tick={{ fill: "#94A3B8", fontSize: 11 }}
+                  tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
                   width={90}
+                  axisLine={{ stroke: "var(--chart-grid)" }}
+                  tickLine={{ stroke: "var(--chart-grid)" }}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "#1E293B",
-                    border: "1px solid #334155",
+                    background: "var(--chart-tooltip-bg)",
+                    border: "1px solid var(--chart-tooltip-border)",
                     borderRadius: 8,
                     fontSize: 12,
                   }}
-                  labelStyle={{ color: "#CBD5E1" }}
+                  labelStyle={{ color: "var(--color-text-secondary)" }}
                 />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#94A3B8" }} />
+                <Legend
+                  formatter={(value) => (
+                    <span
+                      style={{ color: "var(--color-text-muted)", fontSize: 12 }}
+                    >
+                      {value}
+                    </span>
+                  )}
+                />
                 <Bar
                   dataKey="active_users"
                   name="Active users"
@@ -254,20 +340,41 @@ export default function EngagementTab({ data }) {
         </div>
 
         {/* Engagement health bars */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-          <h3 className="text-sm font-semibold text-slate-200 mb-4">
+        <div
+          className="rounded-xl p-6"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
+          <h3
+            className="text-sm font-semibold mb-4"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Engagement Health Indicators
           </h3>
           <div className="space-y-5">
             {healthMetrics.map((m, i) => (
               <div key={i}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-400">{m.label}</span>
-                  <span className="text-xs font-bold text-slate-200">
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    {m.label}
+                  </span>
+                  <span
+                    className="text-xs font-bold"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
                     {m.value}%
                   </span>
                 </div>
-                <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-2 rounded-full overflow-hidden"
+                  style={{ backgroundColor: "var(--color-bg-elevated)" }}
+                >
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
@@ -277,7 +384,10 @@ export default function EngagementTab({ data }) {
                   />
                 </div>
                 {m.target && (
-                  <p className="text-xs text-slate-600 mt-0.5 text-right">
+                  <p
+                    className="text-xs mt-0.5 text-right"
+                    style={{ color: "var(--color-text-disabled)" }}
+                  >
                     Target {m.target}%
                   </p>
                 )}

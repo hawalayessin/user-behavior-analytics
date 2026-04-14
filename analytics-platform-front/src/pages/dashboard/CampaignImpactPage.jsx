@@ -607,31 +607,6 @@ export default function CampaignImpactPage() {
           </div>
         )}
 
-        {!dashLoading && qualityAlerts.length > 0 && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle size={18} className="text-amber-300" />
-              <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wide">
-                Data Quality Alerts
-              </h3>
-            </div>
-            <div className="space-y-2">
-              {qualityAlerts.map((alert, idx) => (
-                <div
-                  key={`${alert.level}-${idx}`}
-                  className={`rounded-lg border px-3 py-2 text-sm ${
-                    alert.level === "critical"
-                      ? "bg-red-500/10 border-red-500/30 text-red-200"
-                      : "bg-amber-500/10 border-amber-500/30 text-amber-100"
-                  }`}
-                >
-                  {alert.text}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Campaign Performance Chart */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {dashLoading ? (
@@ -927,6 +902,31 @@ export default function CampaignImpactPage() {
             </div>
           </div>
         </div>
+
+        {!dashLoading && qualityAlerts.length > 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 space-y-3 mt-6">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="text-amber-300" />
+              <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wide">
+                Data Quality Alerts
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {qualityAlerts.map((alert, idx) => (
+                <div
+                  key={`${alert.level}-${idx}`}
+                  className={`rounded-lg border px-3 py-2 text-sm ${
+                    alert.level === "critical"
+                      ? "bg-red-500/10 border-red-500/30 text-red-200"
+                      : "bg-amber-500/10 border-amber-500/30 text-amber-100"
+                  }`}
+                >
+                  {alert.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Insight Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

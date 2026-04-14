@@ -1,6 +1,6 @@
-import Sidebar from './Sidebar'
-import Topbar from './Topbar'
-import Footer from './Footer'
+import Sidebar from "./Sidebar";
+import Topbar from "./Topbar";
+import Footer from "./Footer";
 
 /**
  * AppLayout
@@ -14,12 +14,18 @@ import Footer from './Footer'
  */
 export default function AppLayout({
   children,
-  pageTitle = 'Dashboard',
+  pageTitle = "Dashboard",
   hasNotifications = false,
   showExportButton = false,
 }) {
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden">
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{
+        backgroundColor: "var(--color-bg-primary)",
+        minHeight: "100vh",
+      }}
+    >
       {/* Sidebar — always visible, never covered */}
       <Sidebar />
 
@@ -41,5 +47,5 @@ export default function AppLayout({
         <Footer />
       </div>
     </div>
-  )
+  );
 }

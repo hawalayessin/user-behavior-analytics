@@ -262,7 +262,7 @@ export default function ChurnPredictionDashboard() {
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#0F172A",
+                      background: "var(--chart-tooltip-bg)",
                       border: "1px solid rgba(148,163,184,0.2)",
                       borderRadius: 12,
                     }}

@@ -44,3 +44,25 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
+
+
+# ─── Password Reset ───────────────────
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyResetTokenRequest(BaseModel):
+    token: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class TokenValidationResponse(BaseModel):
+    valid: bool
+
+
+class MessageResponse(BaseModel):
+    message: str

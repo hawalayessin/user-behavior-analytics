@@ -344,8 +344,8 @@ export default function UserSegmentationPage() {
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #334155",
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
                     }}
                     formatter={(value) => value.toFixed(2)}
                     labelFormatter={(value) => `${value.toFixed(2)}`}
@@ -391,8 +391,8 @@ export default function UserSegmentationPage() {
                   <Tooltip
                     formatter={(v) => `${v}%`}
                     contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #334155",
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
                     }}
                   />
                   <Bar dataKey="percentage" radius={[0, 4, 4, 0]}>
@@ -501,8 +501,8 @@ export default function UserSegmentationPage() {
                   <Legend />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #334155",
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
                     }}
                   />
                 </RadarChart>

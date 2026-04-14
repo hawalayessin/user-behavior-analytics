@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     CACHE_LOCK_WAIT_MS: int = 1200
     CACHE_LOCK_POLL_INTERVAL_MS: int = 80
 
+    # SMTP Configuration for password reset emails
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str = "noreply@digmaco.tn"
+    SMTP_USE_TLS: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",  # Ignore unrelated env vars during Alembic startup

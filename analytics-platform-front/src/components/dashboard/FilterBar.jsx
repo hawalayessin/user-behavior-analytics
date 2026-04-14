@@ -59,7 +59,12 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
     <div className="relative">
       <button
         onClick={onToggle}
-        className="flex items-center gap-2 px-4 py-2 bg-[#1A1D27] border border-slate-700 rounded-full text-sm text-slate-300 hover:bg-slate-800 transition-all"
+        className="flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-all"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          color: "var(--color-text-secondary)",
+        }}
       >
         <span>{selected?.label ?? "Select"}</span>
         <ChevronDown
@@ -68,16 +73,28 @@ function Dropdown({ options, value, onChange, isOpen, onToggle }) {
         />
       </button>
       {isOpen && (
-        <div className="absolute top-full mt-2 min-w-[200px] bg-[#1A1D27] border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
+        <div
+          className="absolute top-full mt-2 min-w-[200px] rounded-xl shadow-xl z-50 overflow-hidden"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
           {options.map((opt) => (
             <button
               key={String(opt.value)}
               onClick={() => onChange(opt.value)}
               className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                value === opt.value
-                  ? "bg-violet-700 text-white"
-                  : "text-slate-300 hover:bg-slate-800"
+                value === opt.value ? "text-white" : "hover:opacity-90"
               }`}
+              style={{
+                backgroundColor:
+                  value === opt.value ? "var(--color-primary)" : "transparent",
+                color:
+                  value === opt.value
+                    ? "#ffffff"
+                    : "var(--color-text-secondary)",
+              }}
             >
               {opt.label}
             </button>
@@ -143,7 +160,12 @@ export default function FilterBar({
     <div className="space-y-3">
       {/* ── Filtres ── */}
       <div
-        className="flex flex-wrap items-center gap-3 p-4 bg-[#1A1D27] border border-slate-800 rounded-xl"
+        className="flex flex-wrap items-center gap-3 p-4 rounded-xl"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Période */}
@@ -169,7 +191,12 @@ export default function FilterBar({
               value={customStart}
               max={customEnd}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-[#0F1117] border border-slate-700 rounded-full text-slate-300 focus:outline-none focus:border-violet-500"
+              className="px-3 py-1.5 text-sm rounded-full focus:outline-none"
+              style={{
+                backgroundColor: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
             />
             <span className="text-slate-500 text-sm">→</span>
             <input
@@ -178,7 +205,12 @@ export default function FilterBar({
               min={customStart}
               max={today}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-[#0F1117] border border-slate-700 rounded-full text-slate-300 focus:outline-none focus:border-violet-500"
+              className="px-3 py-1.5 text-sm rounded-full focus:outline-none"
+              style={{
+                backgroundColor: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
             />
           </div>
         )}
@@ -201,7 +233,8 @@ export default function FilterBar({
         {/* Apply */}
         <button
           onClick={handleApply}
-          className="px-4 py-2 bg-violet-700 hover:bg-violet-800 text-white text-sm font-semibold rounded-full transition"
+          className="px-4 py-2 text-white text-sm font-semibold rounded-full transition"
+          style={{ backgroundColor: "var(--color-primary)" }}
         >
           Apply filters
         </button>
@@ -209,7 +242,8 @@ export default function FilterBar({
         {/* Reset */}
         <button
           onClick={handleReset}
-          className="px-3 py-2 text-sm text-slate-500 hover:text-slate-300 transition"
+          className="px-3 py-2 text-sm transition"
+          style={{ color: "var(--color-text-muted)" }}
         >
           Reset
         </button>

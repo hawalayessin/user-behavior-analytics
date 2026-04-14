@@ -1,5 +1,5 @@
-import React, { useMemo } from "react"
-import PropTypes from "prop-types"
+import React, { useMemo } from "react";
+import PropTypes from "prop-types";
 import {
   ResponsiveContainer,
   BarChart,
@@ -8,8 +8,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-} from "recharts"
-import ChartContainer from "./ChartContainer"
+} from "recharts";
+import ChartContainer from "./ChartContainer";
 
 function Card({ title, subtitle, children, right }) {
   return (
@@ -17,24 +17,37 @@ function Card({ title, subtitle, children, right }) {
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="text-lg font-bold text-slate-100">{title}</h3>
-          {subtitle && <p className="text-sm text-slate-400 mt-1">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-sm text-slate-400 mt-1">{subtitle}</p>
+          )}
         </div>
         {right}
       </div>
       {children}
     </div>
-  )
+  );
 }
 
-export default function ChurnReasonsChart({ data = [], churnType = "ALL", onChangeType }) {
+export default function ChurnReasonsChart({
+  data = [],
+  churnType = "ALL",
+  onChangeType,
+}) {
   const rows = useMemo(() => {
-    const filtered = churnType === "ALL" ? data : data.filter((r) => r.churn_type === churnType)
+    const filtered =
+      churnType === "ALL"
+        ? data
+        : data.filter((r) => r.churn_type === churnType);
     return filtered
-      .map((r) => ({ reason: r.reason ?? "Unknown", count: Number(r.count ?? 0), churn_type: r.churn_type }))
+      .map((r) => ({
+        reason: r.reason ?? "Unknown",
+        count: Number(r.count ?? 0),
+        churn_type: r.churn_type,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
-      .reverse()
-  }, [data, churnType])
+      .reverse();
+  }, [data, churnType]);
 
   return (
     <Card
@@ -53,24 +66,37 @@ export default function ChurnReasonsChart({ data = [], churnType = "ALL", onChan
       }
     >
       <ChartContainer className="h-80 w-full min-w-0">
-        <ResponsiveContainer width="100%" height="100%" minWidth="0" minHeight="0">
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          minWidth="0"
+          minHeight="0"
+        >
           <BarChart
             layout="vertical"
             data={rows}
             margin={{ top: 10, right: 18, left: 20, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.12)" />
-            <XAxis type="number" stroke="rgba(148,163,184,0.8)" tick={{ fontSize: 12 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+            <XAxis
+              type="number"
+              stroke="var(--chart-grid)"
+              tick={{ fontSize: 12, fill: "var(--chart-axis-text)" }}
+            />
             <YAxis
               type="category"
               dataKey="reason"
               width={160}
-              stroke="rgba(148,163,184,0.8)"
-              tick={{ fontSize: 12 }}
+              stroke="var(--chart-grid)"
+              tick={{ fontSize: 12, fill: "var(--chart-axis-text)" }}
             />
             <Tooltip
-              contentStyle={{ background: "#0F172A", border: "1px solid rgba(148,163,184,0.2)", borderRadius: 12 }}
-              labelStyle={{ color: "#E2E8F0" }}
+              contentStyle={{
+                background: "var(--chart-tooltip-bg)",
+                border: "1px solid var(--chart-tooltip-border)",
+                borderRadius: 12,
+              }}
+              labelStyle={{ color: "var(--color-text-secondary)" }}
               formatter={(v) => [Number(v ?? 0).toLocaleString(), "Count"]}
             />
             <Bar dataKey="count" fill="#F97316" radius={[8, 8, 8, 8]} />
@@ -78,12 +104,11 @@ export default function ChurnReasonsChart({ data = [], churnType = "ALL", onChan
         </ResponsiveContainer>
       </ChartContainer>
     </Card>
-  )
+  );
 }
 
 ChurnReasonsChart.propTypes = {
   data: PropTypes.array,
   churnType: PropTypes.oneOf(["ALL", "VOLUNTARY", "TECHNICAL"]),
   onChangeType: PropTypes.func,
-}
-
+};

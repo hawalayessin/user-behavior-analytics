@@ -31,15 +31,15 @@ import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 import { useAnomalies } from "../../hooks/useAnomalies";
 
 const THEME = {
-  cardBg: "#1e293b",
-  border: "#334155",
-  text: "#f1f5f9",
+  cardBg: "var(--color-bg-card)",
+  border: "var(--color-border)",
+  text: "var(--color-text-primary)",
   primary: "#3b82f6",
   green: "#22c55e",
   red: "#ef4444",
   orange: "#f97316",
   cyan: "#06b6d4",
-  darkBg: "#0f172a",
+  darkBg: "var(--color-bg-primary)",
 };
 
 const SEVERITY_COLORS = {

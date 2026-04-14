@@ -266,15 +266,28 @@ export default function DashboardPage() {
 
         {/* Insight Guide (narrative drill-down mode) */}
         {!loading && !error && data && (
-          <div className="bg-slate-900/60 border border-slate-700 rounded-xl p-4 space-y-4">
+          <div
+            className="rounded-xl p-4 space-y-4"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div className="flex items-center gap-2">
                 <BookOpen size={18} className="text-cyan-300" />
                 <div>
-                  <p className="text-sm font-semibold text-slate-100">
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
                     Insight Guide
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     Narrative drill-down for non-technical managers
                   </p>
                 </div>
@@ -294,7 +307,12 @@ export default function DashboardPage() {
                 {guideEnabled && (
                   <button
                     onClick={() => setGuideExpanded((v) => !v)}
-                    className="px-2 py-1.5 text-xs rounded-lg border bg-slate-800 text-slate-300 border-slate-600"
+                    className="px-2 py-1.5 text-xs rounded-lg border"
+                    style={{
+                      backgroundColor: "var(--color-bg-elevated)",
+                      color: "var(--color-text-secondary)",
+                      borderColor: "var(--color-border)",
+                    }}
                     aria-label="Toggle guide details"
                   >
                     {guideExpanded ? (
@@ -309,11 +327,23 @@ export default function DashboardPage() {
 
             {guideEnabled && guideExpanded && (
               <div className="space-y-3">
-                <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3">
-                  <p className="text-sm font-semibold text-slate-100">
+                <div
+                  className="rounded-lg p-3"
+                  style={{
+                    border: "1px solid var(--color-border)",
+                    backgroundColor: "var(--color-bg-elevated)",
+                  }}
+                >
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
                     {insightGuide.title}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     {insightGuide.summary}
                   </p>
                 </div>
@@ -322,15 +352,25 @@ export default function DashboardPage() {
                   {insightGuide.steps.map((step) => (
                     <div
                       key={step.heading}
-                      className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 space-y-2"
+                      className="rounded-lg p-3 space-y-2"
+                      style={{
+                        border: "1px solid var(--color-border)",
+                        backgroundColor: "var(--color-bg-elevated)",
+                      }}
                     >
                       <p className="text-xs uppercase tracking-wide text-cyan-300 font-semibold">
                         {step.heading}
                       </p>
-                      <p className="text-sm font-bold text-slate-100">
+                      <p
+                        className="text-sm font-bold"
+                        style={{ color: "var(--color-text-primary)" }}
+                      >
                         {step.metric}
                       </p>
-                      <p className="text-xs text-slate-300">
+                      <p
+                        className="text-xs"
+                        style={{ color: "var(--color-text-secondary)" }}
+                      >
                         {step.interpretation}
                       </p>
                       <p className="text-xs text-emerald-300">

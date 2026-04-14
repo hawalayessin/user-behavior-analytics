@@ -21,13 +21,27 @@ import { useRetentionKPIs } from "../../hooks/useRetentionKPIs";
 import { useRetentionHeatmap } from "../../hooks/useRetentionHeatmap";
 import { useRetentionCurve } from "../../hooks/useRetentionCurve";
 import { useCohortsTable } from "../../hooks/useCohortsTable";
+import { useRetentionRecompute } from "../../hooks/useRetentionRecompute";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
+import { useAuth } from "../../context/AuthContext";
 
 const KPISkeleton = () => (
-  <div className="w-full h-32 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  <div
+    className="w-full h-32 animate-pulse rounded-xl"
+    style={{
+      backgroundColor: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border)",
+    }}
+  />
 );
 const ChartSkeleton = () => (
-  <div className="w-full h-80 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  <div
+    className="w-full h-80 animate-pulse rounded-xl"
+    style={{
+      backgroundColor: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border)",
+    }}
+  />
 );
 const RowSkeleton = () => (
   <tr>
@@ -48,6 +62,7 @@ const HEALTH_BADGE = {
 const ITEMS_PER_PAGE = 10;
 
 export default function RetentionPage() {
+  const { isAdmin } = useAuth();
   const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -94,6 +109,12 @@ export default function RetentionPage() {
     page,
     page_size: ITEMS_PER_PAGE,
   });
+
+  const {
+    recompute,
+    loading: recomputeLoading,
+    error: recomputeError,
+  } = useRetentionRecompute();
 
   const kpis = useMemo(() => {
     if (!kpiData) return null;
@@ -158,6 +179,29 @@ export default function RetentionPage() {
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const handleRecomputeCohorts = async () => {
+    try {
+      const result = await recompute();
+      await Promise.all([
+        refetchKPIs(),
+        refetchHeatmap(),
+        refetchCurve(),
+        refetchCohorts(),
+      ]);
+
+      const freshness = result?.freshness;
+      if (freshness?.up_to_date) {
+        showToast(
+          `✅ Cohorts recalculated • up to date (${freshness.max_cohort_month})`,
+        );
+      } else {
+        showToast("⚠️ Cohorts recalculated, freshness check needs attention");
+      }
+    } catch {
+      showToast("❌ Failed to recalculate cohorts");
+    }
   };
 
   const buildRows = (list) =>
@@ -262,10 +306,13 @@ export default function RetentionPage() {
     <AppLayout pageTitle="Retention Analysis">
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">
+          <h1
+            className="text-3xl font-bold mb-2"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Retention Analysis
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             Cohort-based retention tracking across services and periods
           </p>
         </div>
@@ -400,24 +447,44 @@ export default function RetentionPage() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-100">Cohorts</h2>
-            <span className="text-sm text-slate-400">
+            <h2
+              className="text-xl font-bold"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Cohorts
+            </h2>
+            <span
+              className="text-sm"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               {totalCount} cohort{totalCount !== 1 ? "s" : ""}
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-800 border border-slate-700 rounded-lg">
+          <div
+            className="flex flex-wrap items-center gap-3 p-4 rounded-lg"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
             <div className="flex-1 min-w-[200px] relative">
               <Search
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                className="absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: "var(--color-text-muted)" }}
               />
               <input
                 type="text"
                 placeholder="Search by cohort or service..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500"
+                className="w-full pl-9 pr-3 py-2 rounded text-sm focus:outline-none"
+                style={{
+                  backgroundColor: "var(--color-bg-elevated)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text-primary)",
+                }}
               />
             </div>
 
@@ -425,7 +492,12 @@ export default function RetentionPage() {
               <button
                 onClick={() => !exportLoading && setExportOpen((prev) => !prev)}
                 disabled={exportLoading}
-                className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-3 py-2 text-sm rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: "var(--color-bg-elevated)",
+                  border: "1px solid var(--color-border)",
+                  color: "var(--color-text-secondary)",
+                }}
               >
                 {exportLoading ? (
                   <RotateCcw size={14} className="animate-spin" />
@@ -439,23 +511,35 @@ export default function RetentionPage() {
               </button>
 
               {exportOpen && (
-                <div className="absolute right-0 top-10 z-50 w-44 rounded-lg border border-slate-600 bg-slate-800 shadow-xl overflow-hidden">
+                <div
+                  className="absolute right-0 top-10 z-50 w-44 rounded-lg shadow-xl overflow-hidden"
+                  style={{
+                    border: "1px solid var(--color-border)",
+                    backgroundColor: "var(--color-bg-card)",
+                  }}
+                >
                   <button
                     onClick={() => {
                       exportCSV();
                       setExportOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-700 transition"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition"
+                    style={{ color: "var(--color-text-secondary)" }}
                   >
                     📄 Export CSV
                   </button>
-                  <div className="border-t border-slate-700" />
+                  <div
+                    style={{
+                      borderTop: "1px solid var(--color-border-subtle)",
+                    }}
+                  />
                   <button
                     onClick={() => {
                       exportExcel();
                       setExportOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-700 transition"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition"
+                    style={{ color: "var(--color-text-secondary)" }}
                   >
                     📊 Export Excel
                   </button>
@@ -470,18 +554,44 @@ export default function RetentionPage() {
                 refetchHeatmap();
                 refetchCurve();
               }}
-              className="flex items-center gap-2 px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 rounded transition"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded transition"
+              style={{
+                backgroundColor: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-secondary)",
+              }}
             >
               <RotateCcw size={14} /> Refresh
             </button>
+
+            {isAdmin() && (
+              <button
+                onClick={handleRecomputeCohorts}
+                disabled={recomputeLoading}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-violet-600 hover:bg-violet-700 border border-violet-500/40 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw
+                  size={14}
+                  className={recomputeLoading ? "animate-spin" : ""}
+                />
+                {recomputeLoading ? "Calculating..." : "Calcul Cohorts"}
+              </button>
+            )}
           </div>
 
-          {cohortsError && (
+          {(cohortsError || recomputeError) && (
             <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
               <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-              <p className="flex-1 text-sm text-red-200">{cohortsError}</p>
+              <p className="flex-1 text-sm text-red-200">
+                {cohortsError || recomputeError}
+              </p>
               <button
-                onClick={refetchCohorts}
+                onClick={() => {
+                  refetchCohorts();
+                  refetchKPIs();
+                  refetchHeatmap();
+                  refetchCurve();
+                }}
                 className="flex items-center gap-2 px-3 py-1 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition"
               >
                 <RotateCcw size={14} /> Retry
@@ -489,10 +599,22 @@ export default function RetentionPage() {
             </div>
           )}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-800 border-b border-slate-700">
+                <thead
+                  style={{
+                    backgroundColor: "var(--color-bg-elevated)",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
                   <tr>
                     {[
                       { label: "Cohort", field: "cohort_date" },
@@ -508,12 +630,16 @@ export default function RetentionPage() {
                         {field ? (
                           <button
                             onClick={() => toggleSort(field)}
-                            className="flex items-center gap-2 font-semibold text-slate-300 hover:text-slate-100"
+                            className="flex items-center gap-2 font-semibold"
+                            style={{ color: "var(--color-text-secondary)" }}
                           >
                             {label} <SortIcon field={field} />
                           </button>
                         ) : (
-                          <span className="font-semibold text-slate-300">
+                          <span
+                            className="font-semibold"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {label}
                           </span>
                         )}
@@ -521,7 +647,7 @@ export default function RetentionPage() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700">
+                <tbody>
                   {cohortsLoading ? (
                     Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
                       <RowSkeleton key={i} />
@@ -530,7 +656,8 @@ export default function RetentionPage() {
                     <tr>
                       <td
                         colSpan={8}
-                        className="px-6 py-12 text-center text-slate-500"
+                        className="px-6 py-12 text-center"
+                        style={{ color: "var(--color-text-muted)" }}
                       >
                         No cohorts found
                       </td>
@@ -542,24 +669,53 @@ export default function RetentionPage() {
                       return (
                         <tr
                           key={`${c.cohort_date}-${c.service_name}`}
-                          className="hover:bg-slate-800/30 transition cursor-pointer"
+                          className="transition cursor-pointer"
+                          style={{
+                            borderTop: "1px solid var(--color-border-subtle)",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "var(--color-bg-elevated)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                          }}
                         >
-                          <td className="px-6 py-4 text-slate-200 text-xs">
+                          <td
+                            className="px-6 py-4 text-xs"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {c.cohort_date}
                           </td>
-                          <td className="px-6 py-4 text-slate-300 text-xs">
+                          <td
+                            className="px-6 py-4 text-xs"
+                            style={{ color: "var(--color-text-muted)" }}
+                          >
                             {c.service_name}
                           </td>
-                          <td className="px-6 py-4 text-slate-200 text-xs font-mono">
+                          <td
+                            className="px-6 py-4 text-xs font-mono"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {c.total_users.toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 text-slate-200 text-xs">
+                          <td
+                            className="px-6 py-4 text-xs"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {c.retention_d7.toFixed(1)}%
                           </td>
-                          <td className="px-6 py-4 text-slate-200 text-xs">
+                          <td
+                            className="px-6 py-4 text-xs"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {c.retention_d14.toFixed(1)}%
                           </td>
-                          <td className="px-6 py-4 text-slate-200 text-xs">
+                          <td
+                            className="px-6 py-4 text-xs"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {c.retention_d30.toFixed(1)}%
                           </td>
                           <td className="px-6 py-4">
@@ -578,7 +734,10 @@ export default function RetentionPage() {
                               ].map((v, i) => (
                                 <div
                                   key={i}
-                                  className="w-6 h-4 bg-slate-800 rounded-full overflow-hidden"
+                                  className="w-6 h-4 rounded-full overflow-hidden"
+                                  style={{
+                                    backgroundColor: "var(--color-bg-elevated)",
+                                  }}
                                 >
                                   <div
                                     className="h-full rounded-full"
@@ -604,8 +763,17 @@ export default function RetentionPage() {
               </table>
             </div>
 
-            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700 bg-slate-800/50">
-              <span className="text-sm text-slate-400">
+            <div
+              className="flex items-center justify-between px-6 py-4"
+              style={{
+                borderTop: "1px solid var(--color-border)",
+                backgroundColor: "var(--color-bg-elevated)",
+              }}
+            >
+              <span
+                className="text-sm"
+                style={{ color: "var(--color-text-muted)" }}
+              >
                 Page {page} / {totalPages} — {totalCount} result
                 {totalCount !== 1 ? "s" : ""}
               </span>
@@ -613,31 +781,42 @@ export default function RetentionPage() {
                 <button
                   onClick={() => setPage(1)}
                   disabled={page === 1}
-                  className="px-2 py-1 text-xs hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
+                  className="px-2 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed rounded transition"
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   «
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 text-sm hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
+                  className="px-3 py-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed rounded transition"
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   ←
                 </button>
-                <span className="px-3 py-1 text-sm text-slate-100 bg-slate-700 rounded font-medium">
+                <span
+                  className="px-3 py-1 text-sm rounded font-medium"
+                  style={{
+                    color: "var(--color-text-primary)",
+                    backgroundColor: "var(--color-bg-card)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
                   {page}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1 text-sm hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
+                  className="px-3 py-1 text-sm disabled:opacity-40 disabled:cursor-not-allowed rounded transition"
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   →
                 </button>
                 <button
                   onClick={() => setPage(totalPages)}
                   disabled={page === totalPages}
-                  className="px-2 py-1 text-xs hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition text-slate-300"
+                  className="px-2 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed rounded transition"
+                  style={{ color: "var(--color-text-secondary)" }}
                 >
                   »
                 </button>
@@ -648,7 +827,14 @@ export default function RetentionPage() {
       </div>
 
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-600 bg-slate-800 text-sm text-slate-100 shadow-xl">
+        <div
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg text-sm shadow-xl"
+          style={{
+            border: "1px solid var(--color-border)",
+            backgroundColor: "var(--color-bg-card)",
+            color: "var(--color-text-primary)",
+          }}
+        >
           {toastMsg}
         </div>
       )}

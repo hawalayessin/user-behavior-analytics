@@ -16,12 +16,13 @@ import { useDashboardMetrics } from "../../../hooks/useDashboardMetrics";
 
 const TOOLTIP_STYLE = {
   contentStyle: {
-    backgroundColor: "#1E293B",
-    border: "1px solid #334155",
+    backgroundColor: "var(--chart-tooltip-bg)",
+    border: "1px solid var(--chart-tooltip-border)",
     borderRadius: 8,
+    color: "var(--color-text-primary)",
   },
-  labelStyle: { color: "#94A3B8" },
-  itemStyle: { color: "#F1F5F9" },
+  labelStyle: { color: "var(--color-text-secondary)" },
+  itemStyle: { color: "var(--color-text-muted)" },
 };
 
 const SERVICE_COLORS = [
@@ -106,9 +107,19 @@ export default function RevenueTab({ data, nrr, nrrLoading, nrrError }) {
         ].map((kpi) => (
           <div
             key={kpi.label}
-            className="bg-[#1A1D27] border border-slate-800 rounded-xl p-5"
+            className="rounded-xl p-5"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
           >
-            <p className="text-xs text-slate-500 mb-1">{kpi.label}</p>
+            <p
+              className="text-xs mb-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              {kpi.label}
+            </p>
             <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
           </div>
         ))}
@@ -121,17 +132,44 @@ export default function RevenueTab({ data, nrr, nrrLoading, nrrError }) {
           total={subscriptions.total}
         />
 
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-5 flex-1">
-          <h3 className="text-sm font-semibold text-slate-100 mb-4">
+        <div
+          className="rounded-xl p-5 flex-1"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
+          <h3
+            className="text-sm font-semibold mb-4"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Billing — Success vs Failed
           </h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={billingData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-              <XAxis dataKey="label" tick={{ fill: "#94A3B8", fontSize: 12 }} />
-              <YAxis tick={{ fill: "#94A3B8", fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+              <XAxis
+                dataKey="label"
+                tick={{ fill: "var(--chart-axis-text)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--chart-grid)" }}
+                tickLine={{ stroke: "var(--chart-grid)" }}
+              />
+              <YAxis
+                tick={{ fill: "var(--chart-axis-text)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--chart-grid)" }}
+                tickLine={{ stroke: "var(--chart-grid)" }}
+              />
               <Tooltip {...TOOLTIP_STYLE} />
-              <Legend wrapperStyle={{ color: "#94A3B8", fontSize: 12 }} />
+              <Legend
+                formatter={(value) => (
+                  <span
+                    style={{ color: "var(--color-text-muted)", fontSize: 12 }}
+                  >
+                    {value}
+                  </span>
+                )}
+              />
               <Bar
                 dataKey="success"
                 name="Success"
@@ -150,13 +188,23 @@ export default function RevenueTab({ data, nrr, nrrLoading, nrrError }) {
       </div>
 
       {/* NRR (sous Subscription Status Breakdown + Billing) */}
-      <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-5">
+      <div
+        className="rounded-xl p-5"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
+      >
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-100 mb-1">
+            <h3
+              className="text-sm font-semibold mb-1"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               Revenue by Service
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Distribution of revenue contribution across top services.
             </p>
           </div>
@@ -170,18 +218,22 @@ export default function RevenueTab({ data, nrr, nrrLoading, nrrError }) {
             data={revenueByServiceData}
             margin={{ top: 8, right: 10, left: 8, bottom: 24 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis
               dataKey="service"
-              tick={{ fill: "#94A3B8", fontSize: 11 }}
+              tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
               interval={0}
               angle={-18}
               textAnchor="end"
               height={64}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tickLine={{ stroke: "var(--chart-grid)" }}
             />
             <YAxis
-              tick={{ fill: "#94A3B8", fontSize: 12 }}
+              tick={{ fill: "var(--chart-axis-text)", fontSize: 12 }}
               tickFormatter={(v) => `${Math.round(v).toLocaleString()} DT`}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tickLine={{ stroke: "var(--chart-grid)" }}
             />
             <Tooltip
               {...TOOLTIP_STYLE}

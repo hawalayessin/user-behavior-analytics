@@ -170,7 +170,7 @@ export default function UserDistributionByServiceChart({ data }) {
                 paddingAngle={3}
                 dataKey="subscriptions"
                 nameKey="service_name"
-                stroke="#0f172a"
+                stroke="var(--color-bg-primary)"
                 strokeWidth={1.5}
               >
                 {chartData.map((_, index) => (

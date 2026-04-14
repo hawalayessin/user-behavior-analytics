@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, LogOut, Zap } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-import { navigationConfig } from './navConfig'
-import SidebarSection from './SidebarSection'
-import SidebarNavItem from './SidebarNavItem'
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, LogOut, Zap } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { navigationConfig } from "./navConfig";
+import SidebarSection from "./SidebarSection";
+import SidebarNavItem from "./SidebarNavItem";
+import { ThemeToggleWithLabel } from "./ThemeToggle";
 
 /**
  * Sidebar
@@ -11,31 +12,38 @@ import SidebarNavItem from './SidebarNavItem'
  * and sticky header/footer with user info
  */
 export default function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const { full_name, role, logout, isAdmin } = useAuth()
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const { full_name, logout, isAdmin } = useAuth();
 
   const getInitials = () => {
-    if (!full_name) return '?'
+    if (!full_name) return "?";
     return full_name
-      .split(' ')
+      .split(" ")
       .map((part) => part[0])
-      .join('')
+      .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
 
   const getRoleLabel = () => {
-    return isAdmin() ? 'System Admin' : 'Analyst'
-  }
+    return isAdmin() ? "System Admin" : "Analyst";
+  };
 
-  const sidebarWidth = isCollapsed ? 'w-16' : 'w-[220px]'
+  const sidebarWidth = isCollapsed ? "w-16" : "w-[220px]";
 
   return (
     <aside
-      className={`${sidebarWidth} bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-200 ease-in-out h-screen overflow-hidden flex-shrink-0`}
+      className={`${sidebarWidth} flex flex-col transition-all duration-200 ease-in-out h-screen overflow-hidden flex-shrink-0`}
+      style={{
+        backgroundColor: "var(--color-bg-card)",
+        borderRight: "1px solid var(--color-border)",
+      }}
     >
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-slate-800">
+      <div
+        className="flex-shrink-0 p-4"
+        style={{ borderBottom: "1px solid var(--color-border)" }}
+      >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
@@ -43,14 +51,29 @@ export default function Sidebar() {
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
-                <h1 className="text-sm font-bold text-slate-100 truncate">TT InsightHub</h1>
-                <p className="text-xs text-slate-500 truncate">SMS Services</p>
+                <h1
+                  className="text-sm font-bold truncate"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  InsightHub
+                </h1>
+                <p
+                  className="text-xs truncate"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  SMS Services
+                </p>
               </div>
             )}
           </div>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-all duration-200 ease-in-out"
+            className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 ease-in-out"
+            style={{
+              backgroundColor: "var(--color-bg-elevated)",
+              border: "1px solid var(--color-border)",
+              color: "var(--color-text-muted)",
+            }}
             aria-label="Toggle sidebar"
           >
             {isCollapsed ? (
@@ -65,7 +88,7 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto sidebar-nav">
         {navigationConfig.map((section) => {
-          if (section.adminOnly && !isAdmin()) return null
+          if (section.adminOnly && !isAdmin()) return null;
 
           return (
             <SidebarSection
@@ -82,31 +105,54 @@ export default function Sidebar() {
                   isCollapsed={isCollapsed}
                 />
               ))}
+
+              {!isCollapsed && section.section === "ADMIN" && (
+                <div className="px-3 pt-2">
+                  <ThemeToggleWithLabel />
+                </div>
+              )}
             </SidebarSection>
-          )
+          );
         })}
       </nav>
 
       {/* Footer */}
-      <div className="flex-shrink-0 p-4 border-t border-slate-800">
+      <div
+        className="flex-shrink-0 p-4"
+        style={{ borderTop: "1px solid var(--color-border)" }}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div
               className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white"
-              title={full_name || 'User'}
+              title={full_name || "User"}
             >
               {getInitials()}
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-200 truncate">{full_name}</p>
-                <p className="text-xs text-slate-500 truncate">{getRoleLabel()}</p>
+                <p className="text-sm font-medium text-slate-200 truncate">
+                  {full_name}
+                </p>
+                <p
+                  className="text-sm font-medium truncate"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  {full_name}
+                </p>
+                <p
+                  className="text-xs truncate"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {getRoleLabel()}
+                </p>
               </div>
             )}
           </div>
           <button
             onClick={logout}
-            className="flex-shrink-0 p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors duration-200"
+            className="flex-shrink-0 p-1 rounded transition-colors duration-200"
+            style={{ color: "var(--color-text-muted)" }}
             aria-label="Logout"
           >
             <LogOut size={18} />
@@ -114,5 +160,5 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
-  )
+  );
 }

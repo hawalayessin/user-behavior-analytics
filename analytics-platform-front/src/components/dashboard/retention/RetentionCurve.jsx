@@ -1,4 +1,4 @@
-import PropTypes from "prop-types"
+import PropTypes from "prop-types";
 import {
   LineChart,
   Line,
@@ -8,30 +8,55 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
-} from "recharts"
+} from "recharts";
 
-const COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EC4899", "#22C55E", "#3B82F6"]
+const COLORS = [
+  "#6366F1",
+  "#10B981",
+  "#F59E0B",
+  "#EC4899",
+  "#22C55E",
+  "#3B82F6",
+];
 
 export default function RetentionCurve({ data }) {
   if (!data?.length) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 h-full flex items-center justify-center text-sm text-slate-500">
+      <div
+        className="rounded-xl p-6 h-full flex items-center justify-center text-sm"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          color: "var(--color-text-muted)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
+      >
         No retention curve data
       </div>
-    )
+    );
   }
 
   const chartData = data.map((row) => ({
     service: row.service,
-    D0:  row.d0,
-    D7:  row.d7,
+    D0: row.d0,
+    D7: row.d7,
     D14: row.d14,
     D30: row.d30,
-  }))
+  }));
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 h-full flex flex-col">
-      <h3 className="text-sm font-semibold text-slate-100 mb-4">
+    <div
+      className="rounded-xl p-6 h-full flex flex-col"
+      style={{
+        backgroundColor: "var(--color-bg-card)",
+        border: "1px solid var(--color-border)",
+        boxShadow: "var(--color-card-shadow)",
+      }}
+    >
+      <h3
+        className="text-sm font-semibold mb-4"
+        style={{ color: "var(--color-text-primary)" }}
+      >
         Retention Curve by Service
       </h3>
       <div className="flex-1 min-h-[260px]">
@@ -40,33 +65,49 @@ export default function RetentionCurve({ data }) {
             data={chartData}
             margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
           >
-            <XAxis dataKey="service" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
+            <XAxis
+              dataKey="service"
+              tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tickLine={{ stroke: "var(--chart-grid)" }}
+            />
             <YAxis
-              tick={{ fontSize: 11, fill: "#9CA3AF" }}
+              tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
               tickFormatter={(v) => `${v}%`}
               domain={[0, 100]}
+              axisLine={{ stroke: "var(--chart-grid)" }}
+              tickLine={{ stroke: "var(--chart-grid)" }}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#020617",
-                border: "1px solid #1f2937",
+                backgroundColor: "var(--chart-tooltip-bg)",
+                border: "1px solid var(--chart-tooltip-border)",
                 borderRadius: "0.5rem",
                 fontSize: "0.75rem",
-                color: "#e5e7eb",
+                color: "var(--color-text-primary)",
               }}
               formatter={(value, name) => [`${value.toFixed(1)}%`, name]}
             />
             <Legend
-              wrapperStyle={{ fontSize: "0.75rem", color: "#9CA3AF" }}
+              formatter={(value) => (
+                <span
+                  style={{
+                    fontSize: "0.75rem",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
+                  {value}
+                </span>
+              )}
             />
             <ReferenceLine
               y={40}
-              stroke="#4B5563"
+              stroke="var(--chart-grid)"
               strokeDasharray="4 4"
               label={{
                 position: "right",
                 value: "D7 target 40%",
-                fill: "#9CA3AF",
+                fill: "var(--chart-axis-text)",
                 fontSize: 11,
               }}
             />
@@ -85,18 +126,17 @@ export default function RetentionCurve({ data }) {
         </ResponsiveContainer>
       </div>
     </div>
-  )
+  );
 }
 
 RetentionCurve.propTypes = {
   data: PropTypes.arrayOf(
     PropTypes.shape({
       service: PropTypes.string.isRequired,
-      d0:      PropTypes.number.isRequired,
-      d7:      PropTypes.number.isRequired,
-      d14:     PropTypes.number.isRequired,
-      d30:     PropTypes.number.isRequired,
-    })
+      d0: PropTypes.number.isRequired,
+      d7: PropTypes.number.isRequired,
+      d14: PropTypes.number.isRequired,
+      d30: PropTypes.number.isRequired,
+    }),
   ),
-}
-
+};

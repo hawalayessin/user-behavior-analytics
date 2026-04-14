@@ -145,7 +145,14 @@ export default function ChurnAnalysisPage() {
         {/* Charts Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Trend Chart */}
-          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <h2 className="text-sm font-semibold text-slate-100 mb-4">
               Daily Churn vs New
             </h2>
@@ -158,10 +165,34 @@ export default function ChurnAnalysisPage() {
                     strokeDasharray="3 3"
                     stroke="var(--color-border)"
                   />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Legend />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
+                  />
+                  <YAxis
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
+                      borderRadius: "8px",
+                      color: "var(--color-text-primary)",
+                    }}
+                    labelStyle={{ color: "var(--color-text-secondary)" }}
+                    itemStyle={{ color: "var(--color-text-muted)" }}
+                  />
+                  <Legend
+                    formatter={(value) => (
+                      <span style={{ color: "var(--color-text-muted)" }}>
+                        {value}
+                      </span>
+                    )}
+                  />
                   <Line
                     type="monotone"
                     dataKey="new_subs"
@@ -184,7 +215,14 @@ export default function ChurnAnalysisPage() {
           </div>
 
           {/* Voluntary vs Technical */}
-          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <h2 className="text-sm font-semibold text-slate-100 mb-4">
               Churn Type
             </h2>
@@ -216,7 +254,16 @@ export default function ChurnAnalysisPage() {
                     <Cell fill={COLORS.churn} />
                     <Cell fill={COLORS.warning} />
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
+                      borderRadius: "8px",
+                      color: "var(--color-text-primary)",
+                    }}
+                    labelStyle={{ color: "var(--color-text-secondary)" }}
+                    itemStyle={{ color: "var(--color-text-muted)" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -286,7 +333,14 @@ export default function ChurnAnalysisPage() {
             </div>
           )}
 
-          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <h3 className="text-sm font-semibold text-slate-100 mb-4">
               Reactivation by Service
             </h3>
@@ -317,18 +371,22 @@ export default function ChurnAnalysisPage() {
                   />
                   <XAxis
                     type="number"
-                    tick={{ fontSize: 11, fill: "#94A3B8" }}
+                    tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
                   />
                   <YAxis
                     type="category"
                     dataKey="service_name"
                     width={120}
-                    tick={{ fontSize: 11, fill: "#94A3B8" }}
+                    tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#1E293B",
-                      border: "1px solid #334155",
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
                       borderRadius: 8,
                     }}
                     formatter={(value, name, item) => {
@@ -364,7 +422,14 @@ export default function ChurnAnalysisPage() {
         {/* Services & Distribution */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* By Service */}
-          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <h2 className="text-sm font-semibold text-slate-100 mb-4">
               Churn by Service
             </h2>
@@ -381,13 +446,29 @@ export default function ChurnAnalysisPage() {
                     strokeDasharray="3 3"
                     stroke="var(--color-border)"
                   />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <XAxis
+                    type="number"
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
+                  />
                   <YAxis
                     dataKey="service_name"
                     type="category"
-                    tick={{ fontSize: 11 }}
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
                   />
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
+                      borderRadius: "8px",
+                      color: "var(--color-text-primary)",
+                    }}
+                    labelStyle={{ color: "var(--color-text-secondary)" }}
+                    itemStyle={{ color: "var(--color-text-muted)" }}
+                  />
                   <Bar dataKey="churned" fill={COLORS.churn} name="Churned" />
                 </BarChart>
               </ResponsiveContainer>
@@ -395,7 +476,14 @@ export default function ChurnAnalysisPage() {
           </div>
 
           {/* Distribution */}
-          <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+          <div
+            className="rounded-xl p-6"
+            style={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--color-card-shadow)",
+            }}
+          >
             <h2 className="text-sm font-semibold text-slate-100 mb-4">
               Lifetime Distribution
             </h2>
@@ -408,9 +496,27 @@ export default function ChurnAnalysisPage() {
                     strokeDasharray="3 3"
                     stroke="var(--color-border)"
                   />
-                  <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
+                  <XAxis
+                    dataKey="bucket"
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
+                  />
+                  <YAxis
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "var(--chart-tooltip-bg)",
+                      border: "1px solid var(--chart-tooltip-border)",
+                      borderRadius: "8px",
+                      color: "var(--color-text-primary)",
+                    }}
+                    labelStyle={{ color: "var(--color-text-secondary)" }}
+                    itemStyle={{ color: "var(--color-text-muted)" }}
+                  />
                   <Bar dataKey="count" fill={COLORS.new} name="Count" />
                 </BarChart>
               </ResponsiveContainer>
@@ -419,27 +525,54 @@ export default function ChurnAnalysisPage() {
         </div>
 
         {/* Retention Table */}
-        <div className="rounded-xl border border-slate-700 bg-[#121820] p-6">
+        <div
+          className="rounded-xl p-6"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
           <h2 className="text-sm font-semibold text-slate-100 mb-4">
             Retention by Cohort
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-400">
+                <tr
+                  style={{
+                    backgroundColor: "var(--color-bg-elevated)",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <th
+                    className="text-left py-3 px-4 text-xs font-semibold"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     Cohort
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">
+                  <th
+                    className="text-right py-3 px-4 text-xs font-semibold"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     Users
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">
+                  <th
+                    className="text-right py-3 px-4 text-xs font-semibold"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     D+7
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">
+                  <th
+                    className="text-right py-3 px-4 text-xs font-semibold"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     D+14
                   </th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-400">
+                  <th
+                    className="text-right py-3 px-4 text-xs font-semibold"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     D+30
                   </th>
                 </tr>
@@ -448,10 +581,34 @@ export default function ChurnAnalysisPage() {
                 {(charts?.retention_cohort || []).map((row, i) => (
                   <tr
                     key={i}
-                    className="border-b border-slate-700/50 hover:bg-slate-800/30"
+                    style={{
+                      borderBottom: "1px solid var(--color-border-subtle)",
+                      backgroundColor:
+                        i % 2 === 0
+                          ? "var(--color-bg-card)"
+                          : "var(--color-bg-elevated)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        "var(--color-bg-elevated)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        i % 2 === 0
+                          ? "var(--color-bg-card)"
+                          : "var(--color-bg-elevated)";
+                    }}
                   >
-                    <td className="py-3 px-4 text-slate-300">{row.cohort}</td>
-                    <td className="text-right py-3 px-4 text-slate-300">
+                    <td
+                      className="py-3 px-4"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
+                      {row.cohort}
+                    </td>
+                    <td
+                      className="text-right py-3 px-4"
+                      style={{ color: "var(--color-text-secondary)" }}
+                    >
                       {(row.total || 0).toLocaleString()}
                     </td>
                     <td className="text-right py-3 px-4">

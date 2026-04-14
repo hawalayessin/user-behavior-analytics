@@ -6,7 +6,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  CartesianGrid,
+                background: "var(--chart-tooltip-bg)",
 } from "recharts"
 
 export default function ServiceCampaignComparison({ data }) {
@@ -39,7 +39,7 @@ export default function ServiceCampaignComparison({ data }) {
             />
             <Tooltip
               contentStyle={{
-                background: "#0F172A",
+                background: "var(--chart-tooltip-bg)",
                 border: "1px solid rgba(148,163,184,0.25)",
                 borderRadius: 12,
               }}

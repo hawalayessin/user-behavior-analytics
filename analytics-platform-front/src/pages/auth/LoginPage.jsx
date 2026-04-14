@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import digmacoLogo from "../../assets/digmaco.png";
-
+import { ThemeToggle } from "../../components/layout/ThemeToggle";
 
 <div className="text-center mb-8">
   <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-600 rounded-lg mb-4">
@@ -14,7 +14,6 @@ import digmacoLogo from "../../assets/digmaco.png";
     />
   </div>
 </div>;
-
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -42,12 +41,12 @@ export default function LoginPage() {
         setError("Invalid email or password. Please try again.");
       } else if (err.response?.status === 403) {
         setError(
-          "Your account has been deactivated. Contact your administrator."
+          "Your account has been deactivated. Contact your administrator.",
         );
       } else {
         setError(
           err.response?.data?.detail ||
-            "An unexpected error occurred. Please try again."
+            "An unexpected error occurred. Please try again.",
         );
       }
     } finally {
@@ -56,7 +55,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 relative overflow-hidden">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, var(--color-bg-card) 0%, var(--color-bg-primary) 100%)",
+      }}
+    >
+      <div
+        style={{ position: "absolute", top: "16px", right: "16px", zIndex: 20 }}
+      >
+        <ThemeToggle />
+      </div>
+
       {/* Background Blobs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
@@ -73,16 +84,21 @@ export default function LoginPage() {
               className="w-8 h-8 object-contain"
             />
           </div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">
-            TT InsightHub
-          </h1>
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">InsightHub</h1>
           <p className="text-slate-400">
             User Behavioral Analytics & Insights Platform
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl shadow-2xl p-8 border border-slate-800">
+        <div
+          className="backdrop-blur-sm rounded-xl p-8"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            border: "1px solid var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Error Banner */}
             {error && (
@@ -147,12 +163,13 @@ export default function LoginPage() {
                 >
                   Password
                 </label>
-                <a
-                  href="#"
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
                   className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition"
                 >
                   Forgot password?
-                </a>
+                </button>
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-500 transition-colors">

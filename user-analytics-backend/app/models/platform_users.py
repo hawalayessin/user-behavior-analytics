@@ -41,6 +41,14 @@ class PlatformUser(Base):
         DateTime(timezone=True), nullable=True,
         comment="Dernière connexion au dashboard",
     )
+    reset_token: Mapped[str | None] = mapped_column(
+        String(255), nullable=True,
+        comment="Token de réinitialisation de mot de passe",
+    )
+    reset_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        comment="Expiration du token de réinitialisation",
+    )
 
     __table_args__ = (
         Index("ix_platform_users_role", "role"),

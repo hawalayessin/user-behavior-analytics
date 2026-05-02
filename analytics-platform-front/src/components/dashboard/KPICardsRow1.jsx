@@ -1,11 +1,11 @@
 import PropTypes from "prop-types";
-import { Users, UserCheck, AlertTriangle, Clock3 } from "lucide-react";
+import { Users, UserCheck, Wallet, TrendingDown } from "lucide-react";
 import KPICard from "./KPICard";
 
 export default function KPICardsRow1({ data, metrics }) {
   const total = data.subscriptions.total || 0;
-  const pending = data.subscriptions.pending || 0;
-  const totalWithPending = data.subscriptions.total_with_pending || total;
+  const monthlyRevenue = data.revenue?.mrr || 0;
+  const churnRate = data.churn?.churn_rate_month_pct || 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -26,20 +26,20 @@ export default function KPICardsRow1({ data, metrics }) {
         iconBg="bg-emerald-500/20"
       />
       <KPICard
-        title="At Risk (Billing)"
-        value={(data.subscriptions.billing_failed || 0).toLocaleString()}
-        subtitle={`${(data.subscriptions.at_risk_users || 0).toLocaleString()} users at risk`}
-        icon={AlertTriangle}
-        iconColor="#F59E0B"
-        iconBg="bg-amber-500/20"
+        title="Monthly Revenue"
+        value={`${monthlyRevenue.toLocaleString()} TND`}
+        subtitle="Recurring monthly revenue (MRR)"
+        icon={Wallet}
+        iconColor="#10B981"
+        iconBg="bg-emerald-500/20"
       />
       <KPICard
-        title="Pending OTP"
-        value={pending.toLocaleString()}
-        subtitle={`${totalWithPending > 0 ? Math.round((pending * 100) / totalWithPending) : 0}% of total pipeline`}
-        icon={Clock3}
-        iconColor="#94A3B8"
-        iconBg="bg-slate-500/20"
+        title="Churn Rate"
+        value={`${Number(churnRate).toFixed(1)}%`}
+        subtitle="Monthly churn rate"
+        icon={TrendingDown}
+        iconColor="#EF4444"
+        iconBg="bg-red-500/20"
       />
     </div>
   );

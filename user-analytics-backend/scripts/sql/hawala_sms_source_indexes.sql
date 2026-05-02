@@ -1,4 +1,4 @@
--- Run these on Hawala source DB (not analytics_db)
+﻿-- Run these on prod_db source DB (not analytics_db)
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_message_events_created_at
 ON message_events (created_at);
 
@@ -20,3 +20,4 @@ ON message_templates (event_type_id, created_at);
 
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_message_templates_event_type_id
 ON message_templates (event_type_id);
+

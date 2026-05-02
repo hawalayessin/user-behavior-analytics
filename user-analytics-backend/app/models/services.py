@@ -23,6 +23,7 @@ class Service(Base):
         comment="Horoscope, Météo, Actualités, etc."
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     service_type_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("service_types.id", ondelete="RESTRICT"),

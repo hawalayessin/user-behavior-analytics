@@ -1,12 +1,12 @@
-"""
+﻿"""
 Backfill Campaign ROI data (campaign_targets + sms_events) using realistic, deterministic SQL.
 
 Why:
-- Hawala source has no `campaigns` / `campaign_targets` / rich outbound SMS delivery logs.
+- prod_db source has no `campaigns` / `campaign_targets` / rich outbound SMS delivery logs.
 - Campaign ROI KPIs need message-level volumes linked to campaigns.
 
 What this script does:
-1) Optional source verification (HAWALA_CONN): checks candidate source tables and row counts.
+1) Optional source verification (PROD_CONN): checks candidate source tables and row counts.
 2) Backfills campaign_targets from analytics users/subscriptions, per campaign, deterministic sampling.
 3) Backfills sms_events outbound delivery rows per campaign target with realistic success/failure split.
 
@@ -17,7 +17,7 @@ Usage:
 
 Env:
   ANALYTICS_CONN (or DATABASE_URL) required
-  HAWALA_CONN optional (for source verification)
+  PROD_CONN optional (for source verification)
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def _engine_from_env(var_names: list[str]):
     return None
 
 
-def verify_hawala_source(source_engine) -> None:
+def verify_prod_db_source(source_engine) -> None:
     candidates = [
         "campaigns",
         "campaign_targets",
@@ -275,12 +275,12 @@ def main() -> None:
     if analytics_engine is None:
         raise RuntimeError("Missing ANALYTICS_CONN or DATABASE_URL")
 
-    source_engine = _engine_from_env(["HAWALA_CONN", "hawala_conn"])
+    source_engine = _engine_from_env(["PROD_CONN", "prod_conn"])
     if source_engine is not None:
-        print("=== Source verification (HAWALA) ===")
-        verify_hawala_source(source_engine)
+        print("=== Source verification (prod_db) ===")
+        verify_prod_db_source(source_engine)
     else:
-        print("=== Source verification skipped: HAWALA_CONN not set ===")
+        print("=== Source verification skipped: PROD_CONN not set ===")
 
     if args.verify_source_only:
         return
@@ -322,3 +322,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

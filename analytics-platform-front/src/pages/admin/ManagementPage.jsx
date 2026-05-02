@@ -68,7 +68,7 @@ export default function ManagementPage() {
     const s = search.trim().toLowerCase();
     if (!s) return services;
     return (services ?? []).filter((r) =>
-      (r.name ?? "").toLowerCase().includes(s),
+      `${r.name ?? ""} ${r.url ?? ""}`.toLowerCase().includes(s),
     );
   }, [services, search]);
 

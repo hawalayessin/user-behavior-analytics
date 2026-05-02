@@ -7,7 +7,7 @@ export default function ServiceTable({ rows, onEdit, onDelete }) {
       <table className="w-full text-sm">
         <thead className="bg-slate-800 border-b border-slate-700">
           <tr>
-            {["Name", "Billing", "Price", "Subs", "Campaigns", "Edit"].map((h) => (
+            {["Name", "URL", "Billing", "Price", "Subs", "Campaigns", "Edit"].map((h) => (
               <th key={h} className="px-5 py-3 text-left text-slate-300 font-semibold">
                 {h}
               </th>
@@ -17,7 +17,7 @@ export default function ServiceTable({ rows, onEdit, onDelete }) {
         <tbody className="divide-y divide-slate-700">
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="px-6 py-10 text-center text-slate-500">
+              <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
                 No services found
               </td>
             </tr>
@@ -25,6 +25,20 @@ export default function ServiceTable({ rows, onEdit, onDelete }) {
             rows.map((r) => (
               <tr key={r.id} className="hover:bg-slate-700/30 transition">
                 <td className="px-5 py-4 text-slate-100 font-medium">{r.name}</td>
+                <td className="px-5 py-4 text-slate-300 text-xs max-w-[280px] truncate">
+                  {r.url ? (
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-cyan-300 hover:text-cyan-200 underline"
+                    >
+                      {r.url}
+                    </a>
+                  ) : (
+                    <span className="text-slate-500">-</span>
+                  )}
+                </td>
                 <td className="px-5 py-4 text-slate-300 text-xs capitalize">{r.billing_type}</td>
                 <td className="px-5 py-4 text-slate-200 text-xs font-mono">{Number(r.price ?? 0).toFixed(2)} DT</td>
                 <td className="px-5 py-4 text-slate-300 text-xs">

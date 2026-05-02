@@ -34,10 +34,10 @@ export function useDashboardMetrics(data) {
       (churn.dropoff.day3 ?? 0) >= (churn.dropoff.day2 ?? 0)
 
     const subscriptionPieData = [
-      { name: "Actifs", value: subscriptions.active ?? 0, fill: "#10B981" },
-      { name: "A Risque", value: subscriptions.billing_failed ?? 0, fill: "#F59E0B" },
-      { name: "Annulés", value: subscriptions.cancelled ?? 0, fill: "#EF4444" },
-      { name: "Pending OTP", value: subscriptions.pending ?? 0, fill: "#94A3B8" },
+      { name: "Subscribed", value: subscriptions.active ?? 0, fill: "#10B981" },
+      { name: "Billing Failed", value: subscriptions.billing_failed ?? 0, fill: "#F59E0B" },
+      { name: "Unsubscribed", value: subscriptions.cancelled ?? 0, fill: "#EF4444" },
+      { name: "OTP Incomplete", value: subscriptions.pending ?? 0, fill: "#94A3B8" },
     ]
 
     const churnPieData = [

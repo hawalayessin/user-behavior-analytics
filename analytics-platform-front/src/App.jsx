@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import PrivateRoute from "./router/PrivateRoute";
@@ -20,6 +21,9 @@ import CrossServiceBehaviorPage from "./pages/dashboard/CrossServiceBehaviorPage
 import UserSegmentationPage from "./pages/dashboard/UserSegmentationPage";
 import AnomalyDetectionPage from "./pages/dashboard/AnomalyDetectionPage";
 import ManagementPage from "./pages/admin/ManagementPage";
+import SystemSettingsPage from "./pages/admin/SystemSettingsPage";
+import ProfileSettingsPage from "./pages/account/ProfileSettingsPage";
+import NotesPage from "./pages/NotesPage";
 
 function App() {
   return (
@@ -28,6 +32,7 @@ function App() {
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
@@ -148,6 +153,30 @@ function App() {
               <AdminRoute>
                 <ManagementPage />
               </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <AdminRoute>
+                <SystemSettingsPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/account/profile"
+            element={
+              <PrivateRoute>
+                <ProfileSettingsPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/notes"
+            element={
+              <PrivateRoute>
+                <NotesPage />
+              </PrivateRoute>
             }
           />
           <Route path="*" element={<RootRedirect />} />

@@ -1,4 +1,4 @@
-"""Post-fix verification for Hawala -> analytics data pipeline."""
+﻿"""Post-fix verification for prod_db -> analytics data pipeline."""
 
 from __future__ import annotations
 
@@ -28,10 +28,10 @@ def _scalar(conn, sql: str, params: dict | None = None):
 
 def verify() -> int:
     _load_env()
-    hawala_conn = os.getenv("HAWALA_CONN", "postgresql://postgres:password@localhost:5432/hawala")
-    analytics_conn = os.getenv("ANALYTICS_CONN", os.getenv("DATABASE_URL", "postgresql://postgres:12345hawala@localhost:5433/analytics_db"))
+    PROD_CONN = os.getenv("PROD_CONN", "postgresql://postgres:password@localhost:5432/prod_db")
+    analytics_conn = os.getenv("ANALYTICS_CONN", os.getenv("DATABASE_URL", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db"))
 
-    prod_engine = create_engine(hawala_conn, pool_pre_ping=True)
+    prod_engine = create_engine(PROD_CONN, pool_pre_ping=True)
     analytics_engine = create_engine(analytics_conn, pool_pre_ping=True)
 
     print("== VERIFY PROD DB ==")
@@ -79,3 +79,5 @@ def verify() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(verify())
+
+

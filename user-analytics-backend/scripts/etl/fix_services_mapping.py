@@ -1,8 +1,8 @@
-"""
+﻿"""
 Fix subscriptions.service_id mapping after ETL.
 
 Goal:
-- Re-import only subscriptions from hawala.subscribed_clients.
+- Re-import only subscriptions from prod_db.subscribed_clients.
 - Resolve service mapping through:
   subscribed_clients.service_subscription_type_id
     -> service_subscription_types.id
@@ -320,7 +320,7 @@ def main() -> None:
 
     args = parse_args()
 
-    source_engine = get_engine("HAWALA_CONN", "postgresql://postgres:password@localhost:5432/hawala")
+    source_engine = get_engine("PROD_CONN", "postgresql://postgres:password@localhost:5432/prod_db")
     target_engine = get_engine("ANALYTICS_CONN", "postgresql://postgres:password@localhost:5432/analytics_db")
 
     preflight(source_engine, target_engine)
@@ -336,3 +336,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

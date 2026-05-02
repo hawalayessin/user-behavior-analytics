@@ -1,4 +1,4 @@
-# Rapport d'Avancement - PFE 2025/2026
+﻿# Rapport d'Avancement - PFE 2025/2026
 
 ## Plateforme d'Analytics Comportementale - DigMaco
 
@@ -52,31 +52,31 @@ Estimation realiste: les objectifs principaux sont atteignables si les points cr
 
 | #   | Livrable                                          | Statut | Completion | Fichiers cles                                                                                                                           |
 | --- | ------------------------------------------------- | ------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| L1  | Connexion hawala_db (lecture seule)               | ✅     | 90%        | user-analytics-backend/app/core/config.py, user-analytics-backend/.env                                                                  |
-| L2  | Script ETL complet hawala -> analytics_db         | ✅     | 85%        | user-analytics-backend/scripts/etl/etl_prod_to_analytics.py                                                                             |
-| L3  | Modeles SQLAlchemy + migrations Alembic           | ✅     | 92%        | user-analytics-backend/app/models/, user-analytics-backend/alembic/versions/                                                            |
-| L4  | API FastAPI avec endpoints analytics              | ✅     | 88%        | user-analytics-backend/app/routers/                                                                                                     |
-| L5  | Helper temporel (anchor MAX event_datetime)       | ✅     | 95%        | user-analytics-backend/app/utils/temporal.py                                                                                            |
-| L6  | Dashboard Overview (WAU, MAU, revenus)            | ✅     | 88%        | analytics-platform-front/src/pages/dashboard/DashboardPage.jsx                                                                          |
-| L7  | Section User Activity (DAU, WAU, MAU, Stickiness) | ✅     | 86%        | analytics-platform-front/src/pages/UserActivityPage.jsx                                                                                 |
-| L8  | Section Churn Analysis (taux, courbe, raisons)    | ✅     | 85%        | analytics-platform-front/src/pages/dashboard/ChurnAnalysisPage.jsx                                                                      |
-| L9  | Section Retention (cohortes, heatmap, courbe)     | ✅     | 84%        | analytics-platform-front/src/pages/dashboard/RetentionPage.jsx                                                                          |
-| L10 | Section Free Trial Behavior                       | ✅     | 86%        | analytics-platform-front/src/pages/dashboard/FreeTrialBehaviorPage.jsx                                                                  |
-| L11 | Section Campaign Impact                           | ✅     | 84%        | analytics-platform-front/src/pages/dashboard/CampaignImpactPage.jsx                                                                     |
-| L12 | Section Cross-Service Behavior                    | ⚙️     | 72%        | analytics-platform-front/src/pages/dashboard/CrossServiceBehaviorPage.jsx, user-analytics-backend/app/routers/cross_service.py          |
-| L13 | Module IA : Prediction Churn (ML)                 | ✅     | 87%        | user-analytics-backend/ml_models/churn_predictor.py, user-analytics-backend/app/routers/ml_churn.py                                     |
-| L14 | Module IA : Segmentation K-Means                  | ✅     | 82%        | user-analytics-backend/app/services/segmentation_service.py                                                                             |
-| L15 | Module IA : Detection d'Anomalies Z-Score         | ✅     | 78%        | user-analytics-backend/app/routers/anomalies.py                                                                                         |
-| L16 | Systeme Auth JWT (Admin / Viewer)                 | ⚙️     | 80%        | user-analytics-backend/app/routers/auth.py, user-analytics-backend/app/core/dependencies.py                                             |
-| L17 | Export CSV / Excel des KPIs                       | ✅     | 83%        | analytics-platform-front/src/components/subscribers/UserListSection.jsx, analytics-platform-front/src/pages/dashboard/RetentionPage.jsx |
-| L18 | Generation de rapports PDF                        | ❌     | 10%        | docs/tmp/generate_rapport.py [hors pipeline produit]                                                                                    |
-| L19 | Tests unitaires (pytest)                          | ⚙️     | 20%        | user-analytics-backend/tests/test_churn_anchor_logic.py                                                                                 |
-| L20 | Documentation technique                           | ✅     | 78%        | docs/\*.md, PROJECT_REPORT.md                                                                                                           |
-| L21 | Docker / Deploiement                              | ✅     | 82%        | docker-compose.yml, user-analytics-backend/Dockerfile, analytics-platform-front/Dockerfile                                              |
-| L22 | Page Subscribers (lookup utilisateur)             | ✅     | 86%        | analytics-platform-front/src/pages/SubscribersPage.jsx, user-analytics-backend/app/routers/users.py                                     |
-| L23 | Page Management (services + campagnes)            | ✅     | 84%        | analytics-platform-front/src/pages/admin/ManagementPage.jsx, user-analytics-backend/app/routers/management.py                           |
-| L24 | Page Import Data (controle ETL)                   | ✅     | 83%        | analytics-platform-front/src/pages/admin/ImportDataPage.jsx, user-analytics-backend/app/routers/admin_import.py                         |
-| L25 | Page Platform Users (admin)                       | ✅     | 82%        | analytics-platform-front/src/pages/platform-users/PlatformUsersPage.jsx, user-analytics-backend/app/routers/platform_user.py            |
+| L1  | Connexion prod_db (lecture seule)               | âœ…     | 90%        | user-analytics-backend/app/core/config.py, user-analytics-backend/.env                                                                  |
+| L2  | Script ETL complet prod_db -> analytics_db         | âœ…     | 85%        | user-analytics-backend/scripts/etl/etl_prod_to_analytics.py                                                                             |
+| L3  | Modeles SQLAlchemy + migrations Alembic           | âœ…     | 92%        | user-analytics-backend/app/models/, user-analytics-backend/alembic/versions/                                                            |
+| L4  | API FastAPI avec endpoints analytics              | âœ…     | 88%        | user-analytics-backend/app/routers/                                                                                                     |
+| L5  | Helper temporel (anchor MAX event_datetime)       | âœ…     | 95%        | user-analytics-backend/app/utils/temporal.py                                                                                            |
+| L6  | Dashboard Overview (WAU, MAU, revenus)            | âœ…     | 88%        | analytics-platform-front/src/pages/dashboard/DashboardPage.jsx                                                                          |
+| L7  | Section User Activity (DAU, WAU, MAU, Stickiness) | âœ…     | 86%        | analytics-platform-front/src/pages/UserActivityPage.jsx                                                                                 |
+| L8  | Section Churn Analysis (taux, courbe, raisons)    | âœ…     | 85%        | analytics-platform-front/src/pages/dashboard/ChurnAnalysisPage.jsx                                                                      |
+| L9  | Section Retention (cohortes, heatmap, courbe)     | âœ…     | 84%        | analytics-platform-front/src/pages/dashboard/RetentionPage.jsx                                                                          |
+| L10 | Section Free Trial Behavior                       | âœ…     | 86%        | analytics-platform-front/src/pages/dashboard/FreeTrialBehaviorPage.jsx                                                                  |
+| L11 | Section Campaign Impact                           | âœ…     | 84%        | analytics-platform-front/src/pages/dashboard/CampaignImpactPage.jsx                                                                     |
+| L12 | Section Cross-Service Behavior                    | âš™ï¸     | 72%        | analytics-platform-front/src/pages/dashboard/CrossServiceBehaviorPage.jsx, user-analytics-backend/app/routers/cross_service.py          |
+| L13 | Module IA : Prediction Churn (ML)                 | âœ…     | 87%        | user-analytics-backend/ml_models/churn_predictor.py, user-analytics-backend/app/routers/ml_churn.py                                     |
+| L14 | Module IA : Segmentation K-Means                  | âœ…     | 82%        | user-analytics-backend/app/services/segmentation_service.py                                                                             |
+| L15 | Module IA : Detection d'Anomalies Z-Score         | âœ…     | 78%        | user-analytics-backend/app/routers/anomalies.py                                                                                         |
+| L16 | Systeme Auth JWT (Admin / Viewer)                 | âš™ï¸     | 80%        | user-analytics-backend/app/routers/auth.py, user-analytics-backend/app/core/dependencies.py                                             |
+| L17 | Export CSV / Excel des KPIs                       | âœ…     | 83%        | analytics-platform-front/src/components/subscribers/UserListSection.jsx, analytics-platform-front/src/pages/dashboard/RetentionPage.jsx |
+| L18 | Generation de rapports PDF                        | âŒ     | 10%        | docs/tmp/generate_rapport.py [hors pipeline produit]                                                                                    |
+| L19 | Tests unitaires (pytest)                          | âš™ï¸     | 20%        | user-analytics-backend/tests/test_churn_anchor_logic.py                                                                                 |
+| L20 | Documentation technique                           | âœ…     | 78%        | docs/\*.md, PROJECT_REPORT.md                                                                                                           |
+| L21 | Docker / Deploiement                              | âœ…     | 82%        | docker-compose.yml, user-analytics-backend/Dockerfile, analytics-platform-front/Dockerfile                                              |
+| L22 | Page Subscribers (lookup utilisateur)             | âœ…     | 86%        | analytics-platform-front/src/pages/SubscribersPage.jsx, user-analytics-backend/app/routers/users.py                                     |
+| L23 | Page Management (services + campagnes)            | âœ…     | 84%        | analytics-platform-front/src/pages/admin/ManagementPage.jsx, user-analytics-backend/app/routers/management.py                           |
+| L24 | Page Import Data (controle ETL)                   | âœ…     | 83%        | analytics-platform-front/src/pages/admin/ImportDataPage.jsx, user-analytics-backend/app/routers/admin_import.py                         |
+| L25 | Page Platform Users (admin)                       | âœ…     | 82%        | analytics-platform-front/src/pages/platform-users/PlatformUsersPage.jsx, user-analytics-backend/app/routers/platform_user.py            |
 
 Notes transverses par livrable:
 
@@ -112,10 +112,10 @@ Scripts ETL identifies:
 
 Tables source (constatees dans scripts/docs):
 
-- hawala users
-- hawala subscriptions
-- hawala billing/transactions
-- hawala sms events
+- prod_db users
+- prod_db subscriptions
+- prod_db billing/transactions
+- prod_db sms events
 - [NON TROUVE - A VERIFIER] sur certaines tables annexes exactes
 
 Tables cibles analytics:
@@ -406,9 +406,9 @@ Qualite:
 
 | Endpoint                 | Latence | Seuil cible | Statut |
 | ------------------------ | ------- | ----------- | ------ |
-| /analytics/trial/kpis    | 5266ms  | <500ms      | ❌     |
-| /analytics/trial/kpis    | 3984ms  | <500ms      | ❌     |
-| /analytics/user-activity | 3257ms  | <500ms      | ❌     |
+| /analytics/trial/kpis    | 5266ms  | <500ms      | âŒ     |
+| /analytics/trial/kpis    | 3984ms  | <500ms      | âŒ     |
+| /analytics/user-activity | 3257ms  | <500ms      | âŒ     |
 
 ### Causes identifiees dans le code
 
@@ -484,7 +484,7 @@ GROUP BY 1;
 
 ## 4. Problemes Critiques
 
-### 🔴 CRITIQUE - Bloquant pour la soutenance
+### ðŸ”´ CRITIQUE - Bloquant pour la soutenance
 
 1. Faible couverture de tests automatisee
 
@@ -505,7 +505,7 @@ GROUP BY 1;
 - Impact: hygiene securite faible pour environnement non maitrise
 - Fix: supprimer fallback sensible et imposer env obligatoire
 
-### 🟠 HAUTE PRIORITE - Impact significatif
+### ðŸŸ  HAUTE PRIORITE - Impact significatif
 
 1. Couverture RBAC non uniforme sur toutes routes analytics
 
@@ -525,7 +525,7 @@ GROUP BY 1;
 - Impact: manque de KPI business soutenance
 - Fix: ajouter SQL + endpoint + hook + carte UI
 
-### 🟡 MOYENNE PRIORITE - Amelioration recommandee
+### ðŸŸ¡ MOYENNE PRIORITE - Amelioration recommandee
 
 1. Uniformisation de fetch patterns front
 
@@ -1127,7 +1127,7 @@ Jour 15:
 ## Annexe P - Hypotheses et limites
 
 1. Ce rapport est base uniquement sur le codebase et artefacts disponibles.
-2. Les donnees de production reelles n'ont pas ete reexecutées ici.
+2. Les donnees de production reelles n'ont pas ete reexecutÃ©es ici.
 3. Les lignes exactes de certaines causes perf restent indicatives.
 4. Les informations non visibles explicitement sont marquees [NON TROUVE - A VERIFIER].
 5. Le score global est une estimation technique, pas un KPI academique officiel.
@@ -1156,3 +1156,4 @@ Un sprint court et discipline peut faire franchir le seuil de maturite attendu.
 - Generation en une seule passe: Oui
 
 Fin du rapport.
+

@@ -1,5 +1,5 @@
-"""
-ETL Hawala (prod) -> analytics_db (PFE)
+﻿"""
+ETL prod_db (prod) -> analytics_db (PFE)
 
 Usage:
   python etl_prod_to_analytics.py --batch-size 50000
@@ -7,18 +7,18 @@ Usage:
   python etl_prod_to_analytics.py --truncate-target
 
 Environment variables:
-  HAWALA_CONN     Source PostgreSQL connection URL
+  PROD_CONN     Source PostgreSQL connection URL
   ANALYTICS_CONN  Target PostgreSQL connection URL
 
-Corrections appliquées:
-  1. BILLING_STATUS_MAP → minuscules (success/failed/pending/cancelled)
-  2. failure_reason → basé sur status lowercase
-  3. etl_unsubscriptions → source depuis transaction_histories (type=4)
-     avec churn_type (VOLUNTARY/TECHNICAL) et churn_reason réels
+Corrections appliquÃ©es:
+  1. BILLING_STATUS_MAP â†’ minuscules (success/failed/pending/cancelled)
+  2. failure_reason â†’ basÃ© sur status lowercase
+  3. etl_unsubscriptions â†’ source depuis transaction_histories (type=4)
+     avec churn_type (VOLUNTARY/TECHNICAL) et churn_reason rÃ©els
      (NOT_SATISFIED / PRICE_TOO_HIGH / BILLING_FAILED / NO_RENEWAL)
-  4. Fallback datetime → skip au lieu d'injecter datetime.now()
-  5. etl_user_activities → activity_type granulaire (subscription/renewal/churn_event)
-    6. Map status aligné sur la vérité métier prod
+  4. Fallback datetime â†’ skip au lieu d'injecter datetime.now()
+  5. etl_user_activities â†’ activity_type granulaire (subscription/renewal/churn_event)
+    6. Map status alignÃ© sur la vÃ©ritÃ© mÃ©tier prod
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def map_status(status_int: int) -> str:
     }
     return mapping.get(status_int, "unknown")
 
-# FIX #1 : minuscules — cohérent avec les requêtes SQL du dashboard
+# FIX #1 : minuscules â€” cohÃ©rent avec les requÃªtes SQL du dashboard
 BILLING_STATUS_MAP = {
     0: "pending",
     1: "success",
@@ -895,7 +895,7 @@ class ETLRunner:
                         skipped_unmapped_service += 1
                         continue
 
-                    # FIX #4 : skip rows sans date de début
+                    # FIX #4 : skip rows sans date de dÃ©but
                     start_date = self._parse_dt(getattr(rec, "subscription_start_date", None))
                     if start_date is None:
                         metrics.skipped_rows += 1
@@ -1114,7 +1114,7 @@ class ETLRunner:
                         metrics.skipped_rows += 1
                         continue
 
-                    # FIX #2 : failure_reason basé sur status lowercase
+                    # FIX #2 : failure_reason basÃ© sur status lowercase
                     failure_reason = None
                     if status == "failed":
                         failure_reason = "BILLING_FAILED"
@@ -1157,17 +1157,17 @@ class ETLRunner:
 
     def etl_unsubscriptions(self) -> None:
         """
-        FIX #3 : Source = transaction_histories WHERE type = 4 (unsub) depuis hawala.
-        La logique churn_type / churn_reason est déterminée ainsi :
+        FIX #3 : Source = transaction_histories WHERE type = 4 (unsub) depuis prod_db.
+        La logique churn_type / churn_reason est dÃ©terminÃ©e ainsi :
           - Si le dernier billing_event avant le unsub a status='failed'
-              → TECHNICAL / BILLING_FAILED
+              â†’ TECHNICAL / BILLING_FAILED
           - Sinon si tx_status prod = 2 (failed)
-              → TECHNICAL / BILLING_FAILED
+              â†’ TECHNICAL / BILLING_FAILED
           - Sinon si subscription avait un seul paiement (new_sub seulement, pas de renewal)
-              → VOLUNTARY / NOT_SATISFIED  (essai → insatisfait)
+              â†’ VOLUNTARY / NOT_SATISFIED  (essai â†’ insatisfait)
           - Sinon
-              → VOLUNTARY / NO_RENEWAL  (abonné qui ne renouvelle pas)
-        On ne génère plus USER_REQUEST ni SUBSCRIPTION_EXPIRED.
+              â†’ VOLUNTARY / NO_RENEWAL  (abonnÃ© qui ne renouvelle pas)
+        On ne gÃ©nÃ¨re plus USER_REQUEST ni SUBSCRIPTION_EXPIRED.
         """
         step = "unsubscriptions"
         started = time.time()
@@ -1201,10 +1201,10 @@ class ETLRunner:
             {limit_sql}
         """
 
-        # Pré-charger le nombre de billing_events par subscription (pour détecter single-payment)
+        # PrÃ©-charger le nombre de billing_events par subscription (pour dÃ©tecter single-payment)
         self._log("Loading billing counts per subscription...", step=step)
         billing_count_map: dict[uuid.UUID, dict] = {}
-        # Détecte dynamiquement si event_type existe dans billing_events
+        # DÃ©tecte dynamiquement si event_type existe dans billing_events
         be_cols = {c["name"] for c in self.target_inspector.get_columns("billing_events")}
         has_event_type = "event_type" in be_cols
 
@@ -1283,7 +1283,7 @@ class ETLRunner:
             """
         )
 
-        # Helper : récupère le dernier billing_event_id pour une subscription
+        # Helper : rÃ©cupÃ¨re le dernier billing_event_id pour une subscription
         def _last_billing_event(sub_uuid: uuid.UUID, unsub_dt: datetime) -> uuid.UUID | None:
             with self.target_engine.connect() as conn:
                 row = conn.execute(
@@ -1336,7 +1336,7 @@ class ETLRunner:
                     metrics.skipped_rows += 1
                     continue
 
-                # Récupérer start_date depuis subscriptions analytics pour calculer days_since
+                # RÃ©cupÃ©rer start_date depuis subscriptions analytics pour calculer days_since
                 with self.target_engine.connect() as conn:
                     sub_row = conn.execute(
                         text("SELECT subscription_start_date FROM subscriptions WHERE id = :sid"),
@@ -1352,26 +1352,26 @@ class ETLRunner:
                     delta = (unsub_dt - start_dt).days
                     days_since = max(delta, 0)
 
-                # FIX #3 : logique churn_type / churn_reason basée sur les données réelles
+                # FIX #3 : logique churn_type / churn_reason basÃ©e sur les donnÃ©es rÃ©elles
                 tx_status  = int(getattr(rec, "status", 1) or 1)
                 bc         = billing_count_map.get(sub_uuid, {"failed": 0, "renewals": 0, "total": 0})
 
                 if tx_status == 2 or bc["failed"] > 0:
-                    # Paiement échoué → churn technique
+                    # Paiement Ã©chouÃ© â†’ churn technique
                     churn_type   = "TECHNICAL"
                     churn_reason = "BILLING_FAILED"
                 elif bc["renewals"] == 0 and bc["total"] <= 1:
-                    # Jamais renouvelé + 0 ou 1 billing event → essai/insatisfait
+                    # Jamais renouvelÃ© + 0 ou 1 billing event â†’ essai/insatisfait
                     churn_type   = "VOLUNTARY"
                     churn_reason = "NOT_SATISFIED"
                 elif days_since == 0:
-                    # Unsub le jour même → NO_RENEWAL automatique
+                    # Unsub le jour mÃªme â†’ NO_RENEWAL automatique
                     churn_type   = "TECHNICAL"
                     churn_reason = "NO_RENEWAL"
                 else:
-                    # Abonné qui a renouvelé puis est parti → PRICE ou NO_RENEWAL
-                    # On alterne 60/40 pour reproduire la distribution réelle observée
-                    # (NOT_SATISFIED 33%, PRICE_TOO_HIGH 27% → les deux = VOLUNTARY)
+                    # AbonnÃ© qui a renouvelÃ© puis est parti â†’ PRICE ou NO_RENEWAL
+                    # On alterne 60/40 pour reproduire la distribution rÃ©elle observÃ©e
+                    # (NOT_SATISFIED 33%, PRICE_TOO_HIGH 27% â†’ les deux = VOLUNTARY)
                     churn_type   = "VOLUNTARY"
                     churn_reason = "PRICE_TOO_HIGH" if (bc["renewals"] % 2 == 0) else "NO_RENEWAL"
 
@@ -1537,7 +1537,7 @@ class ETLRunner:
                 metrics,
                 "partial",
                 time.time() - started,
-                "No source SMS log table found in hawala; smsevents not populated.",
+                "No source SMS log table found in prod_db; smsevents not populated.",
             )
             self._log("Step skipped", step=step, reason="No source SMS log table found")
             return
@@ -1919,7 +1919,7 @@ class ETLRunner:
 # ------------------------------------------------------------------ #
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="ETL Hawala -> analytics_db")
+    parser = argparse.ArgumentParser(description="ETL prod_db -> analytics_db")
     parser.add_argument("--batch-size",      type=int,  default=50000, help="Rows per batch")
     parser.add_argument("--limit",           type=int,  default=None,  help="Optional source row limit for smoke test")
     parser.add_argument("--dry-run",         action="store_true",      help="Read/transform without writing to analytics DB")
@@ -1940,8 +1940,8 @@ def main() -> None:
     configure_logging()
     args = parse_args()
 
-    source_url = os.getenv("HAWALA_CONN",    "postgresql://postgres:12345hawala@localhost:5433/hawala")
-    target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345hawala@localhost:5433/analytics_db")
+    source_url = os.getenv("PROD_CONN",    "postgresql://postgres:12345prod_db@localhost:5433/prod_db")
+    target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db")
 
     runner = ETLRunner(
         source_url=source_url,
@@ -1956,3 +1956,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

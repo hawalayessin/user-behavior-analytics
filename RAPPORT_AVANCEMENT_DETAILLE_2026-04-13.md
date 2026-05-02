@@ -1,4 +1,4 @@
-    # Rapport d'avancement detaille
+﻿    # Rapport d'avancement detaille
 
     Projet: User Behavior Analytics & Insights Platform
     Date: 13/04/2026
@@ -59,7 +59,7 @@
     ### 3.3 Donnees & ETL
 
     - ETL PROD -> analytics documente et operationnel
-    - Mapping Hawala -> analytics explicite (users/subscriptions/billing/services/service_types)
+    - Mapping prod_db -> analytics explicite (users/subscriptions/billing/services/service_types)
     - Scripts de recalcul cohortes et linkage campaign/subscriptions
     - Script de backfill ROI campaign ajoute pour combler les manques source sur campaign_targets/sms_events
 
@@ -306,3 +306,4 @@
     1. Documenter officiellement dans le catalogue KPI que `churn_reason` est actuellement a granularite faible.
     2. Ajouter dans le rapport management une note systematique: "Reason granularity limited in current source (dominant value: voluntary)".
     3. Planifier un enrichissement ETL pour normaliser les raisons metier (ex: prix, valeur percue, support, qualite reseau, echec paiement, autre) avec mapping versionne.
+

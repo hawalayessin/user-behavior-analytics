@@ -19,7 +19,7 @@ from app.utils.temporal import get_data_bounds
 
 
 _DASHBOARD_CACHE_TTL_SECONDS = 30
-_MAX_CLUSTER_POINTS = 1500
+_MAX_CLUSTER_POINTS = 600
 _MODEL_PATH = Path(__file__).resolve().parents[2] / "ml_models" / "segmentation_kmeans.joblib"
 
 _kpis_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}

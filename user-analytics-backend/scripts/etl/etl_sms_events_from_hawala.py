@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -36,7 +36,7 @@ def uuid5(ns: uuid.UUID, value: str) -> uuid.UUID:
     return uuid.uuid5(ns, value)
 
 
-class HawalaSmsEtl:
+class ProdDbSmsEtl:
     def __init__(self, source_url: str, target_url: str, batch_size: int, limit: int | None, truncate_target: bool):
         self.source_engine = create_engine(source_url, pool_pre_ping=True)
         self.target_engine = create_engine(target_url, pool_pre_ping=True)
@@ -240,7 +240,7 @@ class HawalaSmsEtl:
                     "is_otp": bool(is_otp),
                     "is_activation": bool(is_activation),
                     "direction": "OUTBOUND",
-                    "source_system": "hawala.message_events",
+                    "source_system": "prod_db.message_events",
                     "metadata": json.dumps(metadata, ensure_ascii=True),
                 }
                 rows.append({k: payload.get(k) for k in active_cols})
@@ -254,7 +254,7 @@ class HawalaSmsEtl:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="ETL SMS from Hawala message_events/message_templates")
+    parser = argparse.ArgumentParser(description="ETL SMS from prod_db message_events/message_templates")
     parser.add_argument("--batch-size", type=int, default=5000)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--truncate-target", action="store_true")
@@ -265,12 +265,12 @@ def main() -> None:
     load_dotenv()
     args = parse_args()
 
-    source_url = os.getenv("HAWALA_CONN") or os.getenv("HAWALACONN") or os.getenv("PROD_CONN")
+    source_url = os.getenv("PROD_CONN") or os.getenv("PRODCONN")
     target_url = os.getenv("ANALYTICS_CONN") or os.getenv("ANALYTICSCONN")
     if not source_url or not target_url:
-        raise RuntimeError("Missing HAWALA_CONN/HAWALACONN and ANALYTICS_CONN/ANALYTICSCONN")
+        raise RuntimeError("Missing PROD_CONN/PRODCONN and ANALYTICS_CONN/ANALYTICSCONN")
 
-    etl = HawalaSmsEtl(
+    etl = ProdDbSmsEtl(
         source_url=source_url,
         target_url=target_url,
         batch_size=args.batch_size,
@@ -282,3 +282,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

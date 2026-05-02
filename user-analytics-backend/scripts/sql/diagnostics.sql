@@ -1,5 +1,5 @@
--- Verification queries for services mapping consistency
--- Source: hawala
+﻿-- Verification queries for services mapping consistency
+-- Source: prod_db
 -- Target: analytics_db
 
 -- 1) Source distribution by real service mapping (service_subscription_type_id -> service_id)
@@ -71,3 +71,4 @@ SELECT
 FROM subscriptions sub
 LEFT JOIN users u ON u.id = sub.user_id
 LEFT JOIN services sv ON sv.id = sub.service_id;
+

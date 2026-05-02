@@ -1,4 +1,7 @@
+import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+
+const ROWS_PER_PAGE = 10;
 
 function getCellClasses(value) {
   if (value >= 50) return "bg-emerald-500/30 text-emerald-300";
@@ -8,6 +11,8 @@ function getCellClasses(value) {
 }
 
 export default function CohortHeatmap({ data }) {
+  const [page, setPage] = useState(1);
+
   if (!data?.length) {
     return (
       <div
@@ -24,11 +29,24 @@ export default function CohortHeatmap({ data }) {
     );
   }
 
-  const rows = data;
+  const rows = useMemo(() => data, [data]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const pageRows = useMemo(() => {
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    return rows.slice(start, start + ROWS_PER_PAGE);
+  }, [currentPage, rows]);
 
   return (
     <div
-      className="rounded-xl p-6 h-full flex flex-col"
+      className="rounded-xl p-4 h-full flex flex-col"
       style={{
         backgroundColor: "var(--color-bg-card)",
         border: "1px solid var(--color-border)",
@@ -36,41 +54,41 @@ export default function CohortHeatmap({ data }) {
       }}
     >
       <h3
-        className="text-sm font-semibold mb-4"
+        className="text-sm font-semibold mb-3"
         style={{ color: "var(--color-text-primary)" }}
       >
         Cohort Retention Heatmap
       </h3>
-      <div className="overflow-auto">
-        <table className="w-full text-xs text-center border-collapse">
+      <div className="overflow-auto max-h-[420px]">
+        <table className="w-full text-[11px] text-center border-collapse">
           <thead>
             <tr>
               <th
-                className="px-3 py-2 text-left"
+                className="px-2.5 py-1.5 text-left"
                 style={{ color: "var(--color-text-muted)" }}
               >
                 Cohort
               </th>
               <th
-                className="px-3 py-2 text-left"
+                className="px-2.5 py-1.5 text-left"
                 style={{ color: "var(--color-text-muted)" }}
               >
                 Service
               </th>
               <th
-                className="px-2 py-2"
+                className="px-1.5 py-1.5"
                 style={{ color: "var(--color-text-muted)" }}
               >
                 D7
               </th>
               <th
-                className="px-2 py-2"
+                className="px-1.5 py-1.5"
                 style={{ color: "var(--color-text-muted)" }}
               >
                 D14
               </th>
               <th
-                className="px-2 py-2"
+                className="px-1.5 py-1.5"
                 style={{ color: "var(--color-text-muted)" }}
               >
                 D30
@@ -78,27 +96,27 @@ export default function CohortHeatmap({ data }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, idx) => (
+            {pageRows.map((row, idx) => (
               <tr
                 key={`${row.cohort}-${row.service}-${idx}`}
                 style={{ borderTop: "1px solid var(--color-border-subtle)" }}
               >
                 <td
-                  className="px-3 py-2 text-left whitespace-nowrap"
+                  className="px-2.5 py-1.5 text-left whitespace-nowrap"
                   style={{ color: "var(--color-text-secondary)" }}
                 >
                   {row.cohort}
                 </td>
                 <td
-                  className="px-3 py-2 text-left whitespace-nowrap"
+                  className="px-2.5 py-1.5 text-left whitespace-nowrap"
                   style={{ color: "var(--color-text-muted)" }}
                 >
                   {row.service}
                 </td>
                 {["d7", "d14", "d30"].map((k) => (
-                  <td key={k} className="px-1 py-1">
+                  <td key={k} className="px-1 py-0.5">
                     <div
-                      className={`relative group rounded-md px-2 py-1 text-[11px] font-medium ${getCellClasses(row[k])}`}
+                      className={`relative group rounded px-1.5 py-1 text-[10px] font-medium ${getCellClasses(row[k])}`}
                       style={
                         row[k] > 0
                           ? undefined
@@ -129,6 +147,45 @@ export default function CohortHeatmap({ data }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div
+        className="mt-3 flex items-center justify-between text-xs"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        <span>
+          Showing {(currentPage - 1) * ROWS_PER_PAGE + 1}-
+          {Math.min(currentPage * ROWS_PER_PAGE, rows.length)} of {rows.length}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="px-2 py-1 rounded border disabled:opacity-40"
+            style={{
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            Prev
+          </button>
+          <span>
+            Page {currentPage}/{totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            className="px-2 py-1 rounded border disabled:opacity-40"
+            style={{
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );

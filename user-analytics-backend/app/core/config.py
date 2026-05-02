@@ -1,4 +1,4 @@
-# app/core/config.py
+﻿# app/core/config.py
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,14 +16,16 @@ class Settings(BaseSettings):
     DATABASE_URL: str | None = None
     ANALYTICS_CONN: str | None = Field(default=None, alias="ANALYTICS_CONN")
     analytics_conn: str | None = None
-    HAWALA_CONN: str | None = Field(default=None, alias="HAWALA_CONN")
-    hawala_conn: str | None = None
+    PROD_CONN: str | None = Field(default=None, alias="PROD_CONN")
+    prod_conn: str | None = None
     REDIS_URL: str = "redis://localhost:6379/0"
     ANALYTICS_CACHE_TTL_SECONDS: int = 86400
     OVERVIEW_CACHE_TTL_SECONDS: int = 86400
     TRIAL_KPIS_CACHE_TTL_SECONDS: int = 86400
     CROSS_SERVICE_CACHE_TTL_SECONDS: int = 86400
+    CROSS_SERVICE_DEFAULT_WINDOW_DAYS: int = 365
     RETENTION_CACHE_TTL_SECONDS: int = 86400
+    CHURN_CACHE_TTL_SECONDS: int = 86400
     USER_ACTIVITY_CACHE_TTL_SECONDS: int = 86400
     SEGMENTATION_CACHE_TTL_SECONDS: int = 86400
     CAMPAIGN_CACHE_TTL_SECONDS: int = 86400
@@ -40,6 +42,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     SMTP_FROM: str = "noreply@digmaco.tn"
     SMTP_USE_TLS: bool = True
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -57,3 +60,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

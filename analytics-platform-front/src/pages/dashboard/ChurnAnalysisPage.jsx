@@ -33,10 +33,22 @@ const COLORS = {
 };
 
 const KPISkeleton = () => (
-  <div className="w-full h-28 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  <div
+    className="w-full h-28 animate-pulse rounded-xl"
+    style={{
+      backgroundColor: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border)",
+    }}
+  />
 );
 const ChartSkeleton = () => (
-  <div className="w-full h-80 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  <div
+    className="w-full h-80 animate-pulse rounded-xl"
+    style={{
+      backgroundColor: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border)",
+    }}
+  />
 );
 
 export default function ChurnAnalysisPage() {
@@ -69,10 +81,13 @@ export default function ChurnAnalysisPage() {
     <AppLayout pageTitle="Churn Analysis">
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">
+          <h1
+            className="text-3xl font-bold mb-2"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Churn Analysis
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             {meta
               ? `Period: ${meta.period_start?.slice(0, 10)} → ${meta.period_end?.slice(0, 10)}`
               : "Understand why users leave"}
@@ -88,7 +103,10 @@ export default function ChurnAnalysisPage() {
         {error && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
             <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-            <p className="flex-1 text-sm text-red-200">
+            <p
+              className="flex-1 text-sm"
+              style={{ color: "var(--color-danger-text)" }}
+            >
               {error?.message || error}
             </p>
             <button
@@ -115,17 +133,22 @@ export default function ChurnAnalysisPage() {
                     iconBg="bg-red-500/10"
                   />
                   <KPICard
-                    title="Monthly Churn"
-                    value={`${kpis.monthly_churn_rate?.rate ?? 0}%`}
-                    subtitle={`${kpis.monthly_churn_rate?.churned || 0} in period`}
+                    title="TRIAL CHURN"
+                    value={`${kpis.trial_churn?.rate ?? kpis.monthly_churn_rate?.rate ?? 0}%`}
+                    subtitle="Critical"
                     icon={RotateCcw}
                     iconColor="#964219"
                     iconBg="bg-orange-500/10"
+                    alert={
+                      (kpis.trial_churn?.rate ??
+                        kpis.monthly_churn_rate?.rate ??
+                        0) >= 40
+                    }
                   />
                   <KPICard
-                    title="Avg Lifetime"
+                    title="AVG TIME TO CHURN"
                     value={`${kpis.avg_lifetime_days?.avg_days ?? 0}d`}
-                    subtitle={`Min: ${kpis.avg_lifetime_days?.min_days || 0}d`}
+                    subtitle="Average duration before churn"
                     icon={RotateCcw}
                     iconColor="#01696f"
                     iconBg="bg-teal-500/10"
@@ -136,7 +159,7 @@ export default function ChurnAnalysisPage() {
                     subtitle={`Tech: ${kpis.churn_breakdown?.technical?.rate || 0}%`}
                     icon={RotateCcw}
                     iconColor="#7a7974"
-                    iconBg="bg-slate-500/10"
+                    iconBg="bg-gray-500/10"
                   />
                 </>
               )}
@@ -153,64 +176,78 @@ export default function ChurnAnalysisPage() {
               boxShadow: "var(--color-card-shadow)",
             }}
           >
-            <h2 className="text-sm font-semibold text-slate-100 mb-4">
-              Daily Churn vs New
+            <h2
+              className="text-sm font-semibold mb-4"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              Churn Curve
             </h2>
             {isLoading ? (
               <ChartSkeleton />
             ) : (
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={charts?.daily_trend || []}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--color-border)"
-                  />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
-                    axisLine={{ stroke: "var(--chart-grid)" }}
-                    tickLine={{ stroke: "var(--chart-grid)" }}
-                  />
-                  <YAxis
-                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
-                    axisLine={{ stroke: "var(--chart-grid)" }}
-                    tickLine={{ stroke: "var(--chart-grid)" }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--chart-tooltip-bg)",
-                      border: "1px solid var(--chart-tooltip-border)",
-                      borderRadius: "8px",
-                      color: "var(--color-text-primary)",
-                    }}
-                    labelStyle={{ color: "var(--color-text-secondary)" }}
-                    itemStyle={{ color: "var(--color-text-muted)" }}
-                  />
-                  <Legend
-                    formatter={(value) => (
-                      <span style={{ color: "var(--color-text-muted)" }}>
-                        {value}
-                      </span>
-                    )}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="new_subs"
-                    stroke={COLORS.new}
-                    name="New"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="churned"
-                    stroke={COLORS.churn}
-                    name="Churned"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={charts?.churn_curve || []}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                      axisLine={{ stroke: "var(--chart-grid)" }}
+                      tickLine={{ stroke: "var(--chart-grid)" }}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                      tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
+                      axisLine={{ stroke: "var(--chart-grid)" }}
+                      tickLine={{ stroke: "var(--chart-grid)" }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "var(--chart-tooltip-bg)",
+                        border: "1px solid var(--chart-tooltip-border)",
+                        borderRadius: "8px",
+                        color: "var(--color-text-primary)",
+                      }}
+                      labelStyle={{ color: "var(--color-text-secondary)" }}
+                      itemStyle={{ color: "var(--color-text-muted)" }}
+                    />
+                    <Legend
+                      formatter={(value) => (
+                        <span style={{ color: "var(--color-text-muted)" }}>
+                          {value}
+                        </span>
+                      )}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="trial"
+                      stroke="#f2a9a0"
+                      name="Trial"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="paid"
+                      stroke="#efb37a"
+                      name="Paid"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                <p
+                  className="text-xs italic mt-3"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  {charts?.churn_curve_note ||
+                    "Cumulative churn split between Trial and Paid users."}
+                </p>
+              </>
             )}
           </div>
 
@@ -223,7 +260,10 @@ export default function ChurnAnalysisPage() {
               boxShadow: "var(--color-card-shadow)",
             }}
           >
-            <h2 className="text-sm font-semibold text-slate-100 mb-4">
+            <h2
+              className="text-sm font-semibold mb-4"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               Churn Type
             </h2>
             {isLoading ? (
@@ -273,10 +313,13 @@ export default function ChurnAnalysisPage() {
         {/* Reactivation after Churn */}
         <div className="space-y-4">
           <div>
-            <h2 className="text-lg font-semibold text-slate-100">
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               Reactivation after Churn
             </h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               Users who subscribed again after churn, overall and by service
             </p>
           </div>
@@ -320,7 +363,7 @@ export default function ChurnAnalysisPage() {
                   subtitle="Post-reactivation successful billing"
                   icon={RotateCcw}
                   iconColor="#7a7974"
-                  iconBg="bg-slate-500/10"
+                  iconBg="bg-gray-500/10"
                 />
               </>
             )}
@@ -329,7 +372,12 @@ export default function ChurnAnalysisPage() {
           {reactivationKpisError && (
             <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
               <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
-              <p className="text-sm text-red-200">{reactivationKpisError}</p>
+              <p
+                className="text-sm"
+                style={{ color: "var(--color-danger-text)" }}
+              >
+                {reactivationKpisError}
+              </p>
             </div>
           )}
 
@@ -341,7 +389,10 @@ export default function ChurnAnalysisPage() {
               boxShadow: "var(--color-card-shadow)",
             }}
           >
-            <h3 className="text-sm font-semibold text-slate-100 mb-4">
+            <h3
+              className="text-sm font-semibold mb-4"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               Reactivation by Service
             </h3>
 
@@ -350,12 +401,21 @@ export default function ChurnAnalysisPage() {
             ) : reactivationByServiceError ? (
               <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
                 <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
-                <p className="text-sm text-red-200">
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--color-danger-text)" }}
+                >
                   {reactivationByServiceError}
                 </p>
               </div>
             ) : reactivationChartData.length === 0 ? (
-              <div className="h-56 flex items-center justify-center text-slate-400 text-sm border border-slate-800 rounded-lg">
+              <div
+                className="h-56 flex items-center justify-center text-sm rounded-lg"
+                style={{
+                  color: "var(--color-text-muted)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
                 No reactivation data available for the selected period
               </div>
             ) : (
@@ -412,7 +472,10 @@ export default function ChurnAnalysisPage() {
               </ResponsiveContainer>
             )}
 
-            <p className="mt-3 text-xs text-slate-500">
+            <p
+              className="mt-3 text-xs"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               A reactivated user is a churned user who later subscribed again to
               the same service.
             </p>
@@ -430,7 +493,10 @@ export default function ChurnAnalysisPage() {
               boxShadow: "var(--color-card-shadow)",
             }}
           >
-            <h2 className="text-sm font-semibold text-slate-100 mb-4">
+            <h2
+              className="text-sm font-semibold mb-4"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               Churn by Service
             </h2>
             {isLoading ? (
@@ -484,7 +550,10 @@ export default function ChurnAnalysisPage() {
               boxShadow: "var(--color-card-shadow)",
             }}
           >
-            <h2 className="text-sm font-semibold text-slate-100 mb-4">
+            <h2
+              className="text-sm font-semibold mb-4"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               Lifetime Distribution
             </h2>
             {isLoading ? (
@@ -533,7 +602,10 @@ export default function ChurnAnalysisPage() {
             boxShadow: "var(--color-card-shadow)",
           }}
         >
-          <h2 className="text-sm font-semibold text-slate-100 mb-4">
+          <h2
+            className="text-sm font-semibold mb-4"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Retention by Cohort
           </h2>
           <div className="overflow-x-auto">

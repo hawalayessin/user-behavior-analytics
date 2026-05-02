@@ -5,6 +5,7 @@ import { getApiErrorMessage } from "../../../utils/apiError"
 
 export default function ServiceModal({ open, mode, initialValue, onClose, onSave }) {
   const [name, setName] = useState("")
+  const [url, setUrl] = useState("")
   const [billingType, setBillingType] = useState("daily")
   const [price, setPrice] = useState("")
   const [errors, setErrors] = useState({})
@@ -14,6 +15,7 @@ export default function ServiceModal({ open, mode, initialValue, onClose, onSave
   useEffect(() => {
     if (!open) return
     setName(initialValue?.name ?? "")
+    setUrl(initialValue?.url ?? "")
     setBillingType(initialValue?.billing_type ?? "daily")
     setPrice(initialValue?.price != null ? String(initialValue.price) : "")
     setErrors({})
@@ -35,15 +37,18 @@ export default function ServiceModal({ open, mode, initialValue, onClose, onSave
   const payload = useMemo(() => {
     return {
       name: name.trim(),
+      url: url.trim() || null,
       billing_type: billingType,
       price: Number(price),
     }
-  }, [name, billingType, price])
+  }, [name, url, billingType, price])
 
   const validate = () => {
     const e = {}
     if (!payload.name) e.name = "Service name is required."
     if (payload.name.length > 100) e.name = "Max 100 characters."
+    if (payload.url && payload.url.length > 255) e.url = "Max 255 characters."
+    if (payload.url && !/^https?:\/\//i.test(payload.url)) e.url = "URL must start with http:// or https://"
     if (!["daily", "weekly"].includes(payload.billing_type)) e.billing_type = "Invalid billing type."
     if (!Number.isFinite(payload.price) || payload.price <= 0) e.price = "Price must be > 0."
     setErrors(e)
@@ -99,6 +104,17 @@ export default function ServiceModal({ open, mode, initialValue, onClose, onSave
               placeholder="e.g. Tawer"
             />
             {errors.name && <p className="text-xs text-red-300 mt-1">{errors.name}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm text-slate-300 font-medium mb-1">Service URL</label>
+            <input
+              value={url}
+              onChange={(e) => { setUrl(e.target.value); if (formError) setFormError("") }}
+              className="w-full px-3 py-2 rounded-lg bg-slate-700/50 border border-slate-600 text-slate-100 focus:outline-none focus:border-violet-500"
+              placeholder="https://example.com/"
+            />
+            {errors.url && <p className="text-xs text-red-300 mt-1">{errors.url}</p>}
           </div>
 
           <div>

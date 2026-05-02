@@ -1,19 +1,19 @@
-# ETL Hawala (PROD) vers analytics_db
+﻿# ETL prod_db (PROD) vers analytics_db
 
 ## Objectif
 
-Charger des donnees reelles Hawala dans analytics_db sans modifier le schema utilise par le frontend React et le backend FastAPI.
+Charger des donnees reelles prod_db dans analytics_db sans modifier le schema utilise par le frontend React et le backend FastAPI.
 
 ## Architecture ETL
 
-1. Source PROD: base Hawala (lecture seule).
+1. Source PROD: base prod_db (lecture seule).
 2. Transform: normalisation statuts/champs, UUID deterministes, validation de coherence.
 3. Load: ecriture batch par table dans analytics_db avec upsert.
 4. Post-load: recalcul des cohortes via script dedie.
 
-## Mapping Hawala -> analytics_db
+## Mapping prod_db -> analytics_db
 
-| Hawala                     | Analytics      | Mapping                                                                                                                                                   |
+| prod_db                     | Analytics      | Mapping                                                                                                                                                   |
 | -------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | subscribed_clients         | users          | phone_number -> phone_number, status -> status, subscription_start_date -> created_at                                                                     |
 | subscribed_clients         | subscriptions  | service_subscription_type_id/service_id -> service_id, subscription_start_date -> subscription_start_date, subscription_end_date -> subscription_end_date |
@@ -64,7 +64,7 @@ python recalcul_cohorts.py
 ## Variables d'environnement (.env)
 
 ```env
-HAWALA_CONN=postgresql://postgres:password@localhost:5432/hawala
+PROD_CONN=postgresql://postgres:password@localhost:5432/prod_db
 ANALYTICS_CONN=postgresql://postgres:password@localhost:5432/analytics_db
 ```
 
@@ -77,7 +77,7 @@ ANALYTICS_CONN=postgresql://postgres:password@localhost:5432/analytics_db
 
 ## KPI avant/apres (modele de comparaison)
 
-- Avant (seed): jeu synthétique de reference (10k users env.).
+- Avant (seed): jeu synthÃ©tique de reference (10k users env.).
 - Apres (prod):
   - users >= 1.17M
   - subscriptions >= 1M
@@ -96,4 +96,5 @@ ANALYTICS_CONN=postgresql://postgres:password@localhost:5432/analytics_db
 
 - Schema analytics_db immuable: aucune migration/alter table dans ce flux.
 - Le champ amount de billing_events est injecte seulement s'il existe dans la table cible.
-- Le channel Hawala est normalise (USSD/WEB) pendant la transformation, mais non persiste si la table cible n'a pas de colonne dediee.
+- Le channel prod_db est normalise (USSD/WEB) pendant la transformation, mais non persiste si la table cible n'a pas de colonne dediee.
+

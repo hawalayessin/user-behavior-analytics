@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
 const LONG_CACHE_MS = 24 * 60 * 60 * 1000
-const USER_ACTIVITY_QUERY_VERSION = "2026-04-10-v2"
+const USER_ACTIVITY_QUERY_VERSION = "2026-04-16-v3-coherent-subs"
 
 export function useUserActivity({ start_date, end_date, service_id } = {}) {
   const normalized = useMemo(

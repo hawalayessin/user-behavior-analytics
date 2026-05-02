@@ -115,9 +115,13 @@ export default function TrialChurnTab({ data, filters }) {
       )}
 
       {/* Churn Pie + Trial Dropoff */}
-      <div className="flex gap-4">
-        <ChurnPieChart data={churnPieData} />
-        <TrialDropoffChart data={dropoffBarData} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div className="lg:col-span-1">
+          <ChurnPieChart data={churnPieData} />
+        </div>
+        <div className="lg:col-span-2">
+          <TrialDropoffChart data={dropoffBarData} />
+        </div>
       </div>
 
       {/* Critical zone alert */}

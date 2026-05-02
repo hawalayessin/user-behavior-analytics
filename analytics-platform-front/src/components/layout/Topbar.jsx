@@ -1,32 +1,163 @@
-import { useState } from "react";
-import {
-  Home,
-  ChevronRight,
-  Search,
-  Bell,
-  Download,
-  LogOut,
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Home, ChevronRight, Search, Bell, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
+import { navigationConfig } from "./navConfig";
 
-/**
- * Topbar
- * Top navigation bar with breadcrumb, search, and action buttons
- * @param {Object} props
- * @param {string} props.pageTitle - Current page title for breadcrumb
- * @param {boolean} props.hasNotifications - Show red badge on bell icon
- * @param {boolean} props.showExportButton - Display export button
- */
-export default function Topbar({
-  pageTitle,
-  hasNotifications = false,
-  showExportButton = false,
-}) {
+const KPI_SEARCH_INDEX = [
+  {
+    kpi: "DAU",
+    aliases: ["daily active users"],
+    route: "/analytics/behaviors",
+  },
+  {
+    kpi: "WAU",
+    aliases: ["weekly active users"],
+    route: "/analytics/behaviors",
+  },
+  {
+    kpi: "MAU",
+    aliases: ["monthly active users"],
+    route: "/analytics/behaviors",
+  },
+  {
+    kpi: "ARPU",
+    aliases: ["average revenue per user"],
+    route: "/analytics/cross-service",
+  },
+  {
+    kpi: "MRR",
+    aliases: ["monthly recurring revenue", "monthly revenue"],
+    route: "/dashboard",
+  },
+  {
+    kpi: "Churn Rate",
+    aliases: ["churn", "monthly churn", "voluntary churn"],
+    route: "/analytics/churn",
+  },
+  {
+    kpi: "Retention D7",
+    aliases: ["d7 retention", "week retention"],
+    route: "/analytics/retention",
+  },
+  {
+    kpi: "Retention D30",
+    aliases: ["d30 retention", "month retention"],
+    route: "/analytics/retention",
+  },
+  {
+    kpi: "Trial Conversion",
+    aliases: ["trial to paid", "conversion rate"],
+    route: "/analytics/trial",
+  },
+  {
+    kpi: "New Subscribers",
+    aliases: ["subscriber growth"],
+    route: "/analytics/campaigns",
+  },
+  {
+    kpi: "Anomalies",
+    aliases: ["anomaly score", "anomaly detection"],
+    route: "/analytics/anomalies",
+  },
+  {
+    kpi: "Churn Prediction",
+    aliases: ["risk score", "predicted churn"],
+    route: "/analytics/churn-prediction",
+  },
+  {
+    kpi: "Segmentation ARPU",
+    aliases: ["segment arpu", "premium arpu"],
+    route: "/analytics/segmentation",
+  },
+  {
+    kpi: "Subscribers ARPU",
+    aliases: ["directory arpu"],
+    route: "/management/subscribers",
+  },
+];
+
+export default function Topbar({ pageTitle, hasNotifications = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { full_name, role, logout } = useAuth();
+  const { full_name, role, logout, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  const menuRef = useRef(null);
+  const searchRef = useRef(null);
   const notifications = [];
+
+  const searchableRoutes = useMemo(() => {
+    const navItems = navigationConfig
+      .filter((section) => !section.adminOnly || isAdmin())
+      .flatMap((section) =>
+        section.items.map((item) => ({
+          type: "page",
+          section: section.section,
+          label: item.label.trim(),
+          route: item.route,
+          searchText:
+            `${item.label} ${section.section} ${item.route}`.toLowerCase(),
+        })),
+      );
+
+    const accessibleRoutes = new Set(navItems.map((item) => item.route));
+    const kpiItems = KPI_SEARCH_INDEX.filter((item) =>
+      accessibleRoutes.has(item.route),
+    ).map((item) => ({
+      type: "kpi",
+      section: "KPI",
+      label: item.kpi,
+      route: item.route,
+      searchText:
+        `${item.kpi} ${item.aliases.join(" ")} ${item.route}`.toLowerCase(),
+    }));
+
+    return [...navItems, ...kpiItems];
+  }, [isAdmin]);
+
+  const filteredRoutes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return searchableRoutes
+      .filter((item) => item.searchText.includes(q))
+      .slice(0, 6);
+  }, [searchQuery, searchableRoutes]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowUserMenu(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const navigateFromSearch = (targetRoute) => {
+    navigate(targetRoute);
+    setSearchQuery("");
+    setShowSearchResults(false);
+  };
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (filteredRoutes.length > 0) {
+        navigateFromSearch(filteredRoutes[0].route);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      setShowSearchResults(false);
+    }
+  };
 
   const getInitials = () => {
     if (!full_name) return "?";
@@ -57,7 +188,6 @@ export default function Topbar({
         borderBottom: "1px solid var(--color-border)",
       }}
     >
-      {/* Left: Breadcrumb */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <Home
           className="w-4 h-4"
@@ -75,8 +205,7 @@ export default function Topbar({
         </span>
       </div>
 
-      {/* Center: Search */}
-      <div className="flex-1 max-w-xs mx-8">
+      <div className="flex-1 max-w-xs mx-8" ref={searchRef}>
         <div className="relative">
           <Search
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
@@ -86,7 +215,12 @@ export default function Topbar({
             type="text"
             placeholder="Search analytics..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setShowSearchResults(true)}
+            onKeyDown={handleSearchKeyDown}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setShowSearchResults(true);
+            }}
             className="w-full pl-10 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors duration-200"
             style={{
               backgroundColor: "var(--color-bg-elevated)",
@@ -94,14 +228,52 @@ export default function Topbar({
               color: "var(--color-text-primary)",
             }}
           />
+
+          {showSearchResults && searchQuery.trim() && (
+            <div
+              className="absolute left-0 right-0 mt-2 rounded-lg shadow-xl z-50 overflow-hidden"
+              style={{
+                backgroundColor: "var(--color-bg-card)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              {filteredRoutes.length > 0 ? (
+                filteredRoutes.map((item, index) => (
+                  <button
+                    key={`${item.type}-${item.route}-${item.label}-${index}`}
+                    onClick={() => navigateFromSearch(item.route)}
+                    className="w-full px-3 py-2 text-left hover:bg-slate-800/60 transition"
+                  >
+                    <div
+                      className="text-sm font-medium"
+                      style={{ color: "var(--color-text-primary)" }}
+                    >
+                      {item.label}
+                    </div>
+                    <div
+                      className="text-xs mt-0.5"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      {item.section} � {item.route}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div
+                  className="px-3 py-2 text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  No matching page
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Right: Actions */}
       <div className="flex items-center gap-4 flex-shrink-0">
         <ThemeToggle />
 
-        {/* Notifications */}
         <div className="relative">
           <button
             onClick={() => setShowNotifications(!showNotifications)}
@@ -169,53 +341,64 @@ export default function Topbar({
           )}
         </div>
 
-        {/* Divider */}
         <div
           className="w-px h-6"
           style={{ backgroundColor: "var(--color-border)" }}
         />
 
-        {/* User Info */}
-        <div className="flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white"
-            title={full_name || "User"}
-          >
-            {getInitials()}
-          </div>
-          <div
-            className="text-sm font-medium"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            {full_name}
-          </div>
-          <span
-            className={`text-xs font-medium px-2 py-1 rounded ${getRoleBadgeStyle()}`}
-          >
-            {getRoleLabel()}
-          </span>
-        </div>
-
-        {/* Export Button (conditional) */}
-        {showExportButton && (
+        <div className="relative" ref={menuRef}>
           <button
-            className="flex items-center gap-2 px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition-colors duration-200"
-            style={{ backgroundColor: "var(--color-primary)" }}
+            onClick={() => setShowUserMenu((prev) => !prev)}
+            className="flex items-center gap-3 rounded-lg px-2 py-1 transition"
+            style={{ color: "var(--color-text-secondary)" }}
+            aria-label="Open user menu"
           >
-            <Download className="w-4 h-4" />
-            Export
+            <div
+              className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white"
+              title={full_name || "User"}
+            >
+              {getInitials()}
+            </div>
+            <div className="text-sm font-medium">{full_name}</div>
+            <span
+              className={`text-xs font-medium px-2 py-1 rounded ${getRoleBadgeStyle()}`}
+            >
+              {getRoleLabel()}
+            </span>
           </button>
-        )}
 
-        {/* Logout */}
-        <button
-          onClick={logout}
-          className="p-2 rounded-lg transition-colors duration-200"
-          style={{ color: "var(--color-text-muted)" }}
-          aria-label="Logout"
-        >
-          <LogOut className="w-5 h-5" />
-        </button>
+          {showUserMenu && (
+            <div
+              className="absolute right-0 mt-2 w-52 rounded-lg shadow-xl z-50 overflow-hidden"
+              style={{
+                backgroundColor: "var(--color-bg-card)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowUserMenu(false);
+                  navigate("/account/profile");
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-800/60 transition"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                Profile Settings
+              </button>
+              <button
+                onClick={() => {
+                  setShowUserMenu(false);
+                  logout();
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-800/60 transition flex items-center gap-2"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

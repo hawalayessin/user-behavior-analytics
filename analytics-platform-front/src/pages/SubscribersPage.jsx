@@ -26,9 +26,6 @@ export default function SubscribersPage() {
           </p>
         </div>
 
-        {/* User List Section */}
-        <UserListSection />
-
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* New Subscriptions */}
@@ -99,15 +96,6 @@ export default function SubscribersPage() {
 
           {/* Total Directory ARPU */}
           <div className="p-6 bg-slate-800 border border-slate-700 rounded-xl relative overflow-hidden group hover:border-slate-600 transition">
-            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
-              <svg
-                className="w-[100px] h-[100px]"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
-              </svg>
-            </div>
             <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
               Total Directory ARPU
             </div>
@@ -119,6 +107,9 @@ export default function SubscribersPage() {
             </div>
           </div>
         </div>
+
+        {/* User List Section */}
+        <UserListSection />
 
         {error && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">

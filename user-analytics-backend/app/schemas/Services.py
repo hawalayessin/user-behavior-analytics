@@ -8,6 +8,7 @@ from app.schemas.ServicesTypes import ServiceTypeRead
 class ServiceBase(BaseModel):
     name: str = Field(..., max_length=100)
     description: str | None = None
+    url: str | None = Field(default=None, max_length=255)
     service_type_id: UUID
     is_active: bool = True
 
@@ -19,6 +20,7 @@ class ServiceCreate(ServiceBase):
 class ServiceUpdate(BaseModel):
     name: str | None = Field(None, max_length=100)
     description: str | None = None
+    url: str | None = Field(default=None, max_length=255)
     service_type_id: UUID | None = None
     is_active: bool | None = None
 

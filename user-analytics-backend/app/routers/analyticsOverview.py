@@ -31,7 +31,7 @@ from app.utils.temporal import (
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
-OVERVIEW_CACHE_VERSION = "2026-04-13-engagement-trend-v4"
+OVERVIEW_CACHE_VERSION = "2026-04-16-churn-rate-base-v5"
 
 _summary_executor = ThreadPoolExecutor(max_workers=7)
 
@@ -124,25 +124,42 @@ def _summary_subscriptions_block(params: dict, service_id: Optional[str]):
     db = SessionLocal()
     try:
         query = text(f"""
+            WITH normalized_subs AS (
+                SELECT
+                    s.user_id,
+                    s.subscription_start_date,
+                    CASE
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('1', 'active', 'subscribed', 'iscrit', 'inscrit')
+                            THEN 'subscribed'
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('-2', 'billing_failed', 'iscrit avec billing failure', 'inscrit avec billing failure', 'at_risk')
+                            THEN 'billing_failed'
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('-1', 'cancelled', 'expired', 'inactive', 'unsubscribed', 'desinscrit', 'désinscrit', 'churned')
+                            THEN 'unsubscribed'
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('0', 'pending', 'trial', 'otp_pending', 'otp non terminer')
+                            THEN 'otp_incomplete'
+                        ELSE 'unknown'
+                    END AS norm_status
+                FROM subscriptions s
+                WHERE 1=1 {sf_subs}
+            )
             SELECT
-                COUNT(*) FILTER (WHERE s.status != 'pending')         AS total,
-                COUNT(*)                                               AS total_with_pending,
-                COUNT(*) FILTER (WHERE s.status = 'active')           AS active,
-                COUNT(*) FILTER (WHERE s.status = 'billing_failed')   AS billing_failed,
-                COUNT(*) FILTER (WHERE s.status = 'cancelled')        AS cancelled,
-                COUNT(*) FILTER (WHERE s.status = 'pending')          AS pending,
-                COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'active')         AS active_users,
-                COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'billing_failed') AS at_risk_users,
+                COUNT(*) FILTER (WHERE ns.norm_status != 'otp_incomplete') AS total,
+                COUNT(*)                                                    AS total_with_pending,
+                COUNT(*) FILTER (WHERE ns.norm_status = 'subscribed')      AS active,
+                COUNT(*) FILTER (WHERE ns.norm_status = 'billing_failed')  AS billing_failed,
+                COUNT(*) FILTER (WHERE ns.norm_status = 'unsubscribed')    AS cancelled,
+                COUNT(*) FILTER (WHERE ns.norm_status = 'otp_incomplete')  AS pending,
+                COUNT(DISTINCT ns.user_id) FILTER (WHERE ns.norm_status = 'subscribed')     AS active_users,
+                COUNT(DISTINCT ns.user_id) FILTER (WHERE ns.norm_status = 'billing_failed') AS at_risk_users,
                 COUNT(*) FILTER (
-                    WHERE s.subscription_start_date BETWEEN :last30_start_dt AND :last30_end_dt
-                      AND s.status != 'pending'
+                    WHERE ns.subscription_start_date BETWEEN :last30_start_dt AND :last30_end_dt
+                      AND ns.norm_status != 'otp_incomplete'
                 ) AS new_last_30_days,
                 ROUND(
-                    COUNT(*) FILTER (WHERE s.status = 'active') * 100.0
-                    / NULLIF(COUNT(*) FILTER (WHERE s.status != 'pending'), 0), 1
+                    COUNT(*) FILTER (WHERE ns.norm_status = 'subscribed') * 100.0
+                    / NULLIF(COUNT(*) FILTER (WHERE ns.norm_status != 'otp_incomplete'), 0), 1
                 )                                                      AS conversion_rate_pct
-            FROM subscriptions s
-            WHERE 1=1 {sf_subs}
+            FROM normalized_subs ns
         """)
         row = _exec_with_timeout_retry(db, query, params).fetchone()
         if row is not None:
@@ -167,45 +184,61 @@ def _summary_churn_block(params: dict, service_id: Optional[str]):
     db = SessionLocal()
     try:
         row = db.execute(text(f"""
-            WITH active_start AS (
-                SELECT COUNT(DISTINCT s.id) AS active_count
+            WITH exposure_base AS (
+                SELECT
+                    COUNT(DISTINCT s.id) FILTER (
+                        WHERE s.subscription_start_date <= :churn_month_start_dt
+                          AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :churn_month_start_dt)
+                    ) AS active_at_start,
+                    COUNT(DISTINCT s.id) FILTER (
+                        WHERE s.subscription_start_date > :churn_month_start_dt
+                          AND s.subscription_start_date <= :churn_month_end_dt + INTERVAL '1 day'
+                          AND s.status != 'pending'
+                    ) AS new_in_window
                 FROM subscriptions s
-                WHERE s.subscription_start_date <= :churn_month_start_dt
-                    AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :churn_month_start_dt)
-                                        {sf_churn_active}
+                WHERE 1=1
+                  {sf_churn_active}
             ),
             churn_rows AS (
                 SELECT
-                                        u.subscription_id,
-                                        u.service_id,
-                                        u.unsubscription_datetime AS churn_dt,
-                                        u.churn_type AS churn_type,
+                    u.subscription_id,
+                    u.service_id,
+                    u.unsubscription_datetime AS churn_dt,
+                    u.churn_type AS churn_type,
                     COALESCE(
-                      u.days_since_subscription,
-                                            EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
+                        u.days_since_subscription,
+                        EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
                     ) AS days_since_subscription
-                                FROM unsubscriptions u
-                                JOIN subscriptions s ON s.id = u.subscription_id
-                                WHERE u.unsubscription_datetime BETWEEN :churn_month_start_dt AND :churn_month_end_dt
-                                    {sf_churn_rows}
+                FROM unsubscriptions u
+                JOIN subscriptions s ON s.id = u.subscription_id
+                WHERE u.unsubscription_datetime BETWEEN :churn_month_start_dt AND :churn_month_end_dt + INTERVAL '1 day'
+                  {sf_churn_rows}
             )
             SELECT
-                COUNT(*)                                                         AS total_unsubs,
-                COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY')                 AS voluntary,
-                COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL')                 AS technical,
-                ROUND(COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY') * 100.0
-                    / NULLIF(COUNT(*), 0), 1)                                    AS voluntary_pct,
-                ROUND(COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL') * 100.0
-                    / NULLIF(COUNT(*), 0), 1)                                    AS technical_pct,
-                COUNT(*) FILTER (WHERE days_since_subscription = 1)              AS dropoff_day1,
-                COUNT(*) FILTER (WHERE days_since_subscription = 2)              AS dropoff_day2,
-                COUNT(*) FILTER (WHERE days_since_subscription = 3)              AS dropoff_day3,
+                COUNT(DISTINCT subscription_id)                                            AS total_unsubs,
+                COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'VOLUNTARY')    AS voluntary,
+                COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'TECHNICAL')    AS technical,
                 ROUND(
-                    COUNT(*) FILTER (
-                        WHERE churn_dt BETWEEN :churn_month_start_dt AND :churn_month_end_dt
-                    ) * 100.0
-                    / NULLIF((SELECT active_count FROM active_start), 0), 2
-                )                                                                AS churn_rate_month_pct
+                    COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'VOLUNTARY') * 100.0
+                    / NULLIF(COUNT(DISTINCT subscription_id), 0),
+                    1
+                )                                                                           AS voluntary_pct,
+                ROUND(
+                    COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'TECHNICAL') * 100.0
+                    / NULLIF(COUNT(DISTINCT subscription_id), 0),
+                    1
+                )                                                                           AS technical_pct,
+                COUNT(DISTINCT subscription_id) FILTER (WHERE days_since_subscription = 1)  AS dropoff_day1,
+                COUNT(DISTINCT subscription_id) FILTER (WHERE days_since_subscription = 2)  AS dropoff_day2,
+                COUNT(DISTINCT subscription_id) FILTER (WHERE days_since_subscription = 3)  AS dropoff_day3,
+                ROUND(
+                    COUNT(DISTINCT subscription_id) * 100.0
+                    / NULLIF(
+                        (SELECT COALESCE(active_at_start, 0) + COALESCE(new_in_window, 0) FROM exposure_base),
+                        0
+                    ),
+                    2
+                )                                                                           AS churn_rate_month_pct
             FROM churn_rows
         """), params).fetchone()
         if row is not None:
@@ -618,13 +651,12 @@ def _compute_overview_payload(
         "sms_window_days": sms_window_days,
     }
 
-    sf_subs = "AND srv.id = CAST(:service_id AS uuid)" if service_id else ""
+    sf_subs = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_churn_active = "AND s.service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_churn_rows = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_rev = "AND srv.id = CAST(:service_id AS uuid)" if service_id else ""
     sf_eng = "AND service_id = CAST(:service_id AS uuid)" if service_id else ""
     sf_top = "AND srv.id = CAST(:service_id AS uuid)" if service_id else ""
-    sj_subs = "JOIN services srv ON srv.id = s.service_id" if service_id else ""
 
     users = db.execute(text("""
         SELECT
@@ -638,70 +670,102 @@ def _compute_overview_payload(
     """), params).fetchone()
 
     subs_query = text(f"""
+        WITH normalized_subs AS (
+            SELECT
+                s.user_id,
+                s.subscription_start_date,
+                CASE
+                    WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('1', 'active', 'subscribed', 'iscrit', 'inscrit')
+                        THEN 'subscribed'
+                    WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('-2', 'billing_failed', 'iscrit avec billing failure', 'inscrit avec billing failure', 'at_risk')
+                        THEN 'billing_failed'
+                    WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('-1', 'cancelled', 'expired', 'inactive', 'unsubscribed', 'desinscrit', 'désinscrit', 'churned')
+                        THEN 'unsubscribed'
+                    WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('0', 'pending', 'trial', 'otp_pending', 'otp non terminer')
+                        THEN 'otp_incomplete'
+                    ELSE 'unknown'
+                END AS norm_status
+            FROM subscriptions s
+            WHERE s.subscription_start_date BETWEEN :start_dt AND :end_dt
+            {sf_subs}
+        )
         SELECT
-            COUNT(*) FILTER (WHERE s.status != 'pending')         AS total,
-            COUNT(*)                                               AS total_with_pending,
-            COUNT(*) FILTER (WHERE s.status = 'active')           AS active,
-            COUNT(*) FILTER (WHERE s.status = 'billing_failed')   AS billing_failed,
-            COUNT(*) FILTER (WHERE s.status = 'cancelled')        AS cancelled,
-            COUNT(*) FILTER (WHERE s.status = 'pending')          AS pending,
-            COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'active')         AS active_users,
-            COUNT(DISTINCT s.user_id) FILTER (WHERE s.status = 'billing_failed') AS at_risk_users,
+            COUNT(*) FILTER (WHERE ns.norm_status != 'otp_incomplete') AS total,
+            COUNT(*)                                                    AS total_with_pending,
+            COUNT(*) FILTER (WHERE ns.norm_status = 'subscribed')      AS active,
+            COUNT(*) FILTER (WHERE ns.norm_status = 'billing_failed')  AS billing_failed,
+            COUNT(*) FILTER (WHERE ns.norm_status = 'unsubscribed')    AS cancelled,
+            COUNT(*) FILTER (WHERE ns.norm_status = 'otp_incomplete')  AS pending,
+            COUNT(DISTINCT ns.user_id) FILTER (WHERE ns.norm_status = 'subscribed')     AS active_users,
+            COUNT(DISTINCT ns.user_id) FILTER (WHERE ns.norm_status = 'billing_failed') AS at_risk_users,
             COUNT(*) FILTER (
-                WHERE s.subscription_start_date BETWEEN :start_dt AND :end_dt
-                  AND s.status != 'pending'
+                WHERE ns.subscription_start_date BETWEEN :start_dt AND :end_dt
+                  AND ns.norm_status != 'otp_incomplete'
             ) AS new_last_30_days,
             ROUND(
-                COUNT(*) FILTER (WHERE s.status = 'active') * 100.0
-                / NULLIF(COUNT(*) FILTER (WHERE s.status != 'pending'), 0), 1
+                COUNT(*) FILTER (WHERE ns.norm_status = 'subscribed') * 100.0
+                / NULLIF(COUNT(*) FILTER (WHERE ns.norm_status != 'otp_incomplete'), 0), 1
             )                                                      AS conversion_rate_pct
-        FROM subscriptions s
-        {sj_subs}
-        WHERE s.subscription_start_date BETWEEN :start_dt AND :end_dt
-        {sf_subs}
+        FROM normalized_subs ns
     """)
     subs = _exec_with_timeout_retry(db, subs_query, params).fetchone()
 
     churn = db.execute(text(f"""
-                WITH active_start AS (
-                    SELECT COUNT(DISTINCT s.id) AS active_count
-                    FROM subscriptions s
+        WITH exposure_base AS (
+            SELECT
+                COUNT(DISTINCT s.id) FILTER (
                     WHERE s.subscription_start_date <= :churn_window_start_dt
-                        AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :churn_window_start_dt)
-                                                {sf_churn_active}
-                ),
-                churn_rows AS (
-          SELECT
-                        u.subscription_id,
-                        u.service_id,
-                        u.unsubscription_datetime AS churn_dt,
-                        u.churn_type AS churn_type,
-            COALESCE(
-              u.days_since_subscription,
-                            EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
-            ) AS days_since_subscription
-                    FROM unsubscriptions u
-                    JOIN subscriptions s ON s.id = u.subscription_id
-                    WHERE u.unsubscription_datetime BETWEEN :churn_window_start_dt AND :churn_window_end_dt + INTERVAL '1 day'
-                        {sf_churn_rows}
+                      AND (s.subscription_end_date IS NULL OR s.subscription_end_date > :churn_window_start_dt)
+                ) AS active_at_start,
+                COUNT(DISTINCT s.id) FILTER (
+                    WHERE s.subscription_start_date > :churn_window_start_dt
+                      AND s.subscription_start_date <= :churn_window_end_dt + INTERVAL '1 day'
+                      AND s.status != 'pending'
+                ) AS new_in_window
+            FROM subscriptions s
+            WHERE 1=1
+              {sf_churn_active}
+        ),
+        churn_rows AS (
+            SELECT
+                u.subscription_id,
+                u.service_id,
+                u.unsubscription_datetime AS churn_dt,
+                u.churn_type AS churn_type,
+                COALESCE(
+                    u.days_since_subscription,
+                    EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
+                ) AS days_since_subscription
+            FROM unsubscriptions u
+            JOIN subscriptions s ON s.id = u.subscription_id
+            WHERE u.unsubscription_datetime BETWEEN :churn_window_start_dt AND :churn_window_end_dt + INTERVAL '1 day'
+              {sf_churn_rows}
         )
         SELECT
-            COUNT(*)                                                         AS total_unsubs,
-            COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY')                 AS voluntary,
-            COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL')                 AS technical,
-            ROUND(COUNT(*) FILTER (WHERE churn_type = 'VOLUNTARY') * 100.0
-                / NULLIF(COUNT(*), 0), 1)                                    AS voluntary_pct,
-            ROUND(COUNT(*) FILTER (WHERE churn_type = 'TECHNICAL') * 100.0
-                / NULLIF(COUNT(*), 0), 1)                                    AS technical_pct,
-            COUNT(*) FILTER (WHERE days_since_subscription = 1)              AS dropoff_day1,
-            COUNT(*) FILTER (WHERE days_since_subscription = 2)              AS dropoff_day2,
-            COUNT(*) FILTER (WHERE days_since_subscription = 3)              AS dropoff_day3,
+            COUNT(DISTINCT subscription_id)                                            AS total_unsubs,
+            COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'VOLUNTARY')    AS voluntary,
+            COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'TECHNICAL')    AS technical,
             ROUND(
-                COUNT(*) FILTER (
-                    WHERE churn_dt BETWEEN :churn_window_start_dt AND :churn_window_end_dt + INTERVAL '1 day'
-                ) * 100.0
-                / NULLIF((SELECT active_count FROM active_start), 0), 2
-            )                                                                AS churn_rate_month_pct
+                COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'VOLUNTARY') * 100.0
+                / NULLIF(COUNT(DISTINCT subscription_id), 0),
+                1
+            )                                                                           AS voluntary_pct,
+            ROUND(
+                COUNT(DISTINCT subscription_id) FILTER (WHERE churn_type = 'TECHNICAL') * 100.0
+                / NULLIF(COUNT(DISTINCT subscription_id), 0),
+                1
+            )                                                                           AS technical_pct,
+            COUNT(DISTINCT subscription_id) FILTER (WHERE days_since_subscription = 1)  AS dropoff_day1,
+            COUNT(DISTINCT subscription_id) FILTER (WHERE days_since_subscription = 2)  AS dropoff_day2,
+            COUNT(DISTINCT subscription_id) FILTER (WHERE days_since_subscription = 3)  AS dropoff_day3,
+            ROUND(
+                COUNT(DISTINCT subscription_id) * 100.0
+                / NULLIF(
+                    (SELECT COALESCE(active_at_start, 0) + COALESCE(new_in_window, 0) FROM exposure_base),
+                    0
+                ),
+                2
+            )                                                                           AS churn_rate_month_pct
         FROM churn_rows
     """), params).fetchone()
 
@@ -1058,6 +1122,120 @@ def get_overview(
             service_id=service_id,
         ),
     )
+
+
+@router.get("/status/diagnostics")
+def get_status_diagnostics(
+    db: Session = Depends(get_db),
+    service_id: Optional[str] = Query(default=None),
+    _: object = Depends(require_admin),
+):
+    subs_service_filter = "WHERE s.service_id = CAST(:service_id AS uuid)" if service_id else ""
+    params = {"service_id": service_id} if service_id else {}
+
+    users_raw_rows = db.execute(
+        text(
+            """
+            SELECT
+                COALESCE(NULLIF(TRIM(status), ''), '<null>') AS raw_status,
+                COUNT(*) AS count
+            FROM users
+            GROUP BY 1
+            ORDER BY count DESC, raw_status ASC
+            """
+        )
+    ).fetchall()
+
+    users_norm_rows = db.execute(
+        text(
+            """
+            SELECT norm_status, COUNT(*) AS count
+            FROM (
+                SELECT
+                    CASE
+                        WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('1', 'active', 'subscribed', 'iscrit', 'inscrit') THEN 'subscribed'
+                        WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('-2', 'billing_failed', 'iscrit avec billing failure', 'inscrit avec billing failure', 'at_risk') THEN 'billing_failed'
+                        WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('-1', 'cancelled', 'expired', 'inactive', 'unsubscribed', 'desinscrit', 'désinscrit', 'churned') THEN 'unsubscribed'
+                        WHEN LOWER(TRIM(COALESCE(status, ''))) IN ('0', 'pending', 'trial', 'otp_pending', 'otp non terminer') THEN 'otp_incomplete'
+                        ELSE 'unknown'
+                    END AS norm_status
+                FROM users
+            ) t
+            GROUP BY norm_status
+            ORDER BY count DESC, norm_status ASC
+            """
+        )
+    ).fetchall()
+
+    subs_raw_rows = db.execute(
+        text(
+            f"""
+            SELECT
+                COALESCE(NULLIF(TRIM(s.status), ''), '<null>') AS raw_status,
+                COUNT(*) AS count
+            FROM subscriptions s
+            {subs_service_filter}
+            GROUP BY 1
+            ORDER BY count DESC, raw_status ASC
+            """
+        ),
+        params,
+    ).fetchall()
+
+    subs_norm_rows = db.execute(
+        text(
+            f"""
+            SELECT norm_status, COUNT(*) AS count
+            FROM (
+                SELECT
+                    CASE
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('1', 'active', 'subscribed', 'iscrit', 'inscrit') THEN 'subscribed'
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('-2', 'billing_failed', 'iscrit avec billing failure', 'inscrit avec billing failure', 'at_risk') THEN 'billing_failed'
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('-1', 'cancelled', 'expired', 'inactive', 'unsubscribed', 'desinscrit', 'désinscrit', 'churned') THEN 'unsubscribed'
+                        WHEN LOWER(TRIM(COALESCE(s.status, ''))) IN ('0', 'pending', 'trial', 'otp_pending', 'otp non terminer') THEN 'otp_incomplete'
+                        ELSE 'unknown'
+                    END AS norm_status
+                FROM subscriptions s
+                {subs_service_filter}
+            ) t
+            GROUP BY norm_status
+            ORDER BY count DESC, norm_status ASC
+            """
+        ),
+        params,
+    ).fetchall()
+
+    return {
+        "status_reference": {
+            "-1": "unsubscribed",
+            "1": "subscribed",
+            "-2": "billing_failed",
+            "0": "otp_incomplete",
+        },
+        "filters": {
+            "service_id": service_id,
+        },
+        "users": {
+            "raw": [
+                {"raw_status": r.raw_status, "count": int(r.count or 0)}
+                for r in users_raw_rows
+            ],
+            "normalized": [
+                {"status": r.norm_status, "count": int(r.count or 0)}
+                for r in users_norm_rows
+            ],
+        },
+        "subscriptions": {
+            "raw": [
+                {"raw_status": r.raw_status, "count": int(r.count or 0)}
+                for r in subs_raw_rows
+            ],
+            "normalized": [
+                {"status": r.norm_status, "count": int(r.count or 0)}
+                for r in subs_norm_rows
+            ],
+        },
+    }
 
 
 @router.post("/cache/invalidate")

@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { AlertCircle, RotateCcw, Download, RefreshCw } from "lucide-react";
 import {
-  ScatterChart,
-  Scatter,
   BarChart,
   Bar,
   PieChart,
@@ -38,12 +36,38 @@ const SEGMENT_COLORS = {
   "Trial Only": "#ef4444",
 };
 
+const SEGMENT_ALIASES = {
+  "Power Users": "Power",
+  "Regular Loyals": "Regular",
+  "Occasional Users": "Occasional",
+  "Trial Only": "Trial",
+};
+
+const SEGMENT_FALLBACK_POSITIONS = {
+  "Power Users": { x: 0.74, y: 0.78 },
+  "Regular Loyals": { x: 0.56, y: 0.5 },
+  "Occasional Users": { x: 0.2, y: 0.52 },
+  "Trial Only": { x: 0.2, y: 0.3 },
+};
+
 const KPISkeleton = () => (
-  <div className="w-full h-28 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  <div
+    className="w-full h-28 animate-pulse rounded-xl"
+    style={{
+      backgroundColor: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border)",
+    }}
+  />
 );
 
 const ChartSkeleton = () => (
-  <div className="w-full h-80 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
+  <div
+    className="w-full h-80 animate-pulse rounded-xl"
+    style={{
+      backgroundColor: "var(--color-bg-elevated)",
+      border: "1px solid var(--color-border)",
+    }}
+  />
 );
 
 const ChartContainerCard = ({
@@ -52,11 +76,28 @@ const ChartContainerCard = ({
   demoData = false,
   loading = false,
 }) => (
-  <div className="rounded-xl border border-slate-700 bg-slate-900 p-6">
+  <div
+    className="rounded-xl p-6"
+    style={{
+      border: "1px solid var(--color-border)",
+      backgroundColor: "var(--color-bg-card)",
+      boxShadow: "var(--color-card-shadow)",
+    }}
+  >
     <div className="flex items-center justify-between mb-4">
-      <h2 className="text-sm font-semibold text-slate-100">{title}</h2>
+      <h2
+        className="text-sm font-semibold"
+        style={{ color: "var(--color-text-primary)" }}
+      >
+        {title}
+      </h2>
       {demoData && (
-        <span className="text-xs italic text-slate-500">Demo Data</span>
+        <span
+          className="text-xs italic"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          Demo Data
+        </span>
       )}
     </div>
     {loading ? <ChartSkeleton /> : children}
@@ -165,6 +206,75 @@ export default function UserSegmentationPage() {
 
   const totalUsers = distribution.reduce((sum, d) => sum + (d.count || 0), 0);
 
+  const segmentMappingModel = useMemo(() => {
+    const area = {
+      minX: 88,
+      maxX: 610,
+      minY: 46,
+      maxY: 310,
+    };
+
+    const distributionMap = Object.fromEntries(
+      distribution.map((d) => [d.name, Number(d.percentage || 0)]),
+    );
+
+    return Object.keys(SEGMENT_COLORS).map((segment) => {
+      const points = clusterPointsBySegment[segment] || [];
+      const fallback = SEGMENT_FALLBACK_POSITIONS[segment] || {
+        x: 0.5,
+        y: 0.5,
+      };
+
+      const meanX =
+        points.length > 0
+          ? points.reduce((sum, p) => sum + Number(p.x || 0), 0) / points.length
+          : fallback.x;
+      const meanY =
+        points.length > 0
+          ? points.reduce((sum, p) => sum + Number(p.y || 0), 0) / points.length
+          : fallback.y;
+
+      const cx =
+        area.minX + Math.max(0, Math.min(1, meanX)) * (area.maxX - area.minX);
+      const cy =
+        area.maxY - Math.max(0, Math.min(1, meanY)) * (area.maxY - area.minY);
+
+      const pct = Number(distributionMap[segment] || 0);
+      const rx = Math.max(46, Math.min(108, 42 + pct * 1.1));
+      const ry = Math.max(30, Math.min(72, 26 + pct * 0.65));
+
+      const sample = points.slice(0, 4);
+      const dots =
+        sample.length > 0
+          ? sample.map((p, idx) => {
+              const dx = (Number(p.x || meanX) - meanX) * 110;
+              const dy = (Number(p.y || meanY) - meanY) * 90;
+              return {
+                key: `${segment}-dot-${idx}`,
+                x: cx + dx,
+                y: cy - dy,
+              };
+            })
+          : pct > 0
+            ? [
+                { key: `${segment}-dot-a`, x: cx - 16, y: cy + 8 },
+                { key: `${segment}-dot-b`, x: cx + 10, y: cy - 6 },
+              ]
+            : [];
+
+      return {
+        segment,
+        alias: SEGMENT_ALIASES[segment] || segment,
+        color: SEGMENT_COLORS[segment],
+        cx,
+        cy,
+        rx,
+        ry,
+        dots,
+      };
+    });
+  }, [clusterPointsBySegment, distribution]);
+
   // Radar data for behavioral profile
   const radarData = [
     { metric: "Activity", "Power Users": 95, "Trial Only": 10 },
@@ -211,10 +321,16 @@ export default function UserSegmentationPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">
+            <h1
+              className="text-2xl font-bold"
+              style={{ color: "var(--color-text-primary)" }}
+            >
               User Segmentation — AI
             </h1>
-            <p className="text-slate-400 mt-1 text-sm">
+            <p
+              className="mt-1 text-sm"
+              style={{ color: "var(--color-text-muted)" }}
+            >
               Advanced behavioral analysis using AI clustering (K-Means) to
               optimize SMS subscription service performance.
             </p>
@@ -222,7 +338,12 @@ export default function UserSegmentationPage() {
           <div className="flex gap-3">
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg transition text-sm font-medium"
+              style={{
+                backgroundColor: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text-secondary)",
+              }}
             >
               <Download size={16} /> Export
             </button>
@@ -250,7 +371,10 @@ export default function UserSegmentationPage() {
         {(kpiError || clusterError || profileError) && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
             <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
-            <p className="flex-1 text-sm text-red-200">
+            <p
+              className="flex-1 text-sm"
+              style={{ color: "var(--color-danger-text)" }}
+            >
               {kpiError || clusterError || profileError}
             </p>
             <button
@@ -315,53 +439,98 @@ export default function UserSegmentationPage() {
           {/* LEFT: Clustering Map */}
           <div className="xl:col-span-4">
             <ChartContainerCard
-              title="Segment Mapping (Clustering Map)"
+              title="Segment Mapping"
               demoData={!clusterData}
               loading={clusterLoading}
             >
-              <ResponsiveContainer width="100%" height={380}>
-                <ScatterChart
-                  margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis
-                    dataKey="x"
-                    label={{
-                      value: "Axis 1 — Activity / Usage Frequency",
-                      position: "insideBottom",
-                      offset: -5,
+              <div className="mb-3 flex flex-wrap gap-2">
+                {segmentMappingModel.map((cluster) => (
+                  <span
+                    key={cluster.segment}
+                    className="inline-flex items-center gap-2 rounded-full px-2 py-1 text-[11px]"
+                    style={{
+                      color: "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border)",
+                      backgroundColor: "var(--color-bg-elevated)",
                     }}
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
-                  />
-                  <YAxis
-                    dataKey="y"
-                    label={{
-                      value: "Axis 2 — ARPU / Value",
-                      angle: -90,
-                      position: "insideLeft",
-                    }}
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "var(--chart-tooltip-bg)",
-                      border: "1px solid var(--chart-tooltip-border)",
-                    }}
-                    formatter={(value) => value.toFixed(2)}
-                    labelFormatter={(value) => `${value.toFixed(2)}`}
-                  />
-                  <Legend />
-                  {Object.entries(SEGMENT_COLORS).map(([segment, color]) => (
-                    <Scatter
-                      key={segment}
-                      name={segment}
-                      data={clusterPointsBySegment[segment] ?? []}
-                      fill={color}
-                      isAnimationActive={false}
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: cluster.color }}
                     />
+                    {cluster.alias}
+                  </span>
+                ))}
+              </div>
+
+              <div className="h-[380px] w-full">
+                <svg viewBox="0 0 680 360" className="h-full w-full">
+                  <line
+                    x1="66"
+                    y1="24"
+                    x2="66"
+                    y2="322"
+                    stroke="var(--chart-grid)"
+                  />
+                  <line
+                    x1="66"
+                    y1="322"
+                    x2="644"
+                    y2="322"
+                    stroke="var(--chart-grid)"
+                  />
+
+                  <text
+                    x="355"
+                    y="348"
+                    textAnchor="middle"
+                    fontSize="11"
+                    fill="var(--chart-axis-text)"
+                    style={{ letterSpacing: "0.08em" }}
+                  >
+                    USAGE ACTIVITY FREQUENCY
+                  </text>
+                  <text
+                    x="20"
+                    y="178"
+                    textAnchor="middle"
+                    transform="rotate(-90, 20, 178)"
+                    fontSize="11"
+                    fill="var(--chart-axis-text)"
+                    style={{ letterSpacing: "0.08em" }}
+                  >
+                    CUSTOMER LIFETIME VALUE
+                  </text>
+
+                  {segmentMappingModel.map((cluster) => (
+                    <g key={cluster.segment}>
+                      <ellipse
+                        cx={cluster.cx}
+                        cy={cluster.cy}
+                        rx={cluster.rx}
+                        ry={cluster.ry}
+                        fill={cluster.color}
+                        fillOpacity="0.16"
+                        stroke={cluster.color}
+                        strokeOpacity="0.55"
+                        strokeWidth="2"
+                      />
+                      {cluster.dots.map((dot) => (
+                        <circle
+                          key={dot.key}
+                          cx={dot.x}
+                          cy={dot.y}
+                          r="4.3"
+                          fill={cluster.color}
+                          stroke="#ffffff"
+                          strokeOpacity="0.25"
+                          strokeWidth="1"
+                        />
+                      ))}
+                    </g>
                   ))}
-                </ScatterChart>
-              </ResponsiveContainer>
+                </svg>
+              </div>
             </ChartContainerCard>
           </div>
 
@@ -375,18 +544,25 @@ export default function UserSegmentationPage() {
             >
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart layout="vertical" data={distribution}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--chart-grid)"
+                  />
                   <XAxis
                     type="number"
                     domain={[0, 100]}
-                    tick={{ fontSize: 11 }}
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
                     tickFormatter={(v) => `${v}%`}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
                   />
                   <YAxis
                     dataKey="name"
                     type="category"
                     width={150}
-                    tick={{ fill: "#f1f5f9", fontSize: 10 }}
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 10 }}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
+                    tickLine={{ stroke: "var(--chart-grid)" }}
                   />
                   <Tooltip
                     formatter={(v) => `${v}%`}
@@ -443,10 +619,18 @@ export default function UserSegmentationPage() {
 
                 <div className="flex-1 space-y-3">
                   <div className="text-center mb-3">
-                    <p className="text-2xl font-bold text-slate-100">
+                    <p
+                      className="text-2xl font-bold"
+                      style={{ color: "var(--color-text-primary)" }}
+                    >
                       {Number(totalUsers || 0).toLocaleString()}
                     </p>
-                    <p className="text-xs text-slate-400">users</p>
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--color-text-muted)" }}
+                    >
+                      users
+                    </p>
                   </div>
                   <div className="space-y-2 text-xs">
                     {distribution.map((item) => (
@@ -455,8 +639,13 @@ export default function UserSegmentationPage() {
                           className="w-2 h-2 rounded-full"
                           style={{ backgroundColor: SEGMENT_COLORS[item.name] }}
                         />
-                        <span className="text-slate-300">{item.name}</span>
-                        <span className="text-slate-500 ml-auto">
+                        <span style={{ color: "var(--color-text-secondary)" }}>
+                          {item.name}
+                        </span>
+                        <span
+                          className="ml-auto"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
                           {item.percentage}%
                         </span>
                       </div>
@@ -479,10 +668,10 @@ export default function UserSegmentationPage() {
             >
               <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={radarData}>
-                  <PolarGrid stroke="#334155" />
+                  <PolarGrid stroke="var(--chart-grid)" />
                   <PolarAngleAxis
                     dataKey="metric"
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tick={{ fill: "var(--chart-axis-text)", fontSize: 11 }}
                   />
                   <Radar
                     name="Power Users"
@@ -498,7 +687,13 @@ export default function UserSegmentationPage() {
                     fill="#ef4444"
                     fillOpacity={0.2}
                   />
-                  <Legend />
+                  <Legend
+                    formatter={(value) => (
+                      <span style={{ color: "var(--color-text-muted)" }}>
+                        {value}
+                      </span>
+                    )}
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "var(--chart-tooltip-bg)",
@@ -520,20 +715,37 @@ export default function UserSegmentationPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">
+                    <tr
+                      style={{ borderBottom: "1px solid var(--color-border)" }}
+                    >
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Segment
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400">
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Avg Duration
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400">
+                      <th
+                        className="px-4 py-3 text-right text-xs font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         ARPU (TND)
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400">
+                      <th
+                        className="px-4 py-3 text-right text-xs font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Churn Rate
                       </th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400">
+                      <th
+                        className="px-4 py-3 text-center text-xs font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Action
                       </th>
                     </tr>
@@ -550,9 +762,24 @@ export default function UserSegmentationPage() {
                       return (
                         <tr
                           key={i}
-                          className="border-b border-slate-700/50 hover:bg-slate-700/50 transition"
+                          className="transition"
+                          style={{
+                            borderBottom:
+                              "1px solid var(--color-border-subtle)",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "var(--color-bg-elevated)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor =
+                              "transparent";
+                          }}
                         >
-                          <td className="px-4 py-3 text-slate-300">
+                          <td
+                            className="px-4 py-3"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             <div className="flex items-center gap-2">
                               <div
                                 className="w-2 h-2 rounded-full"
@@ -563,10 +790,16 @@ export default function UserSegmentationPage() {
                               {row.segment}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-slate-300">
+                          <td
+                            className="px-4 py-3"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {row.avg_duration}
                           </td>
-                          <td className="px-4 py-3 text-right text-slate-300 font-mono">
+                          <td
+                            className="px-4 py-3 text-right font-mono"
+                            style={{ color: "var(--color-text-secondary)" }}
+                          >
                             {row.arpu.toFixed(1)}
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -577,7 +810,10 @@ export default function UserSegmentationPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <button className="text-blue-400 hover:text-blue-300 text-xs font-medium transition">
+                            <button
+                              className="text-xs font-medium transition"
+                              style={{ color: "var(--color-accent)" }}
+                            >
                               Details
                             </button>
                           </td>

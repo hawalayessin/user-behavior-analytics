@@ -19,7 +19,7 @@ from app.schemas.segmentation import (
 
 router = APIRouter(prefix="/analytics/segmentation", tags=["Segmentation"])
 
-SEGMENTATION_CACHE_VERSION = "2026-04-10-v1"
+SEGMENTATION_CACHE_VERSION = "2026-04-16-v3-segmentation-population-fix"
 
 
 def _segmentation_cache_payload(

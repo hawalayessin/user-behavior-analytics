@@ -1,0 +1,196 @@
+@startuml
+title Diagramme de cas d'utilisation -- DigMaco Analytics
+
+skinparam usecase {
+  BackgroundColor #EEF4FB
+  BorderColor #2196F3
+  ArrowColor #555
+  ActorBorderColor #1a1a2e
+  ActorBackgroundColor #FAFAFA
+}
+skinparam rectangleBorderColor #CCCCCC
+skinparam rectangleBackgroundColor #FAFAFA
+skinparam shadowing false
+
+' -- Acteurs --
+actor "Administrateur" as Admin #LightGreen
+actor "Analyste"       as Analyst #LightBlue
+
+' -- Authentification --
+rectangle "Authentification" {
+  usecase "Se connecter" as UC_LOGIN
+  usecase "Demander une reinitialisation du mot de passe" as UC_FORGOT
+  usecase "Reinitialiser le mot de passe" as UC_RESET
+  usecase "Verifier un jeton de reinitialisation" as UC_VERIFY_TOKEN
+  usecase "S'inscrire par invitation" as UC_REGISTER_INVITE
+}
+
+' -- Pipeline ETL --
+rectangle "Pipeline ETL" {
+  usecase "Executer les scripts ETL" as UC_ETL_RUN
+  usecase "Verifier la coherence des donnees" as UC_VERIFY_DATA
+  usecase "Recalculer les cohortes" as UC_RECOMPUTE_COHORTS
+}
+
+' -- Gestion des utilisateurs --
+rectangle "Gestion des utilisateurs" {
+  usecase "Inviter un utilisateur plateforme" as UC_INVITE_USER
+  usecase "Consulter les utilisateurs plateforme" as UC_USERS_LIST
+  usecase "Modifier un utilisateur plateforme" as UC_USERS_EDIT
+  usecase "Activer ou desactiver un utilisateur" as UC_USERS_STATUS
+  usecase "Attribuer un role" as UC_USERS_ROLE
+  usecase "Supprimer un utilisateur plateforme" as UC_USERS_DELETE
+  usecase "Consulter les utilisateurs finaux" as UC_END_USERS_LIST
+  usecase "Consulter le detail d'un utilisateur" as UC_END_USER_DETAIL
+  usecase "Consulter les utilisateurs en essai" as UC_END_USERS_TRIAL
+}
+
+' -- Gestion des services & campagnes --
+rectangle "Gestion des services & campagnes" {
+  usecase "Gerer les services" as UC_SERVICES_MANAGE
+  usecase "Gerer les campagnes" as UC_CAMPAIGNS_MANAGE
+  usecase "Televerser des cibles de campagne" as UC_CAMPAIGN_TARGETS
+}
+
+' -- Tableaux de bord --
+rectangle "Tableaux de bord" {
+  usecase "Consulter l'aperçu analytique" as UC_OVERVIEW
+  usecase "Consulter l'activite utilisateur" as UC_USER_ACTIVITY
+  usecase "Analyser les essais gratuits" as UC_TRIAL_ANALYTICS
+  usecase "Analyser la retention" as UC_RETENTION
+  usecase "Analyser l'impact des campagnes" as UC_CAMPAIGN_IMPACT
+  usecase "Analyser le churn" as UC_CHURN
+  usecase "Analyser le comportement multi-services" as UC_CROSS_SERVICE
+  usecase "Analyser la segmentation" as UC_SEGMENTATION
+  usecase "Consulter le NRR" as UC_NRR
+  usecase "Consulter les anomalies" as UC_ANOMALIES
+  usecase "Filtrer par service et periode" as UC_FILTER
+  usecase "Consulter les diagnostics" as UC_DIAGNOSTICS
+  usecase "Invalider le cache analytique" as UC_CACHE_INVALIDATE
+  usecase "Recalculer la retention" as UC_RETENTION_RECOMPUTE
+}
+
+' -- Modules IA --
+rectangle "Modules IA" {
+  usecase "Consulter les scores de churn" as UC_CHURN_SCORES
+  usecase "Consulter les metriques du modele" as UC_CHURN_METRICS
+  usecase "Consulter la gouvernance du modele" as UC_CHURN_GOV
+  usecase "Entrainer le modele de churn" as UC_CHURN_TRAIN
+  usecase "Recalculer les scores de churn" as UC_CHURN_RECOMPUTE
+  usecase "Executer la detection d'anomalies" as UC_ANOMALY_RUN
+  usecase "Entrainer la segmentation" as UC_SEGMENTATION_TRAIN
+}
+
+' -- Rapports PDF --
+rectangle "Rapports PDF" {
+  usecase "Exporter des rapports" as UC_REPORT_EXPORT
+}
+
+' -- Notes analytiques --
+rectangle "Notes analytiques" {
+  usecase "Rediger une note analytique" as UC_NOTE_CREATE
+  usecase "Modifier une note analytique" as UC_NOTE_EDIT
+  usecase "Supprimer une note analytique" as UC_NOTE_DELETE
+  usecase "Consulter les notes analytiques" as UC_NOTE_LIST
+  usecase "Consulter une note analytique" as UC_NOTE_DETAIL
+  usecase "Consulter le contexte de notes" as UC_NOTE_CONTEXT
+}
+
+' -- Associations Administrateur --
+Admin --> UC_LOGIN
+Admin --> UC_FORGOT
+Admin --> UC_RESET
+Admin --> UC_VERIFY_TOKEN
+Admin --> UC_REGISTER_INVITE
+Admin --> UC_ETL_RUN
+Admin --> UC_VERIFY_DATA
+Admin --> UC_RECOMPUTE_COHORTS
+Admin --> UC_INVITE_USER
+Admin --> UC_USERS_LIST
+Admin --> UC_USERS_EDIT
+Admin --> UC_USERS_STATUS
+Admin --> UC_USERS_ROLE
+Admin --> UC_USERS_DELETE
+Admin --> UC_END_USERS_LIST
+Admin --> UC_END_USER_DETAIL
+Admin --> UC_END_USERS_TRIAL
+Admin --> UC_SERVICES_MANAGE
+Admin --> UC_CAMPAIGNS_MANAGE
+Admin --> UC_CAMPAIGN_TARGETS
+Admin --> UC_OVERVIEW
+Admin --> UC_USER_ACTIVITY
+Admin --> UC_TRIAL_ANALYTICS
+Admin --> UC_RETENTION
+Admin --> UC_CAMPAIGN_IMPACT
+Admin --> UC_CHURN
+Admin --> UC_CROSS_SERVICE
+Admin --> UC_SEGMENTATION
+Admin --> UC_NRR
+Admin --> UC_ANOMALIES
+Admin --> UC_FILTER
+Admin --> UC_DIAGNOSTICS
+Admin --> UC_CACHE_INVALIDATE
+Admin --> UC_RETENTION_RECOMPUTE
+Admin --> UC_CHURN_SCORES
+Admin --> UC_CHURN_METRICS
+Admin --> UC_CHURN_GOV
+Admin --> UC_CHURN_TRAIN
+Admin --> UC_CHURN_RECOMPUTE
+Admin --> UC_ANOMALY_RUN
+Admin --> UC_SEGMENTATION_TRAIN
+Admin --> UC_NOTE_CREATE
+Admin --> UC_NOTE_EDIT
+Admin --> UC_NOTE_DELETE
+Admin --> UC_NOTE_LIST
+Admin --> UC_NOTE_DETAIL
+Admin --> UC_NOTE_CONTEXT
+Admin --> UC_REPORT_EXPORT
+
+' -- Associations Analyste --
+Analyst --> UC_LOGIN
+Analyst --> UC_FORGOT
+Analyst --> UC_RESET
+Analyst --> UC_VERIFY_TOKEN
+Analyst --> UC_REGISTER_INVITE
+Analyst --> UC_END_USERS_LIST
+Analyst --> UC_END_USER_DETAIL
+Analyst --> UC_END_USERS_TRIAL
+Analyst --> UC_OVERVIEW
+Analyst --> UC_USER_ACTIVITY
+Analyst --> UC_TRIAL_ANALYTICS
+Analyst --> UC_RETENTION
+Analyst --> UC_CAMPAIGN_IMPACT
+Analyst --> UC_CHURN
+Analyst --> UC_CROSS_SERVICE
+Analyst --> UC_SEGMENTATION
+Analyst --> UC_NRR
+Analyst --> UC_ANOMALIES
+Analyst --> UC_FILTER
+Analyst --> UC_CHURN_SCORES
+Analyst --> UC_CHURN_METRICS
+Analyst --> UC_CHURN_GOV
+Analyst --> UC_ANOMALY_RUN
+Analyst --> UC_SEGMENTATION_TRAIN
+Analyst --> UC_NOTE_CREATE
+Analyst --> UC_NOTE_EDIT
+Analyst --> UC_NOTE_DELETE
+Analyst --> UC_NOTE_LIST
+Analyst --> UC_NOTE_DETAIL
+Analyst --> UC_NOTE_CONTEXT
+Analyst --> UC_REPORT_EXPORT
+
+' -- Include / Extend --
+UC_OVERVIEW ..> UC_FILTER : <<extend>>
+UC_USER_ACTIVITY ..> UC_FILTER : <<extend>>
+UC_TRIAL_ANALYTICS ..> UC_FILTER : <<extend>>
+UC_RETENTION ..> UC_FILTER : <<extend>>
+UC_CAMPAIGN_IMPACT ..> UC_FILTER : <<extend>>
+UC_CHURN ..> UC_FILTER : <<extend>>
+UC_CROSS_SERVICE ..> UC_FILTER : <<extend>>
+UC_SEGMENTATION ..> UC_FILTER : <<extend>>
+UC_ANOMALIES ..> UC_FILTER : <<extend>>
+UC_CHURN_TRAIN ..> UC_CHURN_METRICS : <<include>>
+UC_CHURN_RECOMPUTE ..> UC_CHURN_SCORES : <<include>>
+UC_RETENTION_RECOMPUTE ..> UC_RETENTION : <<include>>
+
+@enduml

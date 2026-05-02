@@ -50,12 +50,14 @@ def _campaign_status(send_dt: datetime) -> str:
 
 class ServiceCreateBody(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
+    url: Optional[str] = Field(default=None, max_length=255)
     billing_type: BillingType
     price: float = Field(..., gt=0)
 
 
 class ServiceUpdateBody(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    url: Optional[str] = Field(default=None, max_length=255)
     billing_type: Optional[BillingType] = None
     price: Optional[float] = Field(default=None, gt=0)
 
@@ -115,6 +117,7 @@ def list_services(
             SELECT
               sv.id,
               sv.name,
+                            sv.url,
               st.name AS service_type_name,
               st.billing_frequency_days,
               st.price,
@@ -137,6 +140,7 @@ def list_services(
         {
             "id": str(r.id),
             "name": r.name,
+            "url": r.url,
             "billing_type": _billing_type(r.billing_frequency_days),
             "price": float(r.price or 0),
             "total_subscriptions": int(r.total_subscriptions or 0),
@@ -155,6 +159,7 @@ def create_service(
     _: object = Depends(require_admin),
 ):
     name = body.name.strip()
+    service_url = body.url.strip() if body.url else None
     exists = db.execute(text("SELECT 1 FROM services WHERE LOWER(name) = LOWER(:name)"), {"name": name}).fetchone()
     if exists:
         raise HTTPException(status_code=400, detail="Service name must be unique.")
@@ -179,12 +184,12 @@ def create_service(
     sv_row = db.execute(
         text(
             """
-            INSERT INTO services (id, name, description, service_type_id, is_active)
-            VALUES (CAST(:id AS uuid), :name, NULL, CAST(:st_id AS uuid), true)
+            INSERT INTO services (id, name, description, url, service_type_id, is_active)
+            VALUES (CAST(:id AS uuid), :name, NULL, :url, CAST(:st_id AS uuid), true)
             RETURNING id
             """
         ),
-        {"id": str(uuid.uuid4()), "name": name, "st_id": str(st_row.id)},
+        {"id": str(uuid.uuid4()), "name": name, "url": service_url, "st_id": str(st_row.id)},
     ).fetchone()
     db.commit()
 
@@ -195,6 +200,7 @@ def create_service(
     return {
         "id": str(sv_row.id),
         "name": name,
+        "url": service_url,
         "billing_type": body.billing_type,
         "price": float(body.price),
         "total_subscriptions": 0,
@@ -219,7 +225,7 @@ def update_service(
     current = db.execute(
         text(
             """
-            SELECT sv.id, sv.name, sv.service_type_id, st.billing_frequency_days, st.price
+            SELECT sv.id, sv.name, sv.url, sv.service_type_id, st.billing_frequency_days, st.price
             FROM services sv
             JOIN service_types st ON st.id = sv.service_type_id
             WHERE sv.id = CAST(:id AS uuid) AND sv.is_active = true
@@ -231,6 +237,9 @@ def update_service(
         raise HTTPException(status_code=404, detail="Service not found.")
 
     new_name = body.name.strip() if body.name is not None else current.name
+    new_url = body.url.strip() if body.url is not None else current.url
+    if body.url is not None and new_url == "":
+        new_url = None
     if body.name is not None:
         exists = db.execute(
             text("SELECT 1 FROM services WHERE LOWER(name) = LOWER(:name) AND id <> CAST(:id AS uuid)"),
@@ -267,11 +276,11 @@ def update_service(
         text(
             """
             UPDATE services
-            SET name = :name, service_type_id = CAST(:st_id AS uuid)
+            SET name = :name, url = :url, service_type_id = CAST(:st_id AS uuid)
             WHERE id = CAST(:id AS uuid)
             """
         ),
-        {"id": sid, "name": new_name, "st_id": new_service_type_id},
+        {"id": sid, "name": new_name, "url": new_url, "st_id": new_service_type_id},
     )
     db.commit()
 
@@ -291,6 +300,7 @@ def update_service(
     return {
         "id": sid,
         "name": new_name,
+        "url": new_url,
         "billing_type": new_billing,
         "price": float(new_price),
         "total_subscriptions": int(stats.total_subscriptions or 0),

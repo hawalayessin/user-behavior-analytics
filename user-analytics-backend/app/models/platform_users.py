@@ -27,6 +27,9 @@ class PlatformUser(Base):
     full_name: Mapped[str | None] = mapped_column(
         String(100), nullable=True
     )
+    avatar_url: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )
     role: Mapped[str] = mapped_column(
         String(20), nullable=False, default="analyst",
         comment="admin, analyst, viewer",

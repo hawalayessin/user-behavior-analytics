@@ -1,4 +1,4 @@
-"""sms events hawala lean model and indexes
+﻿"""sms events prod_db lean model and indexes
 
 Revision ID: 4b9e2f7a1d3c
 Revises: c1f4a2d9e8b1
@@ -23,7 +23,7 @@ def upgrade() -> None:
 
     op.execute("""
     UPDATE sms_events
-    SET source_system = 'hawala.message_events'
+    SET source_system = 'prod_db.message_events'
     WHERE source_system IS NULL
     """)
 
@@ -59,7 +59,7 @@ def upgrade() -> None:
         "source_system",
         existing_type=sa.String(length=50),
         nullable=False,
-        server_default=sa.text("'hawala.message_events'"),
+        server_default=sa.text("'prod_db.message_events'"),
     )
 
     op.execute(
@@ -117,3 +117,4 @@ def downgrade() -> None:
     )
 
     op.alter_column("sms_events", "user_id", existing_type=sa.UUID(), nullable=False)
+

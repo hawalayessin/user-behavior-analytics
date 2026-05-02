@@ -37,3 +37,7 @@ build/
 *.csv
 *.xlsx
 __pycache__
+
+# Documentation and progress reports
+docs/
+RAPPORT*.md

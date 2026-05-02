@@ -21,7 +21,7 @@ def _normalize_range(
     end_date: date | datetime | None,
 ) -> tuple[datetime, datetime]:
     """Normalize requested range to billing data bounds."""
-    data_start, data_end = get_data_bounds(db, source="billing")
+    data_start, data_end = get_data_bounds(db, source="subscription")
 
     start = start_date or data_start
     end = end_date or data_end
@@ -37,6 +37,12 @@ def _normalize_range(
         end = data_end
     if start > end:
         start, end = end, start
+    if start < data_start:
+        start = data_start
+    if end > data_end:
+        end = data_end
+    if start > end:
+        start = end
 
     return start, end
 
@@ -108,15 +114,15 @@ def get_user_segments(
                         ELSE 0
                     END AS y,
                     CASE
+                        WHEN us.billing_count = 0
+                            THEN 'Trial Only'
                         WHEN us.billing_count >= COALESCE(p.p75_billing, us.billing_count + 1)
                          AND us.revenue >= COALESCE(p.p75_revenue, us.revenue + 1)
                             THEN 'Power Users'
-                        WHEN us.billing_count >= COALESCE(p.p25_billing, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(p.p25_revenue, us.revenue + 1)
-                            THEN 'Regular Loyals'
-                        WHEN us.billing_count > 0
+                        WHEN us.billing_count <= COALESCE(p.p25_billing, us.billing_count)
+                          AND us.revenue <= COALESCE(p.p25_revenue, us.revenue)
                             THEN 'Occasional Users'
-                        ELSE 'Trial Only'
+                        ELSE 'Regular Loyals'
                     END AS segment
                 FROM user_stats us
                 CROSS JOIN percentiles p
@@ -163,7 +169,8 @@ def get_segment_distribution(
                     COALESCE(
                         SUM(COALESCE(st.price, 0)) FILTER (WHERE {_SUCCESS_STATUS_SQL}),
                         0
-                    ) AS revenue
+                    ) AS revenue,
+                    MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
                                     ON be.subscription_id = s.id
@@ -188,15 +195,15 @@ def get_segment_distribution(
             segmented AS (
                 SELECT
                     CASE
+                        WHEN us.billing_count = 0
+                            THEN 'Trial Only'
                         WHEN us.billing_count >= COALESCE(pct.p75_b, us.billing_count + 1)
                          AND us.revenue >= COALESCE(pct.p75_r, us.revenue + 1)
                             THEN 'Power Users'
-                        WHEN us.billing_count >= COALESCE(pct.p25_b, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(pct.p25_r, us.revenue + 1)
-                            THEN 'Regular Loyals'
-                        WHEN us.billing_count > 0
+                        WHEN us.billing_count <= COALESCE(pct.p25_b, us.billing_count)
+                          AND us.revenue <= COALESCE(pct.p25_r, us.revenue)
                             THEN 'Occasional Users'
-                        ELSE 'Trial Only'
+                        ELSE 'Regular Loyals'
                     END AS segment
                 FROM user_stats us
                 CROSS JOIN pct
@@ -259,7 +266,6 @@ def get_segment_kpis(
     """Return dashboard KPIs in one SQL request."""
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
-    churn_service_filter = _service_filter(service_id, alias="subc")
 
     row = db.execute(
         text(
@@ -271,7 +277,8 @@ def get_segment_kpis(
                     COALESCE(
                         SUM(COALESCE(st.price, 0)) FILTER (WHERE {_SUCCESS_STATUS_SQL}),
                         0
-                    ) AS revenue
+                    ) AS revenue,
+                    MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
                                     ON be.subscription_id = s.id
@@ -298,17 +305,18 @@ def get_segment_kpis(
                 SELECT
                     us.user_id,
                     CASE
+                        WHEN us.billing_count = 0
+                            THEN 'Trial Only'
                         WHEN us.billing_count >= COALESCE(pct.p75_b, us.billing_count + 1)
                          AND us.revenue >= COALESCE(pct.p75_r, us.revenue + 1)
                             THEN 'Power Users'
-                        WHEN us.billing_count >= COALESCE(pct.p25_b, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(pct.p25_r, us.revenue + 1)
-                            THEN 'Regular Loyals'
-                        WHEN us.billing_count > 0
+                        WHEN us.billing_count <= COALESCE(pct.p25_b, us.billing_count)
+                          AND us.revenue <= COALESCE(pct.p25_r, us.revenue)
                             THEN 'Occasional Users'
-                        ELSE 'Trial Only'
+                        ELSE 'Regular Loyals'
                     END AS segment,
-                    us.revenue
+                    us.revenue,
+                    us.has_churn
                 FROM user_stats us
                 CROSS JOIN pct
             ),
@@ -324,23 +332,11 @@ def get_segment_kpis(
                 SELECT COALESCE(SUM(cnt), 0) AS total
                 FROM stats
             ),
-            user_churn AS (
-                SELECT
-                    subc.user_id,
-                    MAX(CASE WHEN subc.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
-                FROM subscriptions subc
-                WHERE 1=1
-                  AND subc.subscription_start_date <= :end
-                  AND (subc.subscription_end_date IS NULL OR subc.subscription_end_date >= :start)
-                  {churn_service_filter}
-                GROUP BY subc.user_id
-            ),
             churn_stats AS (
                 SELECT
                     seg.segment,
-                    AVG(COALESCE(uc.has_churn, 0)::float) * 100 AS churn_pct
+                    AVG(COALESCE(seg.has_churn, 0)::float) * 100 AS churn_pct
                 FROM segmented seg
-                LEFT JOIN user_churn uc ON uc.user_id = seg.user_id
                 GROUP BY seg.segment
             )
             SELECT
@@ -392,7 +388,7 @@ def get_segment_kpis(
         "high_value_segment": str(data["high_value_segment"] or "N/A"),
         "arpu_premium": arpu_premium,
         "risk_segment": str(data["risk_segment"] or "N/A"),
-        "risk_churn_rate": -round(float(data["risk_churn_rate"] or 0.0), 1),
+        "risk_churn_rate": round(float(data["risk_churn_rate"] or 0.0), 1),
     }
 
 
@@ -405,7 +401,6 @@ def get_segment_profiles(
     """Return profiles with ARPU, usage duration and churn per segment."""
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
-    churn_service_filter = _service_filter(service_id, alias="subc")
 
     rows = db.execute(
         text(
@@ -418,7 +413,8 @@ def get_segment_profiles(
                         SUM(COALESCE(st.price, 0)) FILTER (WHERE {_SUCCESS_STATUS_SQL}),
                         0
                     ) AS revenue,
-                    COUNT(DISTINCT DATE(be.event_datetime)) AS active_days
+                    COUNT(DISTINCT DATE(be.event_datetime)) AS active_days,
+                    MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
                                     ON be.subscription_id = s.id
@@ -444,38 +440,27 @@ def get_segment_profiles(
                 SELECT
                     us.user_id,
                     CASE
+                        WHEN us.billing_count = 0
+                            THEN 'Trial Only'
                         WHEN us.billing_count >= COALESCE(pct.p75_b, us.billing_count + 1)
                          AND us.revenue >= COALESCE(pct.p75_r, us.revenue + 1)
                             THEN 'Power Users'
-                        WHEN us.billing_count >= COALESCE(pct.p25_b, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(pct.p25_r, us.revenue + 1)
-                            THEN 'Regular Loyals'
-                        WHEN us.billing_count > 0
+                        WHEN us.billing_count <= COALESCE(pct.p25_b, us.billing_count)
+                          AND us.revenue <= COALESCE(pct.p25_r, us.revenue)
                             THEN 'Occasional Users'
-                        ELSE 'Trial Only'
+                        ELSE 'Regular Loyals'
                     END AS segment,
                     us.revenue,
-                    us.active_days
+                    us.active_days,
+                    us.has_churn
                 FROM user_stats us
                 CROSS JOIN pct
-            ),
-            user_churn AS (
-                SELECT
-                    subc.user_id,
-                    MAX(CASE WHEN subc.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
-                FROM subscriptions subc
-                WHERE 1=1
-                  AND subc.subscription_start_date <= :end
-                  AND (subc.subscription_end_date IS NULL OR subc.subscription_end_date >= :start)
-                  {churn_service_filter}
-                GROUP BY subc.user_id
             ),
             churn AS (
                 SELECT
                     seg.segment,
-                    AVG(COALESCE(uc.has_churn, 0)::float) * 100 AS churn_rate
+                    AVG(COALESCE(seg.has_churn, 0)::float) * 100 AS churn_rate
                 FROM segmented seg
-                LEFT JOIN user_churn uc ON uc.user_id = seg.user_id
                 GROUP BY seg.segment
             ),
             profile_stats AS (

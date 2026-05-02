@@ -50,6 +50,16 @@ def list_users(
     else:
         limit  = page_size
 
+    user_status_expr = """
+        CASE
+            WHEN LOWER(TRIM(COALESCE(u.status, ''))) IN ('1', 'active', 'subscribed', 'iscrit', 'inscrit') THEN 'subscribed'
+            WHEN LOWER(TRIM(COALESCE(u.status, ''))) IN ('-2', 'billing_failed', 'iscrit avec billing failure', 'inscrit avec billing failure', 'at_risk') THEN 'billing_failed'
+            WHEN LOWER(TRIM(COALESCE(u.status, ''))) IN ('-1', 'cancelled', 'expired', 'inactive', 'unsubscribed', 'desinscrit', 'désinscrit', 'churned') THEN 'unsubscribed'
+            WHEN LOWER(TRIM(COALESCE(u.status, ''))) IN ('0', 'pending', 'trial', 'otp_pending', 'otp non terminer') THEN 'otp_incomplete'
+            ELSE 'unknown'
+        END
+    """
+
     # ── filtres dynamiques ────────────────────
     where_clauses = ["1=1"]
     paging_where_clauses = ["1=1"]
@@ -59,9 +69,9 @@ def list_users(
         params["limit"]  = limit
 
     if status:
-        where_clauses.append("u.status = :status")
-        paging_where_clauses.append("u.status = :status")
-        params["status"] = status
+        where_clauses.append(f"({user_status_expr}) = :status")
+        paging_where_clauses.append(f"({user_status_expr}) = :status")
+        params["status"] = str(status).strip().lower()
 
     if search:
         where_clauses.append("u.phone_number ILIKE :search")
@@ -118,7 +128,7 @@ def list_users(
             SELECT
                 u.id,
                 u.phone_number,
-                u.status,
+                {user_status_expr} AS display_status,
                 u.created_at
             FROM users u
             WHERE {paging_where_for_query}
@@ -128,7 +138,7 @@ def list_users(
         SELECT
             pu.id,
             pu.phone_number,
-            pu.status,
+            pu.display_status AS status,
             pu.created_at,
             COALESCE(la.last_activity_at, lu.last_unsub_at, pu.created_at) AS last_activity_at,
             COALESCE(ss.services, '[]'::jsonb) AS services,
@@ -163,7 +173,9 @@ def list_users(
                     '[]'::jsonb
                 ) AS services,
                 COUNT(*) FILTER (WHERE s.id IS NOT NULL) AS total_subscriptions,
-                COUNT(*) FILTER (WHERE s.status = 'active') AS active_subscriptions
+                COUNT(*) FILTER (
+                    WHERE LOWER(TRIM(COALESCE(s.status, ''))) IN ('1', 'active', 'subscribed', 'iscrit', 'inscrit')
+                ) AS active_subscriptions
             FROM subscriptions s
             LEFT JOIN services srv ON srv.id = s.service_id
             WHERE s.user_id = pu.id

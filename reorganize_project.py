@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -48,11 +48,15 @@ build/
 *.csv
 *.xlsx
 __pycache__
+
+# Documentation and progress reports
+docs/
+RAPPORT*.md
 """
 
 BACKEND_ENV_EXAMPLE = """# Database
 ANALYTICS_CONN=postgresql+psycopg2://user:password@localhost:5432/analytics_db
-PROD_CONN=postgresql+psycopg2://user:password@hawala_host:5432/hawala_db
+PROD_CONN=postgresql+psycopg2://user:password@prod_db_host:5432/prod_db
 
 # API
 SECRET_KEY=your-secret-key-here
@@ -136,7 +140,7 @@ README_CONTENT = """# User Analytics Platform - PFE DigMaco
 ## Stack
 - Backend: FastAPI + PostgreSQL + Alembic + SQLAlchemy
 - Frontend: React + Vite
-- ETL: Python scripts (hawala -> analytics_db)
+- ETL: Python scripts (prod_db -> analytics_db)
 
 ## Setup
 
@@ -163,7 +167,7 @@ npm run dev
 | make dev | Lancer FastAPI |
 | make migrate | Appliquer migrations |
 | make seed | Seeder la base analytics |
-| make etl | ETL hawala -> analytics |
+| make etl | ETL prod_db -> analytics |
 | make test | Tests unitaires |
 | make lint | Verifier le code |
 """
@@ -560,3 +564,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

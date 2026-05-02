@@ -13,29 +13,35 @@ import { FixedSizeList as List } from "react-window";
 import { useUsers } from "../../hooks/useUsers";
 
 const STATUT_MAP = {
-  active: {
-    label: "Active",
+  subscribed: {
+    label: "Subscribed",
     bg: "bg-emerald-500/20",
     text: "text-emerald-300",
     border: "border-emerald-500/30",
   },
-  trial: {
-    label: "Trial",
-    bg: "bg-blue-500/20",
-    text: "text-blue-300",
-    border: "border-blue-500/30",
-  },
-  inactive: {
-    label: "Inactive",
+  billing_failed: {
+    label: "Billing Failed",
     bg: "bg-amber-500/20",
     text: "text-amber-300",
     border: "border-amber-500/30",
   },
-  churned: {
-    label: "Churned",
+  unsubscribed: {
+    label: "Unsubscribed",
     bg: "bg-red-500/20",
     text: "text-red-300",
     border: "border-red-500/30",
+  },
+  otp_incomplete: {
+    label: "OTP Incomplete",
+    bg: "bg-slate-500/20",
+    text: "text-slate-300",
+    border: "border-slate-500/30",
+  },
+  unknown: {
+    label: "Unknown",
+    bg: "bg-slate-500/20",
+    text: "text-slate-300",
+    border: "border-slate-500/30",
   },
 };
 
@@ -164,7 +170,7 @@ export default function UserListSection({
 
   const buildRows = (list) =>
     list.map((user) => {
-      const cfg = STATUT_MAP[user.status] ?? STATUT_MAP.inactive;
+      const cfg = STATUT_MAP[user.status] ?? STATUT_MAP.unknown;
       return {
         Number: user.phone_number ?? "—",
         Status: cfg.label,
@@ -295,10 +301,10 @@ export default function UserListSection({
           className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm text-slate-100 focus:outline-none focus:border-violet-500"
         >
           <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="trial">Trial</option>
-          <option value="inactive">Inactive</option>
-          <option value="churned">Churned</option>
+          <option value="subscribed">Subscribed</option>
+          <option value="billing_failed">Billing Failed</option>
+          <option value="unsubscribed">Unsubscribed</option>
+          <option value="otp_incomplete">OTP Incomplete</option>
         </select>
 
         {/* Export dropdown */}
@@ -416,7 +422,7 @@ export default function UserListSection({
               >
                 {({ index, style }) => {
                   const user = sortedUsers[index];
-                  const cfg = STATUT_MAP[user.status] ?? STATUT_MAP.inactive;
+                  const cfg = STATUT_MAP[user.status] ?? STATUT_MAP.unknown;
                   return (
                     <div
                       style={style}

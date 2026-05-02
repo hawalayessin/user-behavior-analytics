@@ -64,6 +64,13 @@ export default function ChurnPredictionDashboard() {
     }));
   }, [scores.data]);
 
+  const dominantRisk = useMemo(() => {
+    if (!distributionSeries.length) return null;
+    return distributionSeries.reduce((best, cur) =>
+      Number(cur.count || 0) > Number(best.count || 0) ? cur : best,
+    );
+  }, [distributionSeries]);
+
   const coefficientTop = useMemo(() => {
     const coeffs = metrics.data?.coefficients ?? {};
     const entries = Object.entries(coeffs).map(([k, v]) => ({
@@ -233,7 +240,7 @@ export default function ChurnPredictionDashboard() {
         <div className="xl:col-span-3">
           <Card
             title="Predicted churn risk distribution"
-            subtitle="Risk category based on churn probability"
+            subtitle={`Risk category based on churn probability • scored users: ${Number(scores.data?.active_users_scored || 0).toLocaleString()}`}
           >
             <div className="h-80 w-full min-w-0">
               <ResponsiveContainer
@@ -271,6 +278,11 @@ export default function ChurnPredictionDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="mt-3 text-xs text-slate-400">
+              {dominantRisk
+                ? `${dominantRisk.risk_category} is currently the dominant risk segment (${Number(dominantRisk.count || 0).toLocaleString()} users).`
+                : "No risk distribution available."}
+            </p>
           </Card>
         </div>
 

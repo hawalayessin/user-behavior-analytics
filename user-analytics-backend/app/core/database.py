@@ -1,14 +1,11 @@
-import os
-from sqlalchemy import create_engine
+﻿from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# ── Lecture depuis variable d'environnement (Docker) ─────────
-# Fallback localhost pour le développement sans Docker
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:12345hawala@localhost:5433/analytics_db"
-)
+from app.core.config import settings
+
+# Use settings to ensure .env is loaded consistently
+DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL,

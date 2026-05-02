@@ -46,7 +46,7 @@ export default function RetentionCurve({ data }) {
 
   return (
     <div
-      className="rounded-xl p-6 h-full flex flex-col"
+      className="rounded-xl p-4 h-full flex flex-col"
       style={{
         backgroundColor: "var(--color-bg-card)",
         border: "1px solid var(--color-border)",
@@ -54,22 +54,26 @@ export default function RetentionCurve({ data }) {
       }}
     >
       <h3
-        className="text-sm font-semibold mb-4"
+        className="text-sm font-semibold mb-3"
         style={{ color: "var(--color-text-primary)" }}
       >
         Retention Curve by Service
       </h3>
-      <div className="flex-1 min-h-[260px]">
+      <div className="flex-1 min-h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 10, right: 20, bottom: 10, left: 0 }}
+            margin={{ top: 8, right: 12, bottom: 6, left: 0 }}
           >
             <XAxis
               dataKey="service"
               tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
               axisLine={{ stroke: "var(--chart-grid)" }}
               tickLine={{ stroke: "var(--chart-grid)" }}
+              interval={0}
+              angle={-20}
+              textAnchor="end"
+              height={48}
             />
             <YAxis
               tick={{ fontSize: 11, fill: "var(--chart-axis-text)" }}
@@ -117,9 +121,9 @@ export default function RetentionCurve({ data }) {
                 type="monotone"
                 dataKey={key}
                 stroke={COLORS[idx]}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-                strokeWidth={2}
+                dot={{ r: 2 }}
+                activeDot={{ r: 4 }}
+                strokeWidth={1.8}
               />
             ))}
           </LineChart>

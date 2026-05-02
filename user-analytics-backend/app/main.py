@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import time
@@ -25,6 +26,7 @@ from app.routers import cross_service
 from app.routers import segmentation
 from app.routers import anomalies
 from app.routers import nrr
+from app.routers import notes
 
 from app.core.security import hash_password
 from app.models.platform_users import PlatformUser
@@ -35,6 +37,11 @@ app = FastAPI(
 )
 
 logger = logging.getLogger(__name__)
+
+static_root = os.path.join(os.path.dirname(__file__), "..", "uploads")
+avatars_dir = os.path.join(static_root, "avatars")
+os.makedirs(avatars_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_root), name="static")
 
 # ⚠️ CORS DOIT être ajouté AVANT tous les routers
 app.add_middleware(
@@ -112,6 +119,7 @@ app.include_router(cross_service.router)
 app.include_router(segmentation.router)
 app.include_router(anomalies.router)
 app.include_router(nrr.router, prefix="/analytics", tags=["NRR"])
+app.include_router(notes.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

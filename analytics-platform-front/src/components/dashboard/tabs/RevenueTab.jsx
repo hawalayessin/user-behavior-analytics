@@ -88,21 +88,25 @@ export default function RevenueTab({ data, nrr, nrrLoading, nrrError }) {
             label: "ARPU",
             value: `${revenue.arpu_current_month ?? 0} DT`,
             color: "text-violet-400",
+            subtitle: "Average revenue per active subscriber this month.",
           },
           {
             label: "MRR",
             value: `${revenue.mrr ?? 0} DT`,
             color: "text-emerald-400",
+            subtitle: "Recurring monthly revenue from active subscriptions.",
           },
           {
             label: "Successful Payments",
             value: revenue.billing_success.toLocaleString(),
             color: "text-emerald-400",
+            subtitle: "Number of billing transactions completed successfully.",
           },
           {
             label: "Failed Payments",
             value: revenue.billing_failed.toLocaleString(),
             color: "text-red-400",
+            subtitle: "Number of billing transactions that failed this period.",
           },
         ].map((kpi) => (
           <div
@@ -121,6 +125,12 @@ export default function RevenueTab({ data, nrr, nrrLoading, nrrError }) {
               {kpi.label}
             </p>
             <p className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</p>
+            <p
+              className="text-xs mt-1"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              {kpi.subtitle}
+            </p>
           </div>
         ))}
       </div>

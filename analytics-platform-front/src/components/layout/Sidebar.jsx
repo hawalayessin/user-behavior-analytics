@@ -135,12 +135,6 @@ export default function Sidebar() {
                   {full_name}
                 </p>
                 <p
-                  className="text-sm font-medium truncate"
-                  style={{ color: "var(--color-text-secondary)" }}
-                >
-                  {full_name}
-                </p>
-                <p
                   className="text-xs truncate"
                   style={{ color: "var(--color-text-muted)" }}
                 >

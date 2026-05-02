@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -68,7 +68,10 @@ def create_platform_user(
     _: PlatformUser = Depends(require_admin),
 ) -> PlatformUserResponse:
     """Create a new platform user account."""
-    return service.create_user(db, data)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Direct account creation is disabled. Use invitations instead.",
+    )
 
 
 # ── PUT /platform-users/{user_id} ─────────────────────────────────────────────

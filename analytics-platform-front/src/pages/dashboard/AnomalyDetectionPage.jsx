@@ -110,10 +110,10 @@ function severityBadgeStyle(severity) {
 }
 
 function getHeatmapColor(value) {
-  if (value === 0) return "bg-slate-700/30";
-  if (value === 1) return "bg-yellow-500/40";
-  if (value === 2) return "bg-orange-500/40";
-  return "bg-red-500/40";
+  if (value === 0) return "var(--color-bg-elevated)";
+  if (value === 1) return "rgba(234, 179, 8, 0.28)";
+  if (value === 2) return "rgba(249, 115, 22, 0.28)";
+  return "rgba(239, 68, 68, 0.28)";
 }
 
 function getHeatmapLabel(value) {
@@ -144,7 +144,7 @@ function TimelineTooltip({ active, payload, label }) {
               key={entry.dataKey}
               className="flex items-center justify-between text-xs"
             >
-              <span style={{ color: "#94a3b8" }}>
+              <span style={{ color: "var(--color-text-muted)" }}>
                 {METRIC_LABELS[entry.dataKey] || entry.name}
               </span>
               <span style={{ color: entry.color, fontWeight: 600 }}>
@@ -170,7 +170,7 @@ function TimelineTooltip({ active, payload, label }) {
               <p
                 key={`${a.metric}-${a.z_score}-${a.date}`}
                 className="text-[11px]"
-                style={{ color: "#cbd5e1" }}
+                style={{ color: "var(--color-text-secondary)" }}
               >
                 {a.service_name} • {METRIC_LABELS[a.metric] || a.metric} •{" "}
                 {a.severity.toUpperCase()} • observed{" "}
@@ -317,7 +317,7 @@ export default function AnomalyDetectionPage() {
                 Z-Score + Isolation Forest
               </span>
             </div>
-            <p className="text-sm" style={{ color: "rgb(148, 163, 184)" }}>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               Z-Score + Isolation Forest detection (14-day rolling window)
             </p>
           </div>
@@ -345,10 +345,9 @@ export default function AnomalyDetectionPage() {
             </button>
             <button
               onClick={() => setShowAutoRefresh(!showAutoRefresh)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                showAutoRefresh ? "text-white" : "text-slate-400"
-              }`}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition"
               style={{
+                color: showAutoRefresh ? "white" : "var(--color-text-muted)",
                 backgroundColor: showAutoRefresh
                   ? THEME.primary
                   : "transparent",
@@ -377,7 +376,10 @@ export default function AnomalyDetectionPage() {
             style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
           >
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-400">
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "var(--color-text-muted)" }}
+              >
                 Anomalies Detected
               </h3>
               <div
@@ -388,7 +390,12 @@ export default function AnomalyDetectionPage() {
               </div>
             </div>
             {summaryLoading ? (
-              <p className="text-lg text-slate-400">Loading...</p>
+              <p
+                className="text-lg"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading...
+              </p>
             ) : (
               <>
                 <p
@@ -410,7 +417,10 @@ export default function AnomalyDetectionPage() {
             style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
           >
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-400">
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "var(--color-text-muted)" }}
+              >
                 Critical Alerts
               </h3>
               <div
@@ -421,7 +431,12 @@ export default function AnomalyDetectionPage() {
               </div>
             </div>
             {summaryLoading ? (
-              <p className="text-lg text-slate-400">Loading...</p>
+              <p
+                className="text-lg"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading...
+              </p>
             ) : (
               <>
                 <p
@@ -430,7 +445,10 @@ export default function AnomalyDetectionPage() {
                 >
                   {Number(summary?.critical_alerts || 0)}
                 </p>
-                <p className="text-xs text-slate-400">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   ({Number(summary?.unresolved || 0)} unresolved)
                 </p>
               </>
@@ -442,7 +460,10 @@ export default function AnomalyDetectionPage() {
             style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
           >
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-400">
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "var(--color-text-muted)" }}
+              >
                 Most Affected
               </h3>
               <div
@@ -453,7 +474,12 @@ export default function AnomalyDetectionPage() {
               </div>
             </div>
             {summaryLoading ? (
-              <p className="text-lg text-slate-400">Loading...</p>
+              <p
+                className="text-lg"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading...
+              </p>
             ) : (
               <>
                 <p
@@ -462,11 +488,17 @@ export default function AnomalyDetectionPage() {
                 >
                   {summary?.most_affected_service?.name || "N/A"}
                 </p>
-                <p className="text-xs text-slate-400">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   {Number(summary?.most_affected_service?.anomaly_count || 0)}{" "}
                   anomalies
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   Next: {summary?.last_detection?.next_run ? "24h" : "—"}
                 </p>
               </>
@@ -478,7 +510,10 @@ export default function AnomalyDetectionPage() {
             style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
           >
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-400">
+              <h3
+                className="text-sm font-semibold"
+                style={{ color: "var(--color-text-muted)" }}
+              >
                 Last Detection
               </h3>
               <div
@@ -489,7 +524,12 @@ export default function AnomalyDetectionPage() {
               </div>
             </div>
             {summaryLoading ? (
-              <p className="text-lg text-slate-400">Loading...</p>
+              <p
+                className="text-lg"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading...
+              </p>
             ) : (
               <>
                 <p
@@ -498,7 +538,12 @@ export default function AnomalyDetectionPage() {
                 >
                   {toRelativeTime(summary?.last_detection?.run_at)}
                 </p>
-                <p className="text-xs text-slate-400">ago</p>
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  ago
+                </p>
               </>
             )}
           </div>
@@ -517,9 +562,11 @@ export default function AnomalyDetectionPage() {
           {errors.timeline ? (
             <p className="text-sm text-red-400">Unable to load anomaly data</p>
           ) : timelineLoading ? (
-            <p className="text-sm text-slate-400">Loading timeline...</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              Loading timeline...
+            </p>
           ) : timelineRows.length === 0 ? (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               No anomalies detected for the selected filters
             </p>
           ) : (
@@ -625,9 +672,17 @@ export default function AnomalyDetectionPage() {
                 Unable to load anomaly data
               </p>
             ) : heatmapLoading ? (
-              <p className="text-sm text-slate-400">Loading heatmap...</p>
+              <p
+                className="text-sm"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Loading heatmap...
+              </p>
             ) : (heatmap?.services || []).length === 0 ? (
-              <p className="text-sm text-slate-400">
+              <p
+                className="text-sm"
+                style={{ color: "var(--color-text-muted)" }}
+              >
                 No anomalies detected for the selected filters
               </p>
             ) : (
@@ -636,13 +691,17 @@ export default function AnomalyDetectionPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr style={{ borderBottomColor: THEME.border }}>
-                        <th className="text-left py-3 px-2 font-semibold text-slate-400">
+                        <th
+                          className="text-left py-3 px-2 font-semibold"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
                           Service
                         </th>
                         {(heatmap.weeks || []).map((w) => (
                           <th
                             key={w}
-                            className="text-center py-3 px-2 font-semibold text-slate-400"
+                            className="text-center py-3 px-2 font-semibold"
+                            style={{ color: "var(--color-text-muted)" }}
                           >
                             {w}
                           </th>
@@ -673,8 +732,13 @@ export default function AnomalyDetectionPage() {
                               return (
                                 <td
                                   key={`${row.service_name}-${w}`}
-                                  className={`text-center py-3 px-2 rounded ${getHeatmapColor(cell.severity_score)}`}
-                                  style={{ color: THEME.text }}
+                                  className="text-center py-3 px-2 rounded"
+                                  style={{
+                                    color: THEME.text,
+                                    backgroundColor: getHeatmapColor(
+                                      cell.severity_score,
+                                    ),
+                                  }}
                                   title={`${cell.count} anomalies`}
                                 >
                                   {getHeatmapLabel(cell.severity_score)}
@@ -687,7 +751,10 @@ export default function AnomalyDetectionPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-slate-400 mt-4">
+                <p
+                  className="text-xs mt-4"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   ● = Medium | ●● = High | ●●● = Critical
                 </p>
               </>
@@ -713,11 +780,17 @@ export default function AnomalyDetectionPage() {
                   Unable to load anomaly data
                 </p>
               ) : distributionLoading ? (
-                <p className="text-sm text-slate-400">
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   Loading distribution...
                 </p>
               ) : severityData.length === 0 ? (
-                <p className="text-sm text-slate-400">
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   No anomalies detected for the selected filters
                 </p>
               ) : (
@@ -766,13 +839,21 @@ export default function AnomalyDetectionPage() {
                   Unable to load anomaly data
                 </p>
               ) : distributionLoading ? (
-                <p className="text-sm text-slate-400">Loading metrics...</p>
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Loading metrics...
+                </p>
               ) : (
                 <div className="space-y-3">
                   {metricBarsData.map((item) => (
                     <div key={item.metric}>
                       <div className="flex justify-between mb-1">
-                        <span className="text-xs font-medium text-slate-400">
+                        <span
+                          className="text-xs font-medium"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
                           {item.metric}
                         </span>
                         <span
@@ -820,31 +901,58 @@ export default function AnomalyDetectionPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottomColor: THEME.border }}>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Severity
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Date
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Service
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Metric
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Observed
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Expected
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Z-Score
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Status
                       </th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-400">
+                      <th
+                        className="text-left py-3 px-4 font-semibold"
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         Action
                       </th>
                     </tr>
@@ -852,13 +960,21 @@ export default function AnomalyDetectionPage() {
                   <tbody>
                     {detailsLoading ? (
                       <tr>
-                        <td colSpan={9} className="py-8 px-4 text-slate-400">
+                        <td
+                          colSpan={9}
+                          className="py-8 px-4"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
                           Loading anomalies...
                         </td>
                       </tr>
                     ) : (details?.items || []).length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-8 px-4 text-slate-400">
+                        <td
+                          colSpan={9}
+                          className="py-8 px-4"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
                           No anomalies detected for the selected filters
                         </td>
                       </tr>
@@ -889,7 +1005,7 @@ export default function AnomalyDetectionPage() {
                               backgroundColor:
                                 idx % 2
                                   ? "transparent"
-                                  : "rgba(51, 65, 85, 0.2)",
+                                  : "var(--color-bg-elevated)",
                             }}
                           >
                             <td className="py-3 px-4">
@@ -981,7 +1097,10 @@ export default function AnomalyDetectionPage() {
               </div>
 
               <div className="flex items-center justify-between mt-4">
-                <p className="text-xs text-slate-400">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   Total: {Number(details?.total || 0)} anomalies
                 </p>
                 <div className="flex items-center gap-2">
@@ -993,7 +1112,10 @@ export default function AnomalyDetectionPage() {
                   >
                     Prev
                   </button>
-                  <span className="text-xs text-slate-400">
+                  <span
+                    className="text-xs"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
                     {page} / {totalDetailsPages}
                   </span>
                   <button
@@ -1022,9 +1144,11 @@ export default function AnomalyDetectionPage() {
           {errors.insights ? (
             <p className="text-sm text-red-400">Unable to load anomaly data</p>
           ) : insightsLoading ? (
-            <p className="text-sm text-slate-400">Loading insights...</p>
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              Loading insights...
+            </p>
           ) : (insights?.items || []).length === 0 ? (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               No anomalies detected for the selected filters
             </p>
           ) : (
@@ -1066,11 +1190,16 @@ export default function AnomalyDetectionPage() {
                         >
                           {insight.title}
                         </h3>
-                        <p className="text-xs text-slate-400">{insight.body}</p>
+                        <p
+                          className="text-xs"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
+                          {insight.body}
+                        </p>
                         {expandedInsight === id && insight.action_label && (
                           <p
                             className="text-xs mt-2"
-                            style={{ color: "#93c5fd" }}
+                            style={{ color: "var(--color-accent)" }}
                           >
                             {insight.action_label}
                           </p>
@@ -1084,7 +1213,10 @@ export default function AnomalyDetectionPage() {
           )}
         </div>
 
-        <div className="text-center py-8 text-slate-500 text-sm">
+        <div
+          className="text-center py-8 text-sm"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           💡 Tip: Use "Run Detection" to refresh anomaly analysis with latest
           data
         </div>

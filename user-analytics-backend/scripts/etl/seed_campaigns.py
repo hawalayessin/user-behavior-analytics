@@ -1,12 +1,12 @@
-"""
-seed_campaigns.py — Version FINALE
-Schéma campaigns figé (10 colonnes exactes):
+﻿"""
+seed_campaigns.py â€” Version FINALE
+SchÃ©ma campaigns figÃ© (10 colonnes exactes):
   id, name, description, service_id, send_datetime (NOT NULL),
   target_size, cost, campaign_type, status, created_at
 
 Usage:
-  python scripts/etl/seed_campaigns.py          # insérer + assigner
-  python scripts/etl/seed_campaigns.py --clear  # vider puis recréer
+  python scripts/etl/seed_campaigns.py          # insÃ©rer + assigner
+  python scripts/etl/seed_campaigns.py --clear  # vider puis recrÃ©er
   python scripts/etl/seed_campaigns.py --dry-run
 """
 from __future__ import annotations
@@ -22,16 +22,16 @@ CAMPAIGN_NS = uuid.UUID("88888888-8888-8888-8888-888888888888")
 
 TEMPLATES = [
     # slug, name, campaign_type, description, target_size, cost
-    ("ussd-ramadan-2025",    "Ramadan USSD Promo 2025",      "PROMOTIONAL",  "Campagne SMS push Ramadan — 50% sur abonnement mensuel",        120_000, 50_000.00),
-    ("ussd-back-school-25",  "Rentrée Scolaire USSD 2025",   "ACQUISITION",  "Push USSD ciblé étudiants/parents rentrée septembre 2025",       80_000, 35_000.00),
-    ("ussd-eid-offer-25",    "Offre Aïd USSD 2025",          "PROMOTIONAL",  "Offre spéciale Aïd El Adha — 3 jours accès gratuit",            95_000, 40_000.00),
-    ("ussd-summer-25",       "Promo Été USSD 2025",          "PROMOTIONAL",  "Campagne été — tarif réduit juillet-août 2025",                  70_000, 30_000.00),
-    ("ussd-retention-q4",    "Rétention Q4 USSD 2025",       "RETENTION",    "Relance abonnés inactifs depuis 15 jours via SMS",               45_000, 25_000.00),
-    ("ussd-reactivation-25", "Réactivation Inactifs USSD",   "REACTIVATION", "Ciblage désabonnés des 60 derniers jours — offre retour",        30_000, 20_000.00),
-    ("web-launch-sept-25",   "Lancement Sept WEB 2025",      "ACQUISITION",  "Bannières web et push notif — nouvelle offre septembre 2025",    25_000, 15_000.00),
-    ("web-promo-oct-25",     "Promo Octobre WEB 2025",       "PROMOTIONAL",  "Display octobre — réduction 30% premier mois",                   22_000, 12_000.00),
-    ("web-loyalty-25",       "Fidélité WEB 2025",            "RETENTION",    "Programme fidélité — email+push abonnés 6+ mois",                18_000, 10_000.00),
-    ("web-upsell-25",        "Upsell Premium WEB 2025",      "UPSELL",       "Upgrade vers offre premium — abonnés plan standard",             15_000,  8_000.00),
+    ("ussd-ramadan-2025",    "Ramadan USSD Promo 2025",      "PROMOTIONAL",  "Campagne SMS push Ramadan â€” 50% sur abonnement mensuel",        120_000, 50_000.00),
+    ("ussd-back-school-25",  "RentrÃ©e Scolaire USSD 2025",   "ACQUISITION",  "Push USSD ciblÃ© Ã©tudiants/parents rentrÃ©e septembre 2025",       80_000, 35_000.00),
+    ("ussd-eid-offer-25",    "Offre AÃ¯d USSD 2025",          "PROMOTIONAL",  "Offre spÃ©ciale AÃ¯d El Adha â€” 3 jours accÃ¨s gratuit",            95_000, 40_000.00),
+    ("ussd-summer-25",       "Promo Ã‰tÃ© USSD 2025",          "PROMOTIONAL",  "Campagne Ã©tÃ© â€” tarif rÃ©duit juillet-aoÃ»t 2025",                  70_000, 30_000.00),
+    ("ussd-retention-q4",    "RÃ©tention Q4 USSD 2025",       "RETENTION",    "Relance abonnÃ©s inactifs depuis 15 jours via SMS",               45_000, 25_000.00),
+    ("ussd-reactivation-25", "RÃ©activation Inactifs USSD",   "REACTIVATION", "Ciblage dÃ©sabonnÃ©s des 60 derniers jours â€” offre retour",        30_000, 20_000.00),
+    ("web-launch-sept-25",   "Lancement Sept WEB 2025",      "ACQUISITION",  "BanniÃ¨res web et push notif â€” nouvelle offre septembre 2025",    25_000, 15_000.00),
+    ("web-promo-oct-25",     "Promo Octobre WEB 2025",       "PROMOTIONAL",  "Display octobre â€” rÃ©duction 30% premier mois",                   22_000, 12_000.00),
+    ("web-loyalty-25",       "FidÃ©litÃ© WEB 2025",            "RETENTION",    "Programme fidÃ©litÃ© â€” email+push abonnÃ©s 6+ mois",                18_000, 10_000.00),
+    ("web-upsell-25",        "Upsell Premium WEB 2025",      "UPSELL",       "Upgrade vers offre premium â€” abonnÃ©s plan standard",             15_000,  8_000.00),
     ("organic-direct",       "Organique / Direct",           "ORGANIC",      "Souscriptions directes sans campagne payante",                  500_000,     0.00),
 ]
 
@@ -44,7 +44,7 @@ def get_anchor(engine) -> datetime:
     with engine.connect() as conn:
         val = conn.execute(text("SELECT MAX(event_datetime) FROM billing_events")).scalar()
     if val is None:
-        raise RuntimeError("billing_events vide — relancer ETL.")
+        raise RuntimeError("billing_events vide â€” relancer ETL.")
     if hasattr(val, "tzinfo") and val.tzinfo is None:
         val = val.replace(tzinfo=timezone.utc)
     log("Anchor", anchor=str(val))
@@ -80,7 +80,7 @@ def build(anchor: datetime, services: list[dict[str, Any]]) -> list[dict]:
             "cost":          cost,
             "campaign_type": ctype,
             "status":        "completed" if end < anchor else "active",
-            # ---- méta (non insérées) ----
+            # ---- mÃ©ta (non insÃ©rÃ©es) ----
             "_slug":    slug,
             "_start":   start,
             "_end":     end,
@@ -109,7 +109,7 @@ INSERT_SQL = text("""
 
 
 def db_rows(campaigns: list[dict]) -> list[dict]:
-    """Retourne seulement les clés sans préfixe _ pour l'INSERT."""
+    """Retourne seulement les clÃ©s sans prÃ©fixe _ pour l'INSERT."""
     return [{k: v for k, v in c.items() if not k.startswith("_")} for c in campaigns]
 
 
@@ -265,7 +265,7 @@ def do_assign(engine, dry_run: bool) -> int:
 
             total = by_service_total + fallback_total
             log(
-                "Subscriptions assignées",
+                "Subscriptions assignÃ©es",
                 by_service=by_service_total,
                 by_service_batches=by_service_batches,
                 organic_fallback=fallback_total,
@@ -325,7 +325,7 @@ def summary(engine) -> None:
         print(f"  {r.name:<40} {r.campaign_type:<14} {r.sub_count:>8,}  {r.send_date}")
     print("-"*78)
     pct = round(assigned*100/total, 1) if total else 0
-    print(f"  Assignées : {assigned:,} / {total:,}  ({pct}%)")
+    print(f"  AssignÃ©es : {assigned:,} / {total:,}  ({pct}%)")
     print("="*78 + "\n")
 
 
@@ -337,7 +337,7 @@ def main():
     p.add_argument("--clear",   action="store_true")
     args = p.parse_args()
 
-    url    = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345hawala@localhost:5433/analytics_db")
+    url    = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db")
     engine = create_engine(url, pool_pre_ping=True)
 
     log("start", dry_run=args.dry_run, clear=args.clear)
@@ -348,11 +348,11 @@ def main():
     anchor     = get_anchor(engine)
     services   = get_services(engine)
     if not services:
-        raise RuntimeError("Aucun service — relancer ETL.")
+        raise RuntimeError("Aucun service â€” relancer ETL.")
 
     campaigns  = build(anchor, services)
     log("Campaigns construites", count=len(campaigns),
-        sample_send=str(campaigns[0]["send_datetime"]))      # ← debug visible
+        sample_send=str(campaigns[0]["send_datetime"]))      # â† debug visible
 
     inserted   = do_insert(engine, campaigns, args.dry_run, pre_clean=not args.clear)
     assigned   = do_assign(engine, args.dry_run)
@@ -365,3 +365,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

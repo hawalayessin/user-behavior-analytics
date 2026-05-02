@@ -874,6 +874,56 @@ def import_history(
     return {"history": history}
 
 
+@router.get("/schema/{table}")
+def get_table_schema(
+    table: str,
+    db: Session = Depends(get_db),
+    current_user: PlatformUser = Depends(require_admin),
+):
+    _ = db
+    _ = current_user
+
+    if table not in TABLE_REGISTRY or table in EXCLUDED_TABLES:
+        raise HTTPException(status_code=404, detail="Unknown table")
+
+    reg = TABLE_REGISTRY[table]
+    required = list(reg.get("required", []))
+    optional = list(reg.get("optional", []))
+    defaults_excluded = list(reg.get("defaults_excluded", []))
+    fk_map = dict(reg.get("fk", {}))
+
+    columns = []
+    for col in required:
+        columns.append(
+            {
+                "name": col,
+                "role": "required",
+                "has_default": col in defaults_excluded,
+                "fk": fk_map.get(col),
+            }
+        )
+    for col in optional:
+        columns.append(
+            {
+                "name": col,
+                "role": "optional",
+                "has_default": col in defaults_excluded,
+                "fk": fk_map.get(col),
+            }
+        )
+
+    return {
+        "table": table,
+        "import_order": int(reg.get("import_order", 0) or 0),
+        "required": required,
+        "optional": optional,
+        "defaults_excluded": defaults_excluded,
+        "fk": fk_map,
+        "columns": columns,
+        "template_headers": required + optional,
+    }
+
+
 @router.get("/template/{table}")
 def download_template(
     table: str,

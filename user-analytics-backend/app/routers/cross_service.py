@@ -6,9 +6,12 @@ All endpoints support optional filters: start_date, end_date, service_id.
 
 from datetime import date, timedelta
 from typing import Optional
+import logging
+import time
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,6 +21,7 @@ from app.core.config import settings
 
 
 router = APIRouter(prefix="/analytics/cross-service", tags=["Cross-Service Behavior"])
+logger = logging.getLogger(__name__)
 
 
 def _cross_service_payload(
@@ -27,7 +31,7 @@ def _cross_service_payload(
     **_: object,
 ) -> dict:
     return {
-        "v": "cross-service-v2-journeys",
+        "v": "cross-service-v3-arpu-status-fix",
         "start_date": start_date.isoformat() if start_date else "auto",
         "end_date": end_date.isoformat() if end_date else "auto",
         "service_id": service_id or "all",
@@ -67,6 +71,14 @@ def _resolve_params(
 ) -> dict:
     """Resolve defaults and return a param dict."""
     start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+
+    # Cross-service joins can get expensive on very large windows.
+    # If the client sends no explicit range, clamp to a recent default window.
+    if start_date is None and end_date is None:
+        window_days = max(int(getattr(settings, "CROSS_SERVICE_DEFAULT_WINDOW_DAYS", 365)), 30)
+        bounded_start = end_dt - timedelta(days=window_days - 1)
+        if bounded_start > start_dt:
+            start_dt = bounded_start
 
     return {
         "start_dt": start_dt,
@@ -212,7 +224,12 @@ def get_overview(
                 SELECT
                     fs.user_id,
                     CASE WHEN usc.nb_services >= 2 THEN 'multi' ELSE 'mono' END AS segment,
-                    COALESCE(SUM(st.price) FILTER (WHERE be.status = 'SUCCESS'), 0) AS revenue
+                    COALESCE(
+                        SUM(st.price) FILTER (
+                            WHERE UPPER(TRIM(COALESCE(be.status, ''))) = 'SUCCESS'
+                        ),
+                        0
+                    ) AS revenue
                 FROM filtered_subs fs
                 JOIN user_service_count usc ON usc.user_id = fs.user_id
                 LEFT JOIN billing_events be ON be.subscription_id = fs.id
@@ -514,40 +531,118 @@ def get_all_cross_service(
     cache_key = build_cache_key(
         "cross-service:all",
         {
-            "v": "cross-service-v2-journeys",
+            "v": "cross-service-v3-arpu-status-fix",
             "start_date": start_dt.isoformat(),
             "end_date": end_dt.isoformat(),
             "service_id": service_id or "all",
         },
     )
 
+    def _safe_compute(section_name: str, compute_fn, fallback):
+        t0 = time.perf_counter()
+        try:
+            value = compute_fn()
+            took_ms = round((time.perf_counter() - t0) * 1000)
+            logger.info("cross_service.%s computed in %sms", section_name, took_ms)
+            return value, None, took_ms
+        except OperationalError as exc:
+            took_ms = round((time.perf_counter() - t0) * 1000)
+            logger.warning("cross_service.%s failed after %sms: %s", section_name, took_ms, exc)
+            return fallback, "database_timeout", took_ms
+        except Exception as exc:  # keep endpoint resilient for dashboard rendering
+            took_ms = round((time.perf_counter() - t0) * 1000)
+            logger.exception("cross_service.%s unexpected failure after %sms", section_name, took_ms)
+            return fallback, "internal_error", took_ms
+
+    def _compute_all_payload():
+        overview, overview_error, overview_ms = _safe_compute(
+            "overview",
+            lambda: get_overview(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            {
+                "multi_service_users": 0,
+                "multi_service_rate": 0,
+                "top_combo": {"service_a": "-", "service_b": "-", "count": 0},
+                "cross_retention_rate": 0,
+                "mono_retention_rate": 0,
+                "arpu_multi": 0,
+                "arpu_mono": 0,
+            },
+        )
+
+        co_subscriptions, co_subscriptions_error, co_subscriptions_ms = _safe_compute(
+            "co_subscriptions",
+            lambda: get_co_subscriptions(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            {"matrix": []},
+        )
+
+        migrations, migrations_error, migrations_ms = _safe_compute(
+            "migrations",
+            lambda: get_migrations(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            {
+                "migrations": [],
+                "standardized_paths": [],
+                "summary": {
+                    "total_users_in_scope": 0,
+                    "total_migration_users": 0,
+                    "top3_concentration_pct": 0,
+                },
+                "management_notes": [],
+            },
+        )
+
+        distribution, distribution_error, distribution_ms = _safe_compute(
+            "distribution",
+            lambda: get_distribution(
+                db=db,
+                start_date=start_dt,
+                end_date=end_dt,
+                service_id=service_id,
+            ),
+            {"distribution": []},
+        )
+
+        return {
+            "overview": overview,
+            "co_subscriptions": co_subscriptions,
+            "migrations": migrations,
+            "distribution": distribution,
+            "meta": {
+                "window": {
+                    "start_date": start_dt.isoformat(),
+                    "end_date": end_dt.isoformat(),
+                },
+                "timings_ms": {
+                    "overview": overview_ms,
+                    "co_subscriptions": co_subscriptions_ms,
+                    "migrations": migrations_ms,
+                    "distribution": distribution_ms,
+                },
+                "errors": {
+                    "overview": overview_error,
+                    "co_subscriptions": co_subscriptions_error,
+                    "migrations": migrations_error,
+                    "distribution": distribution_error,
+                },
+            },
+        }
+
     return cache_or_compute(
         cache_key,
         settings.CROSS_SERVICE_CACHE_TTL_SECONDS,
-        compute_function=lambda: {
-            "overview": get_overview(
-                db=db,
-                start_date=start_dt,
-                end_date=end_dt,
-                service_id=service_id,
-            ),
-            "co_subscriptions": get_co_subscriptions(
-                db=db,
-                start_date=start_dt,
-                end_date=end_dt,
-                service_id=service_id,
-            ),
-            "migrations": get_migrations(
-                db=db,
-                start_date=start_dt,
-                end_date=end_dt,
-                service_id=service_id,
-            ),
-            "distribution": get_distribution(
-                db=db,
-                start_date=start_dt,
-                end_date=end_dt,
-                service_id=service_id,
-            ),
-        },
+        compute_function=_compute_all_payload,
     )

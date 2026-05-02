@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import date
 from typing import Optional
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.utils.temporal import AnchorSource, get_data_bounds
 
-# Known data window for Hawala production snapshots loaded into analytics.
+# Known data window for prod_db production snapshots loaded into analytics.
 DATA_START_DATE = date(2025, 9, 1)
 DATA_END_DATE = date(2025, 10, 31)
 
@@ -52,3 +52,4 @@ def resolve_date_range(
         start_dt = end_dt
 
     return start_dt, end_dt
+

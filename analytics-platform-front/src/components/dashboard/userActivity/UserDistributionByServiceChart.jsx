@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
@@ -21,6 +22,7 @@ function CustomTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
 
   const row = payload[0]?.payload;
+  const metricLabel = row?.metric_label || "Subscriptions";
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl min-w-[180px]">
       <p className="text-xs text-slate-200 font-semibold mb-2">
@@ -28,7 +30,7 @@ function CustomTooltip({ active, payload }) {
       </p>
       <div className="space-y-1 text-xs">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-slate-400">Subscriptions</span>
+          <span className="text-slate-400">{metricLabel}</span>
           <span className="text-slate-100 font-semibold">
             {Number(row?.subscriptions || 0).toLocaleString()}
           </span>
@@ -46,6 +48,8 @@ function CustomTooltip({ active, payload }) {
 
 function ServiceLegendList({ rows }) {
   if (!rows?.length) return null;
+
+  const metricLabel = rows[0]?.metric_label || "subscriptions";
 
   return (
     <div className="w-full">
@@ -73,7 +77,8 @@ function ServiceLegendList({ rows }) {
               </div>
               <div className="text-right flex-shrink-0 tabular-nums">
                 <p className="text-sm text-slate-200 font-medium">
-                  {row.subscriptions.toLocaleString()} subscriptions
+                  {row.subscriptions.toLocaleString()}{" "}
+                  {metricLabel.toLowerCase()}
                 </p>
                 <p className="text-xs text-slate-400">
                   {row.percent.toFixed(1)}%
@@ -88,24 +93,58 @@ function ServiceLegendList({ rows }) {
 }
 
 export default function UserDistributionByServiceChart({ data }) {
-  const normalized = (data?.length ? data : FALLBACK_DATA)
+  const [subscriptionMode, setSubscriptionMode] = useState("all");
+
+  const normalized = useMemo(
+    () =>
+      (data?.length ? data : FALLBACK_DATA).map((item) => {
+        const total = Number(item.subscriptions || 0);
+        const active = Number(item.active_subscriptions || 0);
+        return {
+          service_name: item.service_name,
+          total_subscriptions: total,
+          active_subscriptions: Math.max(0, Math.min(active, total)),
+          non_active_subscriptions: Math.max(total - active, 0),
+        };
+      }),
+    [data],
+  );
+
+  const metricKey =
+    subscriptionMode === "active"
+      ? "active_subscriptions"
+      : subscriptionMode === "inactive"
+        ? "non_active_subscriptions"
+        : "total_subscriptions";
+
+  const metricLabel =
+    subscriptionMode === "active"
+      ? "Active Subscriptions"
+      : subscriptionMode === "inactive"
+        ? "Non-active Subscriptions"
+        : "Total Subscriptions";
+
+  const filtered = normalized
     .map((item) => ({
       service_name: item.service_name,
-      subscriptions: Number(item.subscriptions || 0),
+      subscriptions: Number(item[metricKey] || 0),
     }))
     .filter((item) => item.subscriptions > 0);
 
-  const totalSubscriptions = normalized.reduce(
+  const totalSubscriptions = filtered.reduce(
     (sum, item) => sum + item.subscriptions,
     0,
   );
-  const chartData = normalized.map((item) => ({
+
+  const chartData = filtered.map((item) => ({
     ...item,
+    metric_label: metricLabel,
     percent:
       totalSubscriptions > 0
         ? (item.subscriptions * 100) / totalSubscriptions
         : 0,
   }));
+
   const topService = chartData[0]?.service_name;
 
   return (
@@ -116,8 +155,43 @@ export default function UserDistributionByServiceChart({ data }) {
             Subscription Distribution by Service
           </h3>
           <p className="text-sm text-slate-400 mt-1">
-            Share of subscriptions by service
+            Share of {metricLabel.toLowerCase()} by service
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSubscriptionMode("all")}
+            className={`px-2.5 py-1.5 rounded-md text-xs border transition ${
+              subscriptionMode === "all"
+                ? "bg-slate-700 border-slate-500 text-slate-100"
+                : "bg-slate-800/70 border-slate-700 text-slate-300 hover:bg-slate-700/70"
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubscriptionMode("active")}
+            className={`px-2.5 py-1.5 rounded-md text-xs border transition ${
+              subscriptionMode === "active"
+                ? "bg-green-900/60 border-green-600 text-green-100"
+                : "bg-slate-800/70 border-slate-700 text-slate-300 hover:bg-slate-700/70"
+            }`}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubscriptionMode("inactive")}
+            className={`px-2.5 py-1.5 rounded-md text-xs border transition ${
+              subscriptionMode === "inactive"
+                ? "bg-amber-900/50 border-amber-600 text-amber-100"
+                : "bg-slate-800/70 border-slate-700 text-slate-300 hover:bg-slate-700/70"
+            }`}
+          >
+            Non-active
+          </button>
         </div>
         <div className="px-3.5 py-2 rounded-lg border border-slate-700 bg-slate-800/60 text-right flex-shrink-0">
           <p className="text-[11px] uppercase tracking-wide text-slate-400">
@@ -127,7 +201,7 @@ export default function UserDistributionByServiceChart({ data }) {
             {chartData.length}
           </p>
           <p className="text-[11px] text-slate-400 mt-1.5">
-            Total Subscriptions: {totalSubscriptions.toLocaleString()}
+            {metricLabel}: {totalSubscriptions.toLocaleString()}
           </p>
           {topService && (
             <p className="text-[11px] text-slate-500 mt-1.5">
@@ -188,7 +262,7 @@ export default function UserDistributionByServiceChart({ data }) {
                 dominantBaseline="middle"
                 className="fill-slate-400 text-xs"
               >
-                Total Subscriptions
+                {metricLabel}
               </text>
               <text
                 x="50%"
@@ -219,6 +293,7 @@ ServiceLegendList.propTypes = {
       service_name: PropTypes.string,
       subscriptions: PropTypes.number,
       percent: PropTypes.number,
+      metric_label: PropTypes.string,
     }),
   ),
 };
@@ -228,6 +303,7 @@ UserDistributionByServiceChart.propTypes = {
     PropTypes.shape({
       service_name: PropTypes.string,
       subscriptions: PropTypes.number,
+      active_subscriptions: PropTypes.number,
     }),
   ),
 };

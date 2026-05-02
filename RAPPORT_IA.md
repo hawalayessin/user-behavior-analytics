@@ -1,6 +1,6 @@
-# Rapport Technique — Modules d'Intelligence Artificielle
+﻿# Rapport Technique â€” Modules d'Intelligence Artificielle
 
-## Plateforme d'Analytics Comportementale — PFE 2025/2026
+## Plateforme d'Analytics Comportementale â€” PFE 2025/2026
 
 ---
 
@@ -8,19 +8,19 @@
 
 ### 0.1 Objet
 
-Ce document analyse les composants IA/ML implémentés dans le code source de la plateforme.
-Le rapport est basé sur lecture effective des fichiers backend, frontend, scripts ETL et artefacts modèles.
-Le but est de fournir un support académique pour soutenance PFE.
+Ce document analyse les composants IA/ML implÃ©mentÃ©s dans le code source de la plateforme.
+Le rapport est basÃ© sur lecture effective des fichiers backend, frontend, scripts ETL et artefacts modÃ¨les.
+Le but est de fournir un support acadÃ©mique pour soutenance PFE.
 
-### 0.2 Périmètre audité
+### 0.2 PÃ©rimÃ¨tre auditÃ©
 
-Périmètre backend Python/FastAPI/SQLAlchemy.
-Périmètre frontend React hooks + pages IA.
-Périmètre modèles sérialisés joblib.
-Périmètre ETL cohortes et logique churn.
-Périmètre détection d'anomalies côté API.
+PÃ©rimÃ¨tre backend Python/FastAPI/SQLAlchemy.
+PÃ©rimÃ¨tre frontend React hooks + pages IA.
+PÃ©rimÃ¨tre modÃ¨les sÃ©rialisÃ©s joblib.
+PÃ©rimÃ¨tre ETL cohortes et logique churn.
+PÃ©rimÃ¨tre dÃ©tection d'anomalies cÃ´tÃ© API.
 
-### 0.3 Sources auditées explicitement
+### 0.3 Sources auditÃ©es explicitement
 
 Fichier: user-analytics-backend/ml_models/churn_predictor.py
 Fichier: user-analytics-backend/ml_models/churn_metrics.joblib
@@ -62,40 +62,40 @@ Fichier: user-analytics-backend/app/utils/temporal.py
 Fichier: user-analytics-backend/app/core/date_ranges.py
 Fichier: user-analytics-backend/app/main.py
 
-### 0.4 Contexte métier rappelé
+### 0.4 Contexte mÃ©tier rappelÃ©
 
-Secteur: télécommunications numériques tunisiennes.
+Secteur: tÃ©lÃ©communications numÃ©riques tunisiennes.
 Services suivis: ElJournal, Esports.tn, ttoons, Tawer.
 Funnel: essai 3 jours puis renouvellement automatique.
 Canaux dominants: SMS/USSD.
-Fenêtre de données annoncée: septembre-octobre 2025.
-Volume annoncé: 228 707 transactions.
+FenÃªtre de donnÃ©es annoncÃ©e: septembre-octobre 2025.
+Volume annoncÃ©: 228 707 transactions.
 
-### 0.5 Méthodologie d'analyse
+### 0.5 MÃ©thodologie d'analyse
 
 Lecture statique du code source.
 Extraction de SQL exact des sections critiques.
 Inspection des objets joblib via Python.
-Croisement backend/frontend/schémas.
-Signalement explicite des écarts entre spécification attendue et implémentation réelle.
+Croisement backend/frontend/schÃ©mas.
+Signalement explicite des Ã©carts entre spÃ©cification attendue et implÃ©mentation rÃ©elle.
 
-### 0.6 Règle de traçabilité
+### 0.6 RÃ¨gle de traÃ§abilitÃ©
 
-Toute information non trouvée dans le code est marquée ainsi:
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
+Toute information non trouvÃ©e dans le code est marquÃ©e ainsi:
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
 
 ---
 
-## Résumé Exécutif (1 page)
+## RÃ©sumÃ© ExÃ©cutif (1 page)
 
 ### RE.1 Objectif des modules IA
 
-Le projet implémente trois briques IA/analytique avancée orientées décision opérationnelle.
-Brique 1: prédiction du churn supervisée pour prioriser la rétention.
+Le projet implÃ©mente trois briques IA/analytique avancÃ©e orientÃ©es dÃ©cision opÃ©rationnelle.
+Brique 1: prÃ©diction du churn supervisÃ©e pour prioriser la rÃ©tention.
 Brique 2: segmentation comportementale de type clustering pour personnaliser les campagnes.
-Brique 3: détection d'anomalies temporelles pour alerter sur incidents business.
+Brique 3: dÃ©tection d'anomalies temporelles pour alerter sur incidents business.
 
-### RE.2 Les 3 modules implémentés et rôle métier
+### RE.2 Les 3 modules implÃ©mentÃ©s et rÃ´le mÃ©tier
 
 Module Churn IA:
 Sortie: score de risque de churn par abonnement actif.
@@ -103,102 +103,102 @@ Usage: priorisation CRM, actions anti-churn, listes top risque.
 
 Module Segmentation K-Means:
 Sortie: cluster utilisateur et distribution des segments.
-Usage: ciblage marketing différencié et analyse de valeur par segment.
+Usage: ciblage marketing diffÃ©renciÃ© et analyse de valeur par segment.
 
-Module Détection d'anomalies:
-Sortie: événements anormaux par métrique/jour/sévérité.
-Usage: monitoring business et diagnostic rapide churn/revenus/activité.
+Module DÃ©tection d'anomalies:
+Sortie: Ã©vÃ©nements anormaux par mÃ©trique/jour/sÃ©vÃ©ritÃ©.
+Usage: monitoring business et diagnostic rapide churn/revenus/activitÃ©.
 
-### RE.3 Résultats clés observés (extraits réels)
+### RE.3 RÃ©sultats clÃ©s observÃ©s (extraits rÃ©els)
 
-Le modèle churn sérialisé est une LogisticRegression scikit-learn.
-Métriques extraites de churn_metrics.joblib:
+Le modÃ¨le churn sÃ©rialisÃ© est une LogisticRegression scikit-learn.
+MÃ©triques extraites de churn_metrics.joblib:
 Accuracy = 0.6594546191075198
 ROC-AUC = 0.8201320134904057
-Taux de churn entraînement = 0.9631460674157304
+Taux de churn entraÃ®nement = 0.9631460674157304
 n_samples = 1 172 575
 n_positive = 1 129 361
 n_negative = 43 214
 
-Le modèle segmentation sérialisé est un KMeans avec n_clusters=4.
-Fenêtre de training segmentation stockée:
+Le modÃ¨le segmentation sÃ©rialisÃ© est un KMeans avec n_clusters=4.
+FenÃªtre de training segmentation stockÃ©e:
 start_date = 2025-09-25T12:00:42.275986
 end_date = 2025-10-25T12:00:42.275986
 service_id = null
 
-### RE.4 Valeur ajoutée business
+### RE.4 Valeur ajoutÃ©e business
 
-Passage d'une lecture descriptive à une orchestration prescriptive.
-Le churn module permet d'anticiper les départs plutôt que de les constater.
-La segmentation facilite le design de campagnes SMS à ROI différencié.
-L'anomaly engine réduit le délai de détection des incidents invisibles sans surveillance statistique.
+Passage d'une lecture descriptive Ã  une orchestration prescriptive.
+Le churn module permet d'anticiper les dÃ©parts plutÃ´t que de les constater.
+La segmentation facilite le design de campagnes SMS Ã  ROI diffÃ©renciÃ©.
+L'anomaly engine rÃ©duit le dÃ©lai de dÃ©tection des incidents invisibles sans surveillance statistique.
 
 ### RE.5 Points forts techniques
 
-Architecture API claire par routeurs spécialisés.
-Feature engineering churn riche et ancré SQL.
-Persistance joblib des modèles.
-Intégration frontend opérationnelle pour churn et anomalies.
-Couches de cache TTL pour réduire la latence sur segmentation/churn dashboards.
+Architecture API claire par routeurs spÃ©cialisÃ©s.
+Feature engineering churn riche et ancrÃ© SQL.
+Persistance joblib des modÃ¨les.
+IntÃ©gration frontend opÃ©rationnelle pour churn et anomalies.
+Couches de cache TTL pour rÃ©duire la latence sur segmentation/churn dashboards.
 
-### RE.6 Risques critiques identifiés
+### RE.6 Risques critiques identifiÃ©s
 
-Déséquilibre extrême des classes churn dans les métriques sauvegardées.
-Ambiguïté entre définition métier du churn et label réel codé.
+DÃ©sÃ©quilibre extrÃªme des classes churn dans les mÃ©triques sauvegardÃ©es.
+AmbiguÃ¯tÃ© entre dÃ©finition mÃ©tier du churn et label rÃ©el codÃ©.
 Segmentation frontend contient encore des fallbacks mock.
-Détection anomalies mentionne Isolation Forest en texte mais non implémentée algorithmiquement.
-Incohérences entre endpoints demandés dans cahier et endpoints réellement exposés.
+DÃ©tection anomalies mentionne Isolation Forest en texte mais non implÃ©mentÃ©e algorithmiquement.
+IncohÃ©rences entre endpoints demandÃ©s dans cahier et endpoints rÃ©ellement exposÃ©s.
 
 ---
 
-## PARTIE I — PRÉDICTION DU CHURN
+## PARTIE I â€” PRÃ‰DICTION DU CHURN
 
-### 1.1 Contexte et Justification Métier
+### 1.1 Contexte et Justification MÃ©tier
 
 #### 1.1.1 Pourquoi le churn est critique ici
 
-Le modèle abonnement SMS/USSD repose sur récurrence de facturation.
-Une perte d'abonné diminue immédiatement revenu récurrent.
-La fenêtre d'intervention est courte à cause du cycle essai puis renouvellement.
-Les churn techniques peuvent signaler un incident système impactant en masse.
+Le modÃ¨le abonnement SMS/USSD repose sur rÃ©currence de facturation.
+Une perte d'abonnÃ© diminue immÃ©diatement revenu rÃ©current.
+La fenÃªtre d'intervention est courte Ã  cause du cycle essai puis renouvellement.
+Les churn techniques peuvent signaler un incident systÃ¨me impactant en masse.
 
 #### 1.1.2 Alignement avec le code
 
-Le code calcule des variables orientées comportement récent.
-Les features activité 7j/30j servent à détecter essoufflement usage.
+Le code calcule des variables orientÃ©es comportement rÃ©cent.
+Les features activitÃ© 7j/30j servent Ã  dÃ©tecter essoufflement usage.
 Les features billing capturent friction de paiement et parcours premier charge.
 Le marqueur trial churn cible la phase la plus fragile du funnel.
 
-#### 1.1.3 Exemple concret issu des métriques sauvegardées
+#### 1.1.3 Exemple concret issu des mÃ©triques sauvegardÃ©es
 
-Churn rate entraînement observé = 96.31%.
-Ce niveau est anormalement élevé pour un dataset non biaisé.
-Interprétation possible:
-Fenêtre d'apprentissage orientée historiques abonnements clôturés.
-Ou définition de label favorisant classes positives.
-Ou fuite de structure des données sources.
+Churn rate entraÃ®nement observÃ© = 96.31%.
+Ce niveau est anormalement Ã©levÃ© pour un dataset non biaisÃ©.
+InterprÃ©tation possible:
+FenÃªtre d'apprentissage orientÃ©e historiques abonnements clÃ´turÃ©s.
+Ou dÃ©finition de label favorisant classes positives.
+Ou fuite de structure des donnÃ©es sources.
 
-#### 1.1.4 Coût abonné perdu vs acquisition
+#### 1.1.4 CoÃ»t abonnÃ© perdu vs acquisition
 
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-Le code ne contient pas de modèle financier CAC/LTV explicite.
-Aucun coût unitaire acquisition n'est paramétré.
-Aucun calcul direct perte/retour d'investissement anti-churn n'est implémenté.
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+Le code ne contient pas de modÃ¨le financier CAC/LTV explicite.
+Aucun coÃ»t unitaire acquisition n'est paramÃ©trÃ©.
+Aucun calcul direct perte/retour d'investissement anti-churn n'est implÃ©mentÃ©.
 
-#### 1.1.5 Fenêtre d'intervention
+#### 1.1.5 FenÃªtre d'intervention
 
-Le scoring est réalisé sur abonnements actifs/trial.
-Le threshold par défaut pour classification binaire est 0.4.
-La catégorie risque est Low/Medium/High.
-L'endpoint /ml/churn/scores fournit top users priorisables immédiatement.
+Le scoring est rÃ©alisÃ© sur abonnements actifs/trial.
+Le threshold par dÃ©faut pour classification binaire est 0.4.
+La catÃ©gorie risque est Low/Medium/High.
+L'endpoint /ml/churn/scores fournit top users priorisables immÃ©diatement.
 
-### 1.2 Définition de la Variable Cible
+### 1.2 DÃ©finition de la Variable Cible
 
-#### 1.2.1 Définition effective dans le code
+#### 1.2.1 DÃ©finition effective dans le code
 
-La variable churned n'est pas définie par subscription_end_date IS NOT NULL.
-La définition effective est basée sur status.
-Règle codée:
+La variable churned n'est pas dÃ©finie par subscription_end_date IS NOT NULL.
+La dÃ©finition effective est basÃ©e sur status.
+RÃ¨gle codÃ©e:
 status in ('cancelled','expired') => churned=1
 sinon churned=0
 
@@ -211,15 +211,15 @@ CASE
 END AS churned
 ```
 
-#### 1.2.2 Écart avec documentation existante
+#### 1.2.2 Ã‰cart avec documentation existante
 
 docs/ml_churn_report.md mentionne:
 churned = 1 if subscription_end_date IS NOT NULL
 Cela n'est pas strictement conforme au code source actuel.
-Conclusion académique:
-La vérité de référence technique est la requête dans churn_predictor.py.
+Conclusion acadÃ©mique:
+La vÃ©ritÃ© de rÃ©fÃ©rence technique est la requÃªte dans churn_predictor.py.
 
-#### 1.2.3 Requête SQL de base (extrait exact)
+#### 1.2.3 RequÃªte SQL de base (extrait exact)
 
 ```sql
 WITH base AS (
@@ -253,17 +253,17 @@ WITH base AS (
 )
 ```
 
-#### 1.2.4 Pourquoi subscription_end_date IS NOT NULL n'est pas utilisé directement
+#### 1.2.4 Pourquoi subscription_end_date IS NOT NULL n'est pas utilisÃ© directement
 
-Le système peut contenir incohérences sur dates de fin selon source.
+Le systÃ¨me peut contenir incohÃ©rences sur dates de fin selon source.
 Le status est ici choisi comme signal principal de churn logique.
-Cette décision est cohérente avec commentaire dans classe ChurnPredictor.
+Cette dÃ©cision est cohÃ©rente avec commentaire dans classe ChurnPredictor.
 
-#### 1.2.5 Différence churn trial vs churn payant
+#### 1.2.5 DiffÃ©rence churn trial vs churn payant
 
-La feature is_trial_churn représente churn pendant période essai.
-Règle:
-unsubscription_datetime présent
+La feature is_trial_churn reprÃ©sente churn pendant pÃ©riode essai.
+RÃ¨gle:
+unsubscription_datetime prÃ©sent
 et days_since_subscription <= trial_duration_days
 Alors is_trial_churn = 1.
 
@@ -297,7 +297,7 @@ END AS days_to_first_unsub
 
 ### 1.3 Feature Engineering
 
-#### 1.3.1 Liste exhaustive des features utilisées
+#### 1.3.1 Liste exhaustive des features utilisÃ©es
 
 Feature names extraits exactement de self.feature_names:
 
@@ -313,17 +313,17 @@ Feature names extraits exactement de self.feature_names:
 
 #### 1.3.2 Tableau des features
 
-| Feature                   | Type      | Description                      | Formule/Source                                    | Justification métier                 |
+| Feature                   | Type      | Description                      | Formule/Source                                    | Justification mÃ©tier                 |
 | ------------------------- | --------- | -------------------------------- | ------------------------------------------------- | ------------------------------------ |
-| days_since_last_activity  | Numérique | Âge de dernière activité         | ref_time - MAX(user_activities.activity_datetime) | Mesure désengagement                 |
-| nb_activities_7d          | Numérique | Activité courte période          | COUNT activités 7 jours                           | Signal précoce attrition             |
-| nb_activities_30d         | Numérique | Activité mensuelle               | COUNT activités 30 jours                          | Stabilité usage                      |
-| billing_failures_30d      | Numérique | Echecs de facturation            | COUNT billing_events FAILED sur 30 jours          | Friction paiement et churn technique |
-| days_since_first_charge   | Numérique | Ancienneté depuis 1er succès     | ref_time - MIN(first successful first_charge)     | Maturité client                      |
-| is_trial_churn            | Binaire   | Churn pendant essai              | days_since_subscription <= trial_duration_days    | Fragilité période d'essai            |
-| avg_retention_d7          | Numérique | Rétention de cohorte du service  | cohorts.retention_d7                              | Qualité structurelle du service      |
-| service_billing_frequency | Numérique | Fréquence de facturation service | service_types.billing_frequency_days              | Impact cadence billing               |
-| days_to_first_unsub       | Numérique | Temps au churn                   | calcul depuis unsubscriptions sinon 999           | Intensité risque historique          |
+| days_since_last_activity  | NumÃ©rique | Ã‚ge de derniÃ¨re activitÃ©         | ref_time - MAX(user_activities.activity_datetime) | Mesure dÃ©sengagement                 |
+| nb_activities_7d          | NumÃ©rique | ActivitÃ© courte pÃ©riode          | COUNT activitÃ©s 7 jours                           | Signal prÃ©coce attrition             |
+| nb_activities_30d         | NumÃ©rique | ActivitÃ© mensuelle               | COUNT activitÃ©s 30 jours                          | StabilitÃ© usage                      |
+| billing_failures_30d      | NumÃ©rique | Echecs de facturation            | COUNT billing_events FAILED sur 30 jours          | Friction paiement et churn technique |
+| days_since_first_charge   | NumÃ©rique | AnciennetÃ© depuis 1er succÃ¨s     | ref_time - MIN(first successful first_charge)     | MaturitÃ© client                      |
+| is_trial_churn            | Binaire   | Churn pendant essai              | days_since_subscription <= trial_duration_days    | FragilitÃ© pÃ©riode d'essai            |
+| avg_retention_d7          | NumÃ©rique | RÃ©tention de cohorte du service  | cohorts.retention_d7                              | QualitÃ© structurelle du service      |
+| service_billing_frequency | NumÃ©rique | FrÃ©quence de facturation service | service_types.billing_frequency_days              | Impact cadence billing               |
+| days_to_first_unsub       | NumÃ©rique | Temps au churn                   | calcul depuis unsubscriptions sinon 999           | IntensitÃ© risque historique          |
 
 #### 1.3.3 SQL exact des LEFT JOIN LATERAL
 
@@ -371,26 +371,26 @@ LEFT JOIN LATERAL (
 
 #### 1.3.4 Gestion des valeurs nulles
 
-Usage systématique de COALESCE.
-Valeurs sentinelles observées:
-999 pour délais non définis.
+Usage systÃ©matique de COALESCE.
+Valeurs sentinelles observÃ©es:
+999 pour dÃ©lais non dÃ©finis.
 0 pour compteurs absents.
 
 #### 1.3.5 Traitement des valeurs infinies et NaN
 
-Côté Python:
+CÃ´tÃ© Python:
 X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
-Cette étape protège l'entraînement.
+Cette Ã©tape protÃ¨ge l'entraÃ®nement.
 
-#### 1.3.6 Analyse de corrélation attendue (théorique)
+#### 1.3.6 Analyse de corrÃ©lation attendue (thÃ©orique)
 
-nb_activities_30d élevé devrait réduire churn.
-billing_failures_30d élevé devrait augmenter churn.
-days_since_last_activity élevé devrait augmenter churn.
+nb_activities_30d Ã©levÃ© devrait rÃ©duire churn.
+billing_failures_30d Ã©levÃ© devrait augmenter churn.
+days_since_last_activity Ã©levÃ© devrait augmenter churn.
 Attention:
-Le signe des coefficients dépend du codage final du dataset.
+Le signe des coefficients dÃ©pend du codage final du dataset.
 
-#### 1.3.7 Coefficients réels extraits
+#### 1.3.7 Coefficients rÃ©els extraits
 
 | Feature                   |             Coefficient |
 | ------------------------- | ----------------------: |
@@ -405,20 +405,20 @@ Le signe des coefficients dépend du codage final du dataset.
 | days_to_first_unsub       |  -0.0007865075503406647 |
 
 Commentaire critique:
-Le signe positif de nb_activities_30d est contre-intuitif métier.
-Cela suggère un effet de confusion lié au dataset ou au label.
+Le signe positif de nb_activities_30d est contre-intuitif mÃ©tier.
+Cela suggÃ¨re un effet de confusion liÃ© au dataset ou au label.
 
 ### 1.4 Algorithme de Machine Learning
 
-#### 1.4.1 Identification précise de l'algorithme
+#### 1.4.1 Identification prÃ©cise de l'algorithme
 
-Import explicite observé:
+Import explicite observÃ©:
 from sklearn.linear_model import LogisticRegression
-Objet sérialisé churn_model.joblib:
+Objet sÃ©rialisÃ© churn_model.joblib:
 model_type = LogisticRegression
 module = sklearn.linear_model.\_logistic
 
-#### 1.4.2 Hyperparamètres observés
+#### 1.4.2 HyperparamÃ¨tres observÃ©s
 
 class_weight = balanced
 random_state = 42
@@ -430,17 +430,17 @@ penalty (get_params) = deprecated
 #### 1.4.3 Pourquoi cet algorithme est plausible ici
 
 Simple et robuste sur features tabulaires.
-Rapide à entraîner.
-Probabilités directement disponibles.
-Explicabilité via coefficients.
+Rapide Ã  entraÃ®ner.
+ProbabilitÃ©s directement disponibles.
+ExplicabilitÃ© via coefficients.
 
 #### 1.4.4 Limites de la Logistic Regression dans ce cas
 
-Linéarité log-odds potentiellement insuffisante pour comportement non linéaire.
-Sensibilité au déséquilibre et calibration.
-Dépendance forte à la qualité de feature engineering.
+LinÃ©aritÃ© log-odds potentiellement insuffisante pour comportement non linÃ©aire.
+SensibilitÃ© au dÃ©sÃ©quilibre et calibration.
+DÃ©pendance forte Ã  la qualitÃ© de feature engineering.
 
-#### 1.4.5 Formule mathématique
+#### 1.4.5 Formule mathÃ©matique
 
 Le score probabiliste est:
 
@@ -449,11 +449,11 @@ P(\text{churn}=1\mid X)=\sigma\left(\beta_0+\sum_{i=1}^{n}\beta_i x_i\right)
 =\frac{1}{1+e^{-\left(\beta_0+\sum_{i=1}^{n}\beta_i x_i\right)}}
 $$
 
-où $n=9$ features dans le code actuel.
+oÃ¹ $n=9$ features dans le code actuel.
 
-### 1.5 Pipeline d'Entraînement
+### 1.5 Pipeline d'EntraÃ®nement
 
-#### 1.5.1 Code d'entraînement exact (extrait)
+#### 1.5.1 Code d'entraÃ®nement exact (extrait)
 
 ```python
 def train(self, db_session: Session) -> dict[str, Any]:
@@ -535,43 +535,43 @@ def train(self, db_session: Session) -> dict[str, Any]:
     return metrics
 ```
 
-#### 1.5.2 Préparation des données
+#### 1.5.2 PrÃ©paration des donnÃ©es
 
 Dataset SQL au niveau abonnement.
-Sélection des 9 features.
+SÃ©lection des 9 features.
 Remplacement infinis/NaN.
-Cible castée en int.
+Cible castÃ©e en int.
 
 #### 1.5.3 Split train/test
 
 Ratio test = 20%.
 Random state = 42.
-Stratification activée si au moins 2 classes.
+Stratification activÃ©e si au moins 2 classes.
 
-#### 1.5.4 Validation croisée
+#### 1.5.4 Validation croisÃ©e
 
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-Aucune cross-validation k-fold observée dans churn_predictor.py.
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+Aucune cross-validation k-fold observÃ©e dans churn_predictor.py.
 
-#### 1.5.5 Sauvegarde modèle
+#### 1.5.5 Sauvegarde modÃ¨le
 
 churn_model.joblib pour l'estimateur.
-churn_metrics.joblib pour métriques et coefficients.
+churn_metrics.joblib pour mÃ©triques et coefficients.
 
-### 1.6 Métriques de Performance
+### 1.6 MÃ©triques de Performance
 
-#### 1.6.1 Tableau synthèse métriques réelles
+#### 1.6.1 Tableau synthÃ¨se mÃ©triques rÃ©elles
 
-| Métrique             |             Valeur | Interprétation                               |
+| MÃ©trique             |             Valeur | InterprÃ©tation                               |
 | -------------------- | -----------------: | -------------------------------------------- |
-| Accuracy             | 0.6594546191075198 | 65.95% de prédictions correctes globales     |
-| Precision (classe 1) |    0.9960185078237 | Très peu de faux positifs pour churn positif |
-| Recall (classe 1)    | 0.6490180279096125 | 64.90% des churns positifs détectés          |
+| Accuracy             | 0.6594546191075198 | 65.95% de prÃ©dictions correctes globales     |
+| Precision (classe 1) |    0.9960185078237 | TrÃ¨s peu de faux positifs pour churn positif |
+| Recall (classe 1)    | 0.6490180279096125 | 64.90% des churns positifs dÃ©tectÃ©s          |
 | F1 (classe 1)        | 0.7859204992320126 | Compromis precision/recall classe positive   |
-| AUC-ROC              | 0.8201320134904057 | Bonne séparation probabiliste globale        |
-| Churn rate train     | 0.9631460674157304 | Dataset extrêmement déséquilibré             |
+| AUC-ROC              | 0.8201320134904057 | Bonne sÃ©paration probabiliste globale        |
+| Churn rate train     | 0.9631460674157304 | Dataset extrÃªmement dÃ©sÃ©quilibrÃ©             |
 
-#### 1.6.2 Détail classification_report
+#### 1.6.2 DÃ©tail classification_report
 
 Classe 0:
 precision = 0.09225502095403852
@@ -591,26 +591,26 @@ recall = 0.6594546191075198
 f1 = 0.7631432796499046
 support = 234515
 
-#### 1.6.3 Pourquoi recall > precision peut être prioritaire métier
+#### 1.6.3 Pourquoi recall > precision peut Ãªtre prioritaire mÃ©tier
 
-Dans anti-churn, manquer un churner coûte revenu futur.
-Faux négatif = perte client non traitée.
-Faux positif = coût campagne inutile mais souvent inférieur à perte d'abonnement.
+Dans anti-churn, manquer un churner coÃ»te revenu futur.
+Faux nÃ©gatif = perte client non traitÃ©e.
+Faux positif = coÃ»t campagne inutile mais souvent infÃ©rieur Ã  perte d'abonnement.
 
 #### 1.6.4 Matrice de confusion
 
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-La matrice n'est pas persistée dans churn_metrics.joblib actuel.
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+La matrice n'est pas persistÃ©e dans churn_metrics.joblib actuel.
 
 #### 1.6.5 Analyse d'erreurs
 
-Risque majeur identifié:
-Très faible precision classe 0.
-Cela indique difficulté du modèle à reconnaître non-churn dans contexte très déséquilibré.
+Risque majeur identifiÃ©:
+TrÃ¨s faible precision classe 0.
+Cela indique difficultÃ© du modÃ¨le Ã  reconnaÃ®tre non-churn dans contexte trÃ¨s dÃ©sÃ©quilibrÃ©.
 Impact:
-Le modèle peut sur-qualifier churn selon perspective de classe minoritaire.
+Le modÃ¨le peut sur-qualifier churn selon perspective de classe minoritaire.
 
-### 1.7 Inférence et Scoring en Production
+### 1.7 InfÃ©rence et Scoring en Production
 
 #### 1.7.1 Fonction de scoring active (extrait exact)
 
@@ -647,7 +647,7 @@ def predict_active_subscriptions(
     df["risk_category"] = df["churn_risk"].apply(self._risk_category)
 ```
 
-#### 1.7.2 Catégories de risque
+#### 1.7.2 CatÃ©gories de risque
 
 Low si churn_risk < 0.3
 Medium si 0.3 <= churn_risk < 0.6
@@ -659,7 +659,7 @@ POST /ml/churn/train
 GET /ml/churn/metrics
 GET /ml/churn/scores
 
-#### 1.7.4 Schéma réponse train
+#### 1.7.4 SchÃ©ma rÃ©ponse train
 
 via ChurnTrainMetricsResponse:
 trained_at: str
@@ -672,7 +672,7 @@ n_negative: int
 report: dict
 coefficients: dict[str,float]
 
-#### 1.7.5 Schéma réponse scores
+#### 1.7.5 SchÃ©ma rÃ©ponse scores
 
 via ChurnScoresResponse:
 generated_at: str
@@ -689,7 +689,7 @@ churn_risk
 risk_category
 predicted_churn
 
-### 1.8 Intégration Frontend
+### 1.8 IntÃ©gration Frontend
 
 #### 1.8.1 Page et composants
 
@@ -705,7 +705,7 @@ useChurnPredictionTrain
 Chargement metrics depuis /ml/churn/metrics.
 Chargement scores depuis /ml/churn/scores avec params top/threshold.
 Action train admin via /ml/churn/train.
-Refresh simultané metrics+scores après entraînement.
+Refresh simultanÃ© metrics+scores aprÃ¨s entraÃ®nement.
 
 #### 1.8.3 Visualisations disponibles
 
@@ -732,85 +732,85 @@ const res = await api.get("/ml/churn/scores", {
 });
 ```
 
-#### 1.8.5 Niveau de maturité UX
+#### 1.8.5 Niveau de maturitÃ© UX
 
-Gestion loading, erreurs, retry présents.
-Options topN et threshold éditables.
-Affichage catégories colorées Low/Medium/High.
-Pas d'explicabilité locale type SHAP dans UI.
+Gestion loading, erreurs, retry prÃ©sents.
+Options topN et threshold Ã©ditables.
+Affichage catÃ©gories colorÃ©es Low/Medium/High.
+Pas d'explicabilitÃ© locale type SHAP dans UI.
 
-### 1.9 Limites et Améliorations Futures
+### 1.9 Limites et AmÃ©liorations Futures
 
 #### 1.9.1 Limites actuelles
 
-Déséquilibre classes très fort.
+DÃ©sÃ©quilibre classes trÃ¨s fort.
 Absence de calibration probabiliste explicite.
-Pas de monitoring drift implémenté.
+Pas de monitoring drift implÃ©mentÃ©.
 Pas de validation temporelle walk-forward.
 
 #### 1.9.2 Risque de leakage
 
 Le code tente de limiter leakage via ref_time = subscription_end_date pour churned.
 C'est une bonne pratique partielle.
-Reste un risque selon disponibilité temporelle de certaines tables agrégées.
+Reste un risque selon disponibilitÃ© temporelle de certaines tables agrÃ©gÃ©es.
 
 #### 1.9.3 Drift temporel
 
-Fenêtre production observée 2025-09 à 2025-10.
-Applicabilité hors fenêtre non garantie.
+FenÃªtre production observÃ©e 2025-09 Ã  2025-10.
+ApplicabilitÃ© hors fenÃªtre non garantie.
 
-#### 1.9.4 Recommandations concrètes
+#### 1.9.4 Recommandations concrÃ¨tes
 
 Ajouter split temporel train/validation/test.
 Tester XGBoost/LightGBM en benchmark.
 Ajouter calibration Platt/Isotonic.
 Ajouter SHAP global + local.
-Automatiser réentraînement mensuel.
-Versionner modèle + métriques + data slice.
+Automatiser rÃ©entraÃ®nement mensuel.
+Versionner modÃ¨le + mÃ©triques + data slice.
 
 ---
 
-## PARTIE II — SEGMENTATION UTILISATEURS (K-MEANS)
+## PARTIE II â€” SEGMENTATION UTILISATEURS (K-MEANS)
 
-### 2.1 Contexte et Objectif Métier
+### 2.1 Contexte et Objectif MÃ©tier
 
-#### 2.1.1 Besoin métier
+#### 2.1.1 Besoin mÃ©tier
 
-Tous les abonnés n'ont pas la même valeur.
-Les campagnes massives non segmentées dégradent ROI.
+Tous les abonnÃ©s n'ont pas la mÃªme valeur.
+Les campagnes massives non segmentÃ©es dÃ©gradent ROI.
 La segmentation permet personnalisation des offres SMS.
 
-#### 2.1.2 Cas d'usage opérationnels
+#### 2.1.2 Cas d'usage opÃ©rationnels
 
 Campagnes upsell sur Power Users.
-Réactivation sur Occasionnels.
-Parcours onboarding renforcé sur Trial Only.
-Priorisation support sur segments à fort churn.
+RÃ©activation sur Occasionnels.
+Parcours onboarding renforcÃ© sur Trial Only.
+Priorisation support sur segments Ã  fort churn.
 
-### 2.2 Données Sources et Préparation
+### 2.2 DonnÃ©es Sources et PrÃ©paration
 
-#### 2.2.1 Tables exploitées par segmentation_repo
+#### 2.2.1 Tables exploitÃ©es par segmentation_repo
 
 subscriptions
 billing_events
 services
 service_types
 
-#### 2.2.2 Features effectivement utilisées pour clustering service
+#### 2.2.2 Features effectivement utilisÃ©es pour clustering service
 
-Contrairement au template théorique, l'entraînement KMeans utilise deux dimensions principales:
+Contrairement au template thÃ©orique, l'entraÃ®nement KMeans utilise deux dimensions principales:
 Feature x: ratio billing_count vs percentile p75_billing.
 Feature y: ratio revenue vs percentile p75_revenue.
 
-#### 2.2.3 Tableau de mapping feature/source réel
+#### 2.2.3 Tableau de mapping feature/source rÃ©el
 
-| Feature       | Table source                         | Agrégation                          | Normalisation                                    |
+| Feature       | Table source                         | AgrÃ©gation                          | Normalisation                                    |
 | ------------- | ------------------------------------ | ----------------------------------- | ------------------------------------------------ |
 | billing_count | billing_events + subscriptions       | COUNT events SUCCESS par user       | ratio contre percentile p75                      |
 | revenue       | service_types.price + billing_events | SUM(price) SUCCESS par user         | ratio contre percentile p75                      |
-| x             | dérivée                              | LEAST(billing_count/p75_billing,1)  | StandardScaler au train                          |
-| y             | dérivée                              | LEAST(revenue/p75_revenue,1)        | StandardScaler au train                          |
-| active_days   | billing_events                       | COUNT DISTINCT DATE(event_datetime) | utilisé en profiling, pas training KMeans direct |
+| x             | dÃ©rivÃ©e                              | LEAST(billing_count/p75_billing,1)  | StandardScaler au train                          |
+| y             | dÃ©rivÃ©e                              | LEAST(revenue/p75_revenue,1)        | StandardScaler au train                          |
+| active_days   | billing_events                       | COUNT DISTINCT DATE(event_datetime) | utilisÃ© en profiling, pas training KMeans direct |
 
 #### 2.2.4 SQL extraction principal (exact)
 
@@ -883,13 +883,13 @@ ORDER BY revenue DESC
 LIMIT 50000
 ```
 
-#### 2.2.5 Commentaire méthodologique
+#### 2.2.5 Commentaire mÃ©thodologique
 
-Le clustering visuel consommé frontend est déjà segmenté SQL par règles percentiles.
-Le train KMeans sert surtout à construire artefact modèle et mapping.
+Le clustering visuel consommÃ© frontend est dÃ©jÃ  segmentÃ© SQL par rÃ¨gles percentiles.
+Le train KMeans sert surtout Ã  construire artefact modÃ¨le et mapping.
 Il existe donc un double paradigme:
 Segmentation SQL heuristique pour API runtime.
-KMeans pour entraînement explicite et persistance.
+KMeans pour entraÃ®nement explicite et persistance.
 
 ### 2.3 Algorithme K-Means
 
@@ -901,7 +901,7 @@ $$
 J = \sum_{i=1}^{k} \sum_{x \in C_i} \|x - \mu_i\|^2
 $$
 
-#### 2.3.2 Paramètres réels
+#### 2.3.2 ParamÃ¨tres rÃ©els
 
 n_clusters = 4
 random_state = 42
@@ -909,7 +909,7 @@ n_init = 10
 algorithm = lloyd
 max_iter = 300
 
-#### 2.3.3 Code exact d'entraînement
+#### 2.3.3 Code exact d'entraÃ®nement
 
 ```python
 feature_matrix = np.array(
@@ -926,99 +926,99 @@ labels = model.fit_predict(x_scaled)
 
 #### 2.3.4 Choix K=4
 
-K=4 est codé en dur.
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-Aucune implémentation Elbow ou Silhouette observée.
+K=4 est codÃ© en dur.
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+Aucune implÃ©mentation Elbow ou Silhouette observÃ©e.
 
 #### 2.3.5 Convergence
 
-Critère interne géré par implémentation sklearn.
+CritÃ¨re interne gÃ©rÃ© par implÃ©mentation sklearn.
 Pas de logique custom de convergence dans le code.
 
 ### 2.4 Description des 4 Segments
 
-#### 2.4.1 Segments réellement présents
+#### 2.4.1 Segments rÃ©ellement prÃ©sents
 
 Power Users
 Regular Loyals
 Occasional Users
 Trial Only
 
-#### 2.4.2 Mécanisme de construction profils
+#### 2.4.2 MÃ©canisme de construction profils
 
-Profiling via requêtes SQL agrégées.
-Métriques profil:
+Profiling via requÃªtes SQL agrÃ©gÃ©es.
+MÃ©triques profil:
 ARPU moyen
 jours actifs moyens
 churn_rate segment
 
-#### 2.4.3 Fiche Segment 1 — Power Users
+#### 2.4.3 Fiche Segment 1 â€” Power Users
 
 Profil:
 billing_count et revenue dans quantile haut.
-Valeur métier:
+Valeur mÃ©tier:
 haut ARPU, prioritaire upsell.
 Risque churn:
-calculé via jointure subscriptions status.
+calculÃ© via jointure subscriptions status.
 Recommandation:
 pack premium multi-services.
 
-#### 2.4.4 Fiche Segment 2 — Regular Loyals
+#### 2.4.4 Fiche Segment 2 â€” Regular Loyals
 
 Profil:
-usage/révenue médian-haut stable.
-Valeur métier:
-base récurrente principale.
+usage/rÃ©venue mÃ©dian-haut stable.
+Valeur mÃ©tier:
+base rÃ©currente principale.
 Risque churn:
-intermédiaire selon période.
+intermÃ©diaire selon pÃ©riode.
 Recommandation:
-fidélisation + cross-sell progressif.
+fidÃ©lisation + cross-sell progressif.
 
-#### 2.4.5 Fiche Segment 3 — Occasional Users
+#### 2.4.5 Fiche Segment 3 â€” Occasional Users
 
 Profil:
-activité sporadique et revenu faible-moyen.
-Valeur métier:
+activitÃ© sporadique et revenu faible-moyen.
+Valeur mÃ©tier:
 fort potentiel de conversion.
 Risque churn:
-plus élevé que loyaux.
+plus Ã©levÃ© que loyaux.
 Recommandation:
-campagnes réactivation hebdomadaires.
+campagnes rÃ©activation hebdomadaires.
 
-#### 2.4.6 Fiche Segment 4 — Trial Only
+#### 2.4.6 Fiche Segment 4 â€” Trial Only
 
 Profil:
 faible ou nul billing success.
-Valeur métier:
-faible instantanée mais critique pour croissance.
+Valeur mÃ©tier:
+faible instantanÃ©e mais critique pour croissance.
 Risque churn:
-élevé.
+Ã©levÃ©.
 Recommandation:
-onboarding renforcé + offres d'activation J1/J2/J3.
+onboarding renforcÃ© + offres d'activation J1/J2/J3.
 
 #### 2.4.7 Tableau comparatif
 
-| Métrique         | Power Users                             | Regular Loyals                          | Occasionnels                            | Trial Only                              |
+| MÃ©trique         | Power Users                             | Regular Loyals                          | Occasionnels                            | Trial Only                              |
 | ---------------- | --------------------------------------- | --------------------------------------- | --------------------------------------- | --------------------------------------- |
-| Activité moyenne | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| ARPU (TND)       | Exposé via profiles API                 | Exposé via profiles API                 | Exposé via profiles API                 | Exposé via profiles API                 |
-| Lifetime (jours) | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Churn Rate       | Exposé via profiles API                 | Exposé via profiles API                 | Exposé via profiles API                 | Exposé via profiles API                 |
-| % base           | Exposé via distribution API             | Exposé via distribution API             | Exposé via distribution API             | Exposé via distribution API             |
+| ActivitÃ© moyenne | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| ARPU (TND)       | ExposÃ© via profiles API                 | ExposÃ© via profiles API                 | ExposÃ© via profiles API                 | ExposÃ© via profiles API                 |
+| Lifetime (jours) | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Churn Rate       | ExposÃ© via profiles API                 | ExposÃ© via profiles API                 | ExposÃ© via profiles API                 | ExposÃ© via profiles API                 |
+| % base           | ExposÃ© via distribution API             | ExposÃ© via distribution API             | ExposÃ© via distribution API             | ExposÃ© via distribution API             |
 
-### 2.5 Méthode d'Assignation des Labels
+### 2.5 MÃ©thode d'Assignation des Labels
 
 #### 2.5.1 Dans la logique SQL runtime
 
-Labels assignés par règles percentiles:
+Labels assignÃ©s par rÃ¨gles percentiles:
 haut billing + haut revenue => Power Users
-médian billing + médian revenue => Regular Loyals
+mÃ©dian billing + mÃ©dian revenue => Regular Loyals
 billing > 0 sinon => Occasional Users
 sinon => Trial Only
 
 #### 2.5.2 Dans la logique KMeans train
 
-Après clustering, labels re-mappés par revenu moyen cluster.
+AprÃ¨s clustering, labels re-mappÃ©s par revenu moyen cluster.
 Ordre low->high:
 Trial Only
 Occasional Users
@@ -1037,18 +1037,18 @@ names_low_to_high = ["Trial Only", "Occasional Users", "Regular Loyals", "Power 
 rank_map = {cluster: names_low_to_high[idx] for idx, cluster in enumerate(ordered_clusters)}
 ```
 
-#### 2.5.3 rank_map observé dans artefact
+#### 2.5.3 rank_map observÃ© dans artefact
 
 {"1": "Trial Only", "2": "Occasional Users", "3": "Regular Loyals", "0": "Power Users"}
 
-### 2.6 Visualisation et Interprétation
+### 2.6 Visualisation et InterprÃ©tation
 
 #### 2.6.1 Clustering Map
 
 Frontend: UserSegmentationPage.jsx
 Type: ScatterChart.
-Axe X: Axis 1 — Activity / Usage Frequency.
-Axe Y: Axis 2 — ARPU / Value.
+Axe X: Axis 1 â€” Activity / Usage Frequency.
+Axe Y: Axis 2 â€” ARPU / Value.
 Couleurs par segment via SEGMENT_COLORS.
 
 #### 2.6.2 Segment Size Distribution
@@ -1062,8 +1062,8 @@ Source: /analytics/segmentation/clusters distribution.
 PieChart donut.
 Affiche proportions par segment.
 Note critique:
-userCount hardcodé à 1.2M dans composant.
-Peut diverger du réel.
+userCount hardcodÃ© Ã  1.2M dans composant.
+Peut diverger du rÃ©el.
 
 #### 2.6.4 Radar Chart comportemental
 
@@ -1076,9 +1076,9 @@ Loyalty
 Engagement
 
 Important:
-Ce radar n'est pas alimenté par backend en l'état.
+Ce radar n'est pas alimentÃ© par backend en l'Ã©tat.
 
-### 2.7 Endpoints et Intégration
+### 2.7 Endpoints et IntÃ©gration
 
 #### 2.7.1 Endpoints backend segmentation
 
@@ -1087,7 +1087,7 @@ GET /analytics/segmentation/clusters
 GET /analytics/segmentation/profiles
 POST /analytics/segmentation/train
 
-#### 2.7.2 Schéma réponses
+#### 2.7.2 SchÃ©ma rÃ©ponses
 
 KPIResponse:
 total_segments
@@ -1116,44 +1116,44 @@ useSegmentationClusters -> /clusters
 useSegmentationProfiles -> /profiles
 train action via api.post('/analytics/segmentation/train')
 
-### 2.8 Limites et Améliorations
+### 2.8 Limites et AmÃ©liorations
 
-#### 2.8.1 Limites identifiées
+#### 2.8.1 Limites identifiÃ©es
 
-K fixé sans preuve quantitative dans code.
-Front mixe data réelle et fallback mock.
-Radar non connecté données réelles.
+K fixÃ© sans preuve quantitative dans code.
+Front mixe data rÃ©elle et fallback mock.
+Radar non connectÃ© donnÃ©es rÃ©elles.
 Double logique segmentation SQL + KMeans pouvant diverger.
 
-#### 2.8.2 Améliorations recommandées
+#### 2.8.2 AmÃ©liorations recommandÃ©es
 
 Ajouter Silhouette Score et Davies-Bouldin.
-Tester DBSCAN/HDBSCAN pour structures non sphériques.
+Tester DBSCAN/HDBSCAN pour structures non sphÃ©riques.
 Supprimer mocks frontend en production.
-Exposer centres de clusters et métriques stabilité temporelle.
-Versionner dataset segmentation utilisé au train.
+Exposer centres de clusters et mÃ©triques stabilitÃ© temporelle.
+Versionner dataset segmentation utilisÃ© au train.
 
 ---
 
-## PARTIE III — DÉTECTION D'ANOMALIES
+## PARTIE III â€” DÃ‰TECTION D'ANOMALIES
 
 ### 3.1 Contexte et Justification
 
-#### 3.1.1 Pourquoi critique en télécom
+#### 3.1.1 Pourquoi critique en tÃ©lÃ©com
 
-Chute DAU soudaine peut indiquer panne accès.
-Pic churn peut révéler incident facturation ou qualité service.
+Chute DAU soudaine peut indiquer panne accÃ¨s.
+Pic churn peut rÃ©vÃ©ler incident facturation ou qualitÃ© service.
 Anomalie revenu peut signaler rupture pipeline billing.
 
-#### 3.1.2 Implémentation observée
+#### 3.1.2 ImplÃ©mentation observÃ©e
 
-Module anomalies est exposé via router /anomalies.
-Calcul anomalies à la volée sur séries quotidiennes.
-Pas de persistance table anomalies observée dans code actuel.
+Module anomalies est exposÃ© via router /anomalies.
+Calcul anomalies Ã  la volÃ©e sur sÃ©ries quotidiennes.
+Pas de persistance table anomalies observÃ©e dans code actuel.
 
-### 3.2 Méthode : Z-Score sur Fenêtre Glissante
+### 3.2 MÃ©thode : Z-Score sur FenÃªtre Glissante
 
-#### 3.2.1 Formule utilisée
+#### 3.2.1 Formule utilisÃ©e
 
 $$
 z_t = \frac{x_t - \mu_{t-w:t-1}}{\sigma_{t-w:t-1}}
@@ -1161,7 +1161,7 @@ $$
 
 avec $w=14$ jours selon code.
 
-#### 3.2.2 Extrait exact détection
+#### 3.2.2 Extrait exact dÃ©tection
 
 ```python
 for metric in metrics:
@@ -1178,39 +1178,39 @@ for metric in metrics:
         sev = _severity_for_z(z_score)
 ```
 
-#### 3.2.3 Seuils réels implémentés
+#### 3.2.3 Seuils rÃ©els implÃ©mentÃ©s
 
 |z| >= 4 => critical
 |z| >= 3 => high
 |z| >= 2 => medium
 
 Note:
-Le cahier demandait medium à 2.5.
-Le code réel utilise 2.0.
+Le cahier demandait medium Ã  2.5.
+Le code rÃ©el utilise 2.0.
 
 #### 3.2.4 Mention Isolation Forest
 
 Le texte UI et insights mentionne "Z-Score + Isolation Forest".
-Aucun calcul IsolationForest observé dans router anomalies.py.
+Aucun calcul IsolationForest observÃ© dans router anomalies.py.
 Conclusion:
-Isolation Forest est [NON TROUVÉ DANS LE CODE — À COMPLÉTER].
+Isolation Forest est [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER].
 
-### 3.3 Métriques Surveillées
+### 3.3 MÃ©triques SurveillÃ©es
 
-#### 3.3.1 Liste réelle
+#### 3.3.1 Liste rÃ©elle
 
 metrics = (dau, churn_rate, revenue, renewals)
 
-#### 3.3.2 Tableau source/agrégation
+#### 3.3.2 Tableau source/agrÃ©gation
 
-| Métrique   | Source SQL                           | Agrégation                    | Seuil critique |
+| MÃ©trique   | Source SQL                           | AgrÃ©gation                    | Seuil critique |
 | ---------- | ------------------------------------ | ----------------------------- | -------------- | --- | ------------ |
 | DAU        | user_activities                      | COUNT DISTINCT user_id / jour |                | z   | >=4 critical |
 | Churn Rate | unsubscriptions + active_base        | COUNT churn / actifs \*100    |                | z   | >=4 critical |
 | Revenue    | billing_events + service_types.price | SUM(price) success / jour     |                | z   | >=4 critical |
 | Renewals   | billing_events                       | COUNT success / jour          |                | z   | >=4 critical |
 
-#### 3.3.3 Requête quotidienne exacte (extrait)
+#### 3.3.3 RequÃªte quotidienne exacte (extrait)
 
 ```sql
 WITH days AS (
@@ -1251,46 +1251,46 @@ revenue_daily AS (
 )
 ```
 
-### 3.4 Pipeline de Détection
+### 3.4 Pipeline de DÃ©tection
 
-#### 3.4.1 Fréquence d'exécution
+#### 3.4.1 FrÃ©quence d'exÃ©cution
 
 Pas de scheduler explicite dans code router.
-Détection déclenchée:
+DÃ©tection dÃ©clenchÃ©e:
 au chargement endpoints
 ou via POST /anomalies/run-detection
 
-#### 3.4.2 Fenêtrage temporel
+#### 3.4.2 FenÃªtrage temporel
 
-Résolution des dates via resolve_date_range(source='billing').
-Cap de sécurité MAX_ANOMALY_RANGE_DAYS = 120.
+RÃ©solution des dates via resolve_date_range(source='billing').
+Cap de sÃ©curitÃ© MAX_ANOMALY_RANGE_DAYS = 120.
 
-#### 3.4.3 Niveaux de sévérité
+#### 3.4.3 Niveaux de sÃ©vÃ©ritÃ©
 
 critical/high/medium selon z-score absolu.
-Direction dérivée:
+Direction dÃ©rivÃ©e:
 spike si z_score > 0
 drop sinon.
 
 #### 3.4.4 Persistance anomalies
 
-Table anomalies persistée:
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-Le code génère IDs uuid temporaires en mémoire par appel.
+Table anomalies persistÃ©e:
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+Le code gÃ©nÃ¨re IDs uuid temporaires en mÃ©moire par appel.
 
-### 3.5 Schéma de Table Anomalies
+### 3.5 SchÃ©ma de Table Anomalies
 
-#### 3.5.1 Schéma demandé dans prompt
+#### 3.5.1 SchÃ©ma demandÃ© dans prompt
 
-Le schéma CREATE TABLE fourni par le cahier n'est pas observé dans les migrations auditées.
-Aucun modèle SQLAlchemy anomalies n'a été trouvé.
+Le schÃ©ma CREATE TABLE fourni par le cahier n'est pas observÃ© dans les migrations auditÃ©es.
+Aucun modÃ¨le SQLAlchemy anomalies n'a Ã©tÃ© trouvÃ©.
 
-#### 3.5.2 Position académique
+#### 3.5.2 Position acadÃ©mique
 
-Inclure ce schéma comme cible d'industrialisation.
-Le marquer "non implémenté" dans code actuel.
+Inclure ce schÃ©ma comme cible d'industrialisation.
+Le marquer "non implÃ©mentÃ©" dans code actuel.
 
-#### 3.5.3 Schéma cible proposé
+#### 3.5.3 SchÃ©ma cible proposÃ©
 
 ```sql
 CREATE TABLE anomalies (
@@ -1319,7 +1319,7 @@ CREATE INDEX idx_anomalies_service_metric
 
 ### 3.6 Endpoints et Visualisation
 
-#### 3.6.1 Endpoints réels exposés
+#### 3.6.1 Endpoints rÃ©els exposÃ©s
 
 GET /anomalies/summary
 GET /anomalies/timeline
@@ -1329,23 +1329,23 @@ GET /anomalies/details
 GET /anomalies/insights
 POST /anomalies/run-detection
 
-#### 3.6.2 Écart avec endpoints demandés
+#### 3.6.2 Ã‰cart avec endpoints demandÃ©s
 
 Le prompt mentionne /analytics/anomalies.
-Implémentation réelle utilise préfixe /anomalies.
+ImplÃ©mentation rÃ©elle utilise prÃ©fixe /anomalies.
 Endpoint POST /analytics/anomalies/{id}/status:
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
 
 #### 3.6.3 Visualisations frontend anomalies
 
-Timeline multi-métriques + points anomalies.
+Timeline multi-mÃ©triques + points anomalies.
 Heatmap services x semaines.
-Pie distribution sévérité.
-Bars anomalies par métrique.
-Table détails paginée.
+Pie distribution sÃ©vÃ©ritÃ©.
+Bars anomalies par mÃ©trique.
+Table dÃ©tails paginÃ©e.
 Cartes insights textuelles.
 
-#### 3.6.4 Schémas de réponse observés
+#### 3.6.4 SchÃ©mas de rÃ©ponse observÃ©s
 
 summary:
 anomalies_detected
@@ -1366,156 +1366,156 @@ items[] + total + limit + offset
 
 #### 3.7.1 Limites du Z-score
 
-Hypothèse implicite de stationnarité locale.
-Sensibilité aux fenêtres courtes et petits échantillons.
-Faux positifs en présence de saisonnalité non modélisée.
+HypothÃ¨se implicite de stationnaritÃ© locale.
+SensibilitÃ© aux fenÃªtres courtes et petits Ã©chantillons.
+Faux positifs en prÃ©sence de saisonnalitÃ© non modÃ©lisÃ©e.
 
 #### 3.7.2 Alternatives robustes
 
-IQR par métrique et service.
+IQR par mÃ©trique et service.
 Median Absolute Deviation.
 Prophet residual anomaly detection.
-Isolation Forest multivarié réel.
+Isolation Forest multivariÃ© rÃ©el.
 
-#### 3.7.3 Limite volumétrique
+#### 3.7.3 Limite volumÃ©trique
 
-Fenêtre de données courte (2 mois) restreint robustesse temporelle.
+FenÃªtre de donnÃ©es courte (2 mois) restreint robustesse temporelle.
 Avec w=14, seulement ~46 points activement exploitables sur 60 jours.
 
 ---
 
-## PARTIE IV — COMPARAISON ET SYNTHÈSE
+## PARTIE IV â€” COMPARAISON ET SYNTHÃˆSE
 
 ### 4.1 Tableau Comparatif des 3 Modules IA
 
-| Critère          | Prédiction Churn                        | Segmentation K-Means                   | Détection Anomalies                  |
+| CritÃ¨re          | PrÃ©diction Churn                        | Segmentation K-Means                   | DÃ©tection Anomalies                  |
 | ---------------- | --------------------------------------- | -------------------------------------- | ------------------------------------ |
-| Type d'IA        | Supervisé                               | Non supervisé + heuristique SQL        | Statistique                          |
+| Type d'IA        | SupervisÃ©                               | Non supervisÃ© + heuristique SQL        | Statistique                          |
 | Algorithme       | LogisticRegression                      | KMeans (n=4)                           | Z-Score rolling                      |
-| Données d'entrée | Features abonnement/comportement        | x,y dérivés billing+revenue            | Séries journalières KPI              |
-| Sortie           | Probabilité [0,1] + catégorie           | Segment + distribution                 | z_score + sévérité + direction       |
-| Fréquence        | A la demande                            | A la demande + train manuel            | A la demande + run endpoint          |
-| Latence endpoint | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | logs précédents: ~1.6s à 2.4s observés | dépend plage, optimisée avec bornage |
-| Complexité       | Moyenne                                 | Moyenne                                | Faible à moyenne                     |
-| Explicabilité    | Bonne (coefficients)                    | Moyenne                                | Très haute                           |
-| Valeur métier    | Très haute                              | Haute                                  | Haute                                |
+| DonnÃ©es d'entrÃ©e | Features abonnement/comportement        | x,y dÃ©rivÃ©s billing+revenue            | SÃ©ries journaliÃ¨res KPI              |
+| Sortie           | ProbabilitÃ© [0,1] + catÃ©gorie           | Segment + distribution                 | z_score + sÃ©vÃ©ritÃ© + direction       |
+| FrÃ©quence        | A la demande                            | A la demande + train manuel            | A la demande + run endpoint          |
+| Latence endpoint | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | logs prÃ©cÃ©dents: ~1.6s Ã  2.4s observÃ©s | dÃ©pend plage, optimisÃ©e avec bornage |
+| ComplexitÃ©       | Moyenne                                 | Moyenne                                | Faible Ã  moyenne                     |
+| ExplicabilitÃ©    | Bonne (coefficients)                    | Moyenne                                | TrÃ¨s haute                           |
+| Valeur mÃ©tier    | TrÃ¨s haute                              | Haute                                  | Haute                                |
 
 ### 4.2 Architecture IA Globale
 
 #### 4.2.1 Flux macro
 
-hawala_db (source prod lecture seule)
+prod_db (source prod lecture seule)
 -> ETL / ingestion analytics_db
 -> scripts features/retention
--> modèles ML joblib
+-> modÃ¨les ML joblib
 -> endpoints FastAPI
 -> visualisation React
 
-#### 4.2.2 Routage backend observé (main.py)
+#### 4.2.2 Routage backend observÃ© (main.py)
 
-Routers inclus total observé > 14.
+Routers inclus total observÃ© > 14.
 Inclut ml_churn, segmentation, anomalies explicitement.
-Middleware latency_logger centralise timing requêtes.
+Middleware latency_logger centralise timing requÃªtes.
 
 #### 4.2.3 Nombre de hooks frontend
 
-Hooks recensés dans src/hooks: 33 fichiers.
+Hooks recensÃ©s dans src/hooks: 33 fichiers.
 Observation:
-la mention "28 hooks" dans prompt n'est plus à jour selon arborescence actuelle.
+la mention "28 hooks" dans prompt n'est plus Ã  jour selon arborescence actuelle.
 
-### 4.3 Interdépendances entre Modules
+### 4.3 InterdÃ©pendances entre Modules
 
 #### 4.3.1 Segmentation -> Churn
 
-Interdépendance directe feature-level:
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
+InterdÃ©pendance directe feature-level:
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
 Aucune feature churn ne consomme explicitement label segment.
 
 #### 4.3.2 Anomalies -> Retraining
 
-Déclenchement automatique retrain churn/segmentation par anomalies:
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-Aucun orchestrateur de ce type dans les routeurs audités.
+DÃ©clenchement automatique retrain churn/segmentation par anomalies:
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+Aucun orchestrateur de ce type dans les routeurs auditÃ©s.
 
-#### 4.3.3 Churn -> Segments à risque
+#### 4.3.3 Churn -> Segments Ã  risque
 
 Consommation score churn dans segmentation:
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
-Les deux modules restent découplés techniquement.
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
+Les deux modules restent dÃ©couplÃ©s techniquement.
 
-### 4.4 Performance Globale du Système IA
+### 4.4 Performance Globale du SystÃ¨me IA
 
 #### 4.4.1 Tableau latences
 
-| Endpoint IA                      |                         Latence mesurée |    Cible | Statut                                  |
+| Endpoint IA                      |                         Latence mesurÃ©e |    Cible | Statut                                  |
 | -------------------------------- | --------------------------------------: | -------: | --------------------------------------- |
-| /ml/churn/scores                 | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] | < 2000ms | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| /ml/churn/metrics                | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |  < 500ms | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| /analytics/segmentation/kpis     |        1711ms (valeur fournie contexte) | < 1000ms | ⚠️                                      |
-| /analytics/segmentation/clusters |        1658ms (valeur fournie contexte) | < 1000ms | ⚠️                                      |
-| /analytics/segmentation/profiles |        2427ms (valeur fournie contexte) | < 1000ms | ❌                                      |
+| /ml/churn/scores                 | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] | < 2000ms | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| /ml/churn/metrics                | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |  < 500ms | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| /analytics/segmentation/kpis     |        1711ms (valeur fournie contexte) | < 1000ms | âš ï¸                                      |
+| /analytics/segmentation/clusters |        1658ms (valeur fournie contexte) | < 1000ms | âš ï¸                                      |
+| /analytics/segmentation/profiles |        2427ms (valeur fournie contexte) | < 1000ms | âŒ                                      |
 
 #### 4.4.2 Analyse performance
 
-Segmentation est le module le plus coûteux en agrégations SQL.
-Anomalies a nécessité bornage plage + retry timeout.
-Churn nécessite potentiellement indexation fine sur activités et events temporels.
+Segmentation est le module le plus coÃ»teux en agrÃ©gations SQL.
+Anomalies a nÃ©cessitÃ© bornage plage + retry timeout.
+Churn nÃ©cessite potentiellement indexation fine sur activitÃ©s et events temporels.
 
 ---
 
-## PARTIE V — CONCLUSIONS ET PERSPECTIVES
+## PARTIE V â€” CONCLUSIONS ET PERSPECTIVES
 
 ### 5.1 Bilan des Objectifs IA
 
 #### 5.1.1 Statut par objectif
 
-[x] Prédiction churn: implémentée, entraînement et scoring opérationnels.
-[x] Segmentation utilisateurs: opérationnelle, KMeans sérialisé.
-[x] Détection anomalies: opérationnelle via z-score API.
-[ ] Optimisation campagnes pilotée ML: [NON TROUVÉ DANS LE CODE — À COMPLÉTER].
+[x] PrÃ©diction churn: implÃ©mentÃ©e, entraÃ®nement et scoring opÃ©rationnels.
+[x] Segmentation utilisateurs: opÃ©rationnelle, KMeans sÃ©rialisÃ©.
+[x] DÃ©tection anomalies: opÃ©rationnelle via z-score API.
+[ ] Optimisation campagnes pilotÃ©e ML: [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER].
 
-#### 5.1.2 Maturité globale
+#### 5.1.2 MaturitÃ© globale
 
-Prototype avancé orienté production interne.
-Niveau correct pour démonstration PFE.
-Nécessite consolidation MLOps/monitoring pour mise à l'échelle.
+Prototype avancÃ© orientÃ© production interne.
+Niveau correct pour dÃ©monstration PFE.
+NÃ©cessite consolidation MLOps/monitoring pour mise Ã  l'Ã©chelle.
 
-### 5.2 Valeur Métier Quantifiée
+### 5.2 Valeur MÃ©tier QuantifiÃ©e
 
-| Module              | Bénéfice estimé                                        | Méthode de calcul                                                  |
+| Module              | BÃ©nÃ©fice estimÃ©                                        | MÃ©thode de calcul                                                  |
 | ------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ |
-| Prédiction churn    | Réduction churn potentielle via intervention priorisée | Simuler scénario: % churners détectés x taux de rétention campagne |
-| Segmentation        | Hausse ARPU ciblée                                     | Comparer campagnes segmentées vs mass mailing                      |
-| Détection anomalies | Réduction temps détection incident                     | Mesurer MTTD manuel vs automatique                                 |
+| PrÃ©diction churn    | RÃ©duction churn potentielle via intervention priorisÃ©e | Simuler scÃ©nario: % churners dÃ©tectÃ©s x taux de rÃ©tention campagne |
+| Segmentation        | Hausse ARPU ciblÃ©e                                     | Comparer campagnes segmentÃ©es vs mass mailing                      |
+| DÃ©tection anomalies | RÃ©duction temps dÃ©tection incident                     | Mesurer MTTD manuel vs automatique                                 |
 
 Remarque:
-Valeurs numériques finales de ROI ne sont pas codées.
-[NON TROUVÉ DANS LE CODE — À COMPLÉTER]
+Valeurs numÃ©riques finales de ROI ne sont pas codÃ©es.
+[NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER]
 
 ### 5.3 Roadmap IA Post-PFE
 
-#### Priorité 1 — 1 à 3 mois
+#### PrioritÃ© 1 â€” 1 Ã  3 mois
 
-Implémenter SHAP global/local churn.
+ImplÃ©menter SHAP global/local churn.
 Automatiser retrain mensuel avec snapshot data.
 Ajouter silhoutte et monitoring drift clusters.
 Supprimer fallback mock dans UserSegmentationPage.
 
-#### Priorité 2 — 3 à 6 mois
+#### PrioritÃ© 2 â€” 3 Ã  6 mois
 
 Benchmarker XGBoost/LightGBM pour churn.
-Ajouter Isolation Forest réel côté anomalies.
+Ajouter Isolation Forest rÃ©el cÃ´tÃ© anomalies.
 Ajouter calibration probabiliste + Brier score.
-Industrialiser table anomalies persistée + workflows statut.
+Industrialiser table anomalies persistÃ©e + workflows statut.
 
-#### Priorité 3 — 6 à 12 mois
+#### PrioritÃ© 3 â€” 6 Ã  12 mois
 
-MLOps complet: versioning modèles/données/features.
-Feature store léger pour cohérence training/serving.
-A/B testing systématique des campagnes basées IA.
-Modèle LTV pour arbitrage budget rétention.
+MLOps complet: versioning modÃ¨les/donnÃ©es/features.
+Feature store lÃ©ger pour cohÃ©rence training/serving.
+A/B testing systÃ©matique des campagnes basÃ©es IA.
+ModÃ¨le LTV pour arbitrage budget rÃ©tention.
 
-### 5.4 Références Académiques
+### 5.4 RÃ©fÃ©rences AcadÃ©miques
 
 Breiman, L. (2001). Random Forests. Machine Learning.
 MacQueen, J. (1967). Some Methods for Classification and Analysis of Multivariate Observations.
@@ -1524,9 +1524,9 @@ Provost, F. & Fawcett, T. (2013). Data Science for Business.
 
 ---
 
-## ANNEXE A — Inventaire technique détaillé
+## ANNEXE A â€” Inventaire technique dÃ©taillÃ©
 
-### A.1 Modèle Subscription (attributs clés)
+### A.1 ModÃ¨le Subscription (attributs clÃ©s)
 
 id UUID PK
 user_id FK users
@@ -1537,7 +1537,7 @@ subscription_end_date timestamptz nullable
 status string(20)
 created_at
 
-Indexes observés:
+Indexes observÃ©s:
 ix_subscriptions_user_id
 ix_subscriptions_service_id
 ix_subscriptions_status
@@ -1545,7 +1545,7 @@ ix_subscriptions_start_date
 ix_subscriptions_campaign_id
 idx_user_service
 
-### A.2 Modèle UserActivity
+### A.2 ModÃ¨le UserActivity
 
 id UUID
 user_id FK
@@ -1559,7 +1559,7 @@ idx_user_activity_time
 ix_user_activities_datetime
 ix_user_activities_type
 
-### A.3 Modèle BillingEvent
+### A.3 ModÃ¨le BillingEvent
 
 id
 subscription_id
@@ -1579,7 +1579,7 @@ ix_billing_events_status
 ix_billing_events_is_first_charge
 ix_billing_events_service_id
 
-### A.4 Modèle Unsubscription
+### A.4 ModÃ¨le Unsubscription
 
 id
 subscription_id unique
@@ -1591,7 +1591,7 @@ churn_reason
 days_since_subscription
 last_billing_event_id
 
-### A.5 Modèle Cohort
+### A.5 ModÃ¨le Cohort
 
 id
 cohort_date
@@ -1607,7 +1607,7 @@ Contrainte unique:
 
 ---
 
-## ANNEXE B — ETL Cohortes
+## ANNEXE B â€” ETL Cohortes
 
 ### B.1 Objectif script compute_cohorts.py
 
@@ -1615,25 +1615,25 @@ Calculer et upserter la table cohorts.
 Mesurer retention D7 D14 D30.
 Adapter automatiquement selon type de colonne date/time.
 
-### B.2 Étapes du script
+### B.2 Ã‰tapes du script
 
-Étape 0:
+Ã‰tape 0:
 Diagnostic statuts disponibles dans subscriptions.
 
-Étape 1:
-Vérification volume source et plage dates.
+Ã‰tape 1:
+VÃ©rification volume source et plage dates.
 
-Étape 2:
+Ã‰tape 2:
 Construction first_sub (premier abonnement user+service).
 
-Étape 3:
+Ã‰tape 3:
 Calcul retention par EXISTS sur jalons 7/14/30 jours.
 
-Étape 4:
+Ã‰tape 4:
 INSERT INTO cohorts ON CONFLICT UPDATE.
 
-Étape 5:
-Vérification finale table cohorts.
+Ã‰tape 5:
+VÃ©rification finale table cohorts.
 
 ### B.3 Extrait SQL upsert
 
@@ -1661,27 +1661,27 @@ DO UPDATE SET
 ### B.4 Point performance
 
 Le script force SET LOCAL statement_timeout = 0.
-Cela évite interruption sur scans historiques lourds.
-Nécessite surveillance pour usage contrôlé en production.
+Cela Ã©vite interruption sur scans historiques lourds.
+NÃ©cessite surveillance pour usage contrÃ´lÃ© en production.
 
 ---
 
-## ANNEXE C — API Churn détaillée
+## ANNEXE C â€” API Churn dÃ©taillÃ©e
 
 ### C.1 POST /ml/churn/train
 
 But:
-lancer entraînement modèle logistic.
-Sécurité:
+lancer entraÃ®nement modÃ¨le logistic.
+SÃ©curitÃ©:
 require_admin.
 Sortie:
-métriques complètes.
+mÃ©triques complÃ¨tes.
 
 ### C.2 GET /ml/churn/metrics
 
 But:
-charger métriques sauvegardées.
-Erreur 404 si modèle non entraîné.
+charger mÃ©triques sauvegardÃ©es.
+Erreur 404 si modÃ¨le non entraÃ®nÃ©.
 
 ### C.3 GET /ml/churn/scores
 
@@ -1702,18 +1702,18 @@ Puis groupby user_id et conservation max churn_risk par user.
 
 ---
 
-## ANNEXE D — API Segmentation détaillée
+## ANNEXE D â€” API Segmentation dÃ©taillÃ©e
 
 ### D.1 GET /analytics/segmentation/kpis
 
 KPI business segmentaires.
-Réponse typée KPIResponse.
+RÃ©ponse typÃ©e KPIResponse.
 
 ### D.2 GET /analytics/segmentation/clusters
 
 Retourne points x/y pour scatter map.
 Inclut distribution segments.
-Sampling max 3000 points côté service pour performance.
+Sampling max 3000 points cÃ´tÃ© service pour performance.
 
 ### D.3 GET /analytics/segmentation/profiles
 
@@ -1721,35 +1721,35 @@ Retourne profils segment (duration, arpu, churn_rate).
 
 ### D.4 POST /analytics/segmentation/train
 
-Entraîne KMeans sur features x/y standardisées.
+EntraÃ®ne KMeans sur features x/y standardisÃ©es.
 Sauvegarde dictionnaire joblib avec model+scaler+rank_map+window.
 
 ---
 
-## ANNEXE E — API Anomalies détaillée
+## ANNEXE E â€” API Anomalies dÃ©taillÃ©e
 
 ### E.1 GET /anomalies/summary
 
-KPI synthèse anomalies.
-Inclut tendance période précédente.
+KPI synthÃ¨se anomalies.
+Inclut tendance pÃ©riode prÃ©cÃ©dente.
 
 ### E.2 GET /anomalies/timeline
 
-Séries temporelles + anomalies annotées.
+SÃ©ries temporelles + anomalies annotÃ©es.
 
 ### E.3 GET /anomalies/distribution
 
-Comptages par sévérité et métrique.
+Comptages par sÃ©vÃ©ritÃ© et mÃ©trique.
 
 ### E.4 GET /anomalies/heatmap
 
 Matrice service x semaine.
-Niveau severity_score dérivé count.
+Niveau severity_score dÃ©rivÃ© count.
 
 ### E.5 GET /anomalies/details
 
 Pagination limit/offset.
-Données tabulaires opérationnelles.
+DonnÃ©es tabulaires opÃ©rationnelles.
 
 ### E.6 GET /anomalies/insights
 
@@ -1757,19 +1757,19 @@ Cartes textuelles recommandation.
 
 ### E.7 POST /anomalies/run-detection
 
-Déclenche run logique et renvoie compteurs.
+DÃ©clenche run logique et renvoie compteurs.
 
 ---
 
-## ANNEXE F — Extraits Frontend IA
+## ANNEXE F â€” Extraits Frontend IA
 
 ### F.1 Churn dashboard
 
 Actions:
 Train model
 Refresh
-Réglage threshold
-Réglage top N
+RÃ©glage threshold
+RÃ©glage top N
 
 Visuals:
 BarChart distribution risque
@@ -1788,38 +1788,38 @@ Insights (hardcoded)
 
 ### F.3 Anomaly dashboard
 
-KPI cards synthèse
+KPI cards synthÃ¨se
 Timeline line+scatter
 Heatmap table
 Pie severity
 Metric bars
-Table anomalies paginée
+Table anomalies paginÃ©e
 Insights cards
 
 ---
 
-## ANNEXE G — Incohérences et dette technique
+## ANNEXE G â€” IncohÃ©rences et dette technique
 
-### G.1 Incohérence définition churn
+### G.1 IncohÃ©rence dÃ©finition churn
 
 Doc dit subscription_end_date non null.
 Code utilise status cancelled/expired.
 Action:
-aligner documentation et code de référence.
+aligner documentation et code de rÃ©fÃ©rence.
 
-### G.2 Incohérence segmentation runtime vs training
+### G.2 IncohÃ©rence segmentation runtime vs training
 
-Runtime SQL segmente déjà via règles.
-KMeans entraîné mais non utilisé pour inférence API live.
+Runtime SQL segmente dÃ©jÃ  via rÃ¨gles.
+KMeans entraÃ®nÃ© mais non utilisÃ© pour infÃ©rence API live.
 Action:
 clarifier architecture cible.
 
-### G.3 Incohérence anomalies Isolation Forest
+### G.3 IncohÃ©rence anomalies Isolation Forest
 
 UI indique combinaison Z-Score + Isolation Forest.
 Code calcule uniquement Z-score rolling.
 Action:
-implémenter IsolationForest ou corriger wording.
+implÃ©menter IsolationForest ou corriger wording.
 
 ### G.4 Frontend mocks restants
 
@@ -1829,30 +1829,30 @@ neutraliser mocks en mode production.
 
 ### G.5 Endpoint statut anomalies absent
 
-POST /analytics/anomalies/{id}/status non trouvé.
+POST /analytics/anomalies/{id}/status non trouvÃ©.
 Action:
 ajouter persistance anomalies + workflow statut.
 
 ---
 
-## ANNEXE H — Recommandations SQL et performance
+## ANNEXE H â€” Recommandations SQL et performance
 
 ### H.1 Indexation churn training
 
-Index composite recommandé:
-(user_id, service_id, activity_datetime) sur user_activities déjà partiellement présent.
-(subscription_id, event_datetime, status) sur billing_events à vérifier.
+Index composite recommandÃ©:
+(user_id, service_id, activity_datetime) sur user_activities dÃ©jÃ  partiellement prÃ©sent.
+(subscription_id, event_datetime, status) sur billing_events Ã  vÃ©rifier.
 
-### H.2 Fenêtrage temporel
+### H.2 FenÃªtrage temporel
 
-Bonnes pratiques observées:
+Bonnes pratiques observÃ©es:
 resolve_date_range
 get_data_bounds
 bornage anomalies MAX_ANOMALY_RANGE_DAYS
 
-### H.3 Réduction scans lourds
+### H.3 RÃ©duction scans lourds
 
-Pré-agrégation journalière possible:
+PrÃ©-agrÃ©gation journaliÃ¨re possible:
 materialized views KPI quotidiens.
 
 ### H.4 Monitoring latence
@@ -1863,16 +1863,16 @@ persist logs latence endpoint + percentile P95/P99.
 
 ---
 
-## ANNEXE I — Feuille de route MLOps
+## ANNEXE I â€” Feuille de route MLOps
 
-### I.1 Gouvernance modèle
+### I.1 Gouvernance modÃ¨le
 
-Version modèle
+Version modÃ¨le
 Version features
 Version dataset
-Version métriques
+Version mÃ©triques
 
-### I.2 Observabilité
+### I.2 ObservabilitÃ©
 
 Data drift
 Concept drift
@@ -1887,21 +1887,21 @@ Training pipeline reproductible
 Model registry
 Canary release scoring
 
-### I.4 Sécurité et conformité
+### I.4 SÃ©curitÃ© et conformitÃ©
 
-Traçabilité décision IA
-Minimisation données personnelles
-Contrôle accès endpoints train
-Audit trail inférence
+TraÃ§abilitÃ© dÃ©cision IA
+Minimisation donnÃ©es personnelles
+ContrÃ´le accÃ¨s endpoints train
+Audit trail infÃ©rence
 
 ---
 
-## ANNEXE J — Vérification artefacts joblib
+## ANNEXE J â€” VÃ©rification artefacts joblib
 
 ### J.1 churn_model.joblib
 
-Type réel: sklearn.linear_model.\_logistic.LogisticRegression
-Paramètres clés:
+Type rÃ©el: sklearn.linear_model.\_logistic.LogisticRegression
+ParamÃ¨tres clÃ©s:
 class_weight=balanced
 max_iter=2000
 random_state=42
@@ -1910,8 +1910,8 @@ C=1.0
 
 ### J.2 churn_metrics.joblib
 
-Type réel: dict
-Clés:
+Type rÃ©el: dict
+ClÃ©s:
 trained_at
 roc_auc
 accuracy
@@ -1925,7 +1925,7 @@ warning
 
 ### J.3 segmentation_kmeans.joblib
 
-Type réel: dict
+Type rÃ©el: dict
 Contenu:
 model (KMeans)
 scaler (StandardScaler)
@@ -1935,15 +1935,15 @@ window
 
 ---
 
-## ANNEXE K — Exigences du prompt vs état réel
+## ANNEXE K â€” Exigences du prompt vs Ã©tat rÃ©el
 
 ### K.1 Exigence: reproduire SQL churn exact
 
 Statut: fait dans ce rapport.
 
-### K.2 Exigence: décrire .joblib
+### K.2 Exigence: dÃ©crire .joblib
 
-Statut: fait via inspection réelle.
+Statut: fait via inspection rÃ©elle.
 
 ### K.3 Exigence: endpoints churn
 
@@ -1953,49 +1953,50 @@ Statut: fait.
 
 Statut: fait.
 
-### K.5 Exigence: endpoints anomalies demandés /analytics/anomalies
+### K.5 Exigence: endpoints anomalies demandÃ©s /analytics/anomalies
 
 Statut: partiel.
-État réel: routes sous /anomalies.
+Ã‰tat rÃ©el: routes sous /anomalies.
 
-### K.6 Exigence: table anomalies persistée
+### K.6 Exigence: table anomalies persistÃ©e
 
-Statut: non trouvé.
+Statut: non trouvÃ©.
 
 ### K.7 Exigence: minimum 800 lignes
 
-Statut: visé dans ce document.
+Statut: visÃ© dans ce document.
 
 ---
 
-## ANNEXE L — Tableau de conformité [NON TROUVÉ] par section
+## ANNEXE L â€” Tableau de conformitÃ© [NON TROUVÃ‰] par section
 
-| Rubrique                                | État                                    |
+| Rubrique                                | Ã‰tat                                    |
 | --------------------------------------- | --------------------------------------- |
-| Coût acquisition client chiffré         | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Matrice confusion brute TP/TN/FP/FN     | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Validation croisée churn                | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Endpoint /analytics/churn/curve         | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Endpoint /analytics/churn/time-to-churn | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Endpoint /analytics/churn/reasons       | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Endpoint /analytics/churn/risk-segments | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Elbow method segmentation               | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Silhouette score segmentation           | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Isolation Forest effectif               | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Table anomalies SQLAlchemy/migration    | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Endpoint statut anomalies               | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Latence /ml/churn/scores mesurée        | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
-| Latence /ml/churn/metrics mesurée       | [NON TROUVÉ DANS LE CODE — À COMPLÉTER] |
+| CoÃ»t acquisition client chiffrÃ©         | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Matrice confusion brute TP/TN/FP/FN     | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Validation croisÃ©e churn                | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Endpoint /analytics/churn/curve         | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Endpoint /analytics/churn/time-to-churn | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Endpoint /analytics/churn/reasons       | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Endpoint /analytics/churn/risk-segments | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Elbow method segmentation               | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Silhouette score segmentation           | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Isolation Forest effectif               | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Table anomalies SQLAlchemy/migration    | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Endpoint statut anomalies               | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Latence /ml/churn/scores mesurÃ©e        | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
+| Latence /ml/churn/metrics mesurÃ©e       | [NON TROUVÃ‰ DANS LE CODE â€” Ã€ COMPLÃ‰TER] |
 
 ---
 
-## ANNEXE M — Conclusion académique concise
+## ANNEXE M â€” Conclusion acadÃ©mique concise
 
-Le système IA est réel, déployable et déjà intégré UX/API.
-Le module churn est le plus avancé en cycle complet data->model->API->UI.
-Le module segmentation fonctionne mais souffre d'ambiguïté entre logique SQL et KMeans.
-Le module anomalies est utile et opérationnel, mais reste statistique simple sans persistance native.
+Le systÃ¨me IA est rÃ©el, dÃ©ployable et dÃ©jÃ  intÃ©grÃ© UX/API.
+Le module churn est le plus avancÃ© en cycle complet data->model->API->UI.
+Le module segmentation fonctionne mais souffre d'ambiguÃ¯tÃ© entre logique SQL et KMeans.
+Le module anomalies est utile et opÃ©rationnel, mais reste statistique simple sans persistance native.
 Pour une soutenance PFE, la profondeur technique est solide.
-Pour une industrialisation entreprise, la priorité est la rigueur MLOps et la réduction des écarts de spécification.
+Pour une industrialisation entreprise, la prioritÃ© est la rigueur MLOps et la rÃ©duction des Ã©carts de spÃ©cification.
 
 Fin du rapport.
+

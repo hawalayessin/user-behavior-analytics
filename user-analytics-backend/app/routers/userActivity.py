@@ -13,7 +13,7 @@ from app.utils.temporal import get_data_anchor, get_day_window, get_week_window,
 
 router = APIRouter(prefix="/analytics", tags=["User Activity"])
 
-USER_ACTIVITY_CACHE_VERSION = "2026-04-10-usage-window-v2"
+USER_ACTIVITY_CACHE_VERSION = "2026-04-16-coherent-subscriptions-v3"
 
 
 def _user_activity_cache_payload(
@@ -47,8 +47,9 @@ def get_user_activity(
     MAX_TREND_DAYS = 365
 
     start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="usage")
+    trend_start_dt = start_dt
     if (end_dt - start_dt).days > MAX_TREND_DAYS:
-        start_dt = end_dt - timedelta(days=MAX_TREND_DAYS)
+        trend_start_dt = end_dt - timedelta(days=MAX_TREND_DAYS)
 
     # Align KPI windows with overview logic across the platform.
     # - No explicit filter: anchor-based global windows.
@@ -187,17 +188,19 @@ def get_user_activity(
     """), params).fetchone()
 
     # ── 4. DAU trend ──────────────────────────────────────────
+    trend_params = {**params, "trend_start_dt": trend_start_dt}
+
     dau_rows = db.execute(text(f"""
         SELECT
             DATE(activity_datetime) AS date,
             COUNT(DISTINCT user_id) AS dau
         FROM user_activities
-        WHERE activity_datetime >= CAST(:start_dt AS timestamp)
+        WHERE activity_datetime >= CAST(:trend_start_dt AS timestamp)
           AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_ua}
         GROUP BY DATE(activity_datetime)
         ORDER BY date ASC
-    """), params).fetchall()
+    """), trend_params).fetchall()
 
     dau_map = {str(row.date): row.dau for row in dau_rows}
 
@@ -207,18 +210,18 @@ def get_user_activity(
             DATE(activity_datetime) AS date,
             COUNT(DISTINCT user_id) AS rolling_count
         FROM user_activities
-        WHERE activity_datetime >= CAST(:start_dt AS timestamp) - INTERVAL '30 days'
+        WHERE activity_datetime >= CAST(:trend_start_dt AS timestamp) - INTERVAL '30 days'
           AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_ua}
         GROUP BY DATE(activity_datetime)
         ORDER BY date ASC
-    """), params).fetchall()
+    """), trend_params).fetchall()
 
     wau_map = {str(row.date): row.rolling_count for row in wau_rows}
 
     all_dates = [
-        start_dt + timedelta(days=i)
-        for i in range((end_dt - start_dt).days + 1)
+        trend_start_dt + timedelta(days=i)
+        for i in range((end_dt - trend_start_dt).days + 1)
     ]
 
     dau_trend = []
@@ -240,12 +243,12 @@ def get_user_activity(
             EXTRACT(HOUR FROM activity_datetime)::int AS hour,
             COUNT(*) AS count
         FROM user_activities
-        WHERE activity_datetime >= CAST(:start_dt AS timestamp)
+        WHERE activity_datetime >= CAST(:trend_start_dt AS timestamp)
           AND activity_datetime <  CAST(:end_dt AS timestamp) + INTERVAL '1 day'
         {sf_ua}
         GROUP BY day, hour
         ORDER BY day, hour
-    """), params).fetchall()
+    """), trend_params).fetchall()
 
     day_map = {
         'Monday': 'Lundi', 'Tuesday': 'Mardi', 'Wednesday': 'Mercredi',

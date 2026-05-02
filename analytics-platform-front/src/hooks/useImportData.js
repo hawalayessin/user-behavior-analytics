@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import api from "../services/api"
 import { getApiErrorMessage } from "../utils/apiError"
 
 export default function useImportData() {
   const [loading, setLoading] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [schemaLoading, setSchemaLoading] = useState(false)
   const [error, setError] = useState(null)
   const [history, setHistory] = useState([])
+  const schemaCacheRef = useRef(new Map())
 
   const refreshHistory = useCallback(async () => {
     setHistoryLoading(true)
@@ -103,9 +105,27 @@ export default function useImportData() {
     URL.revokeObjectURL(url)
   }, [])
 
+  const getTableSchema = useCallback(async (table) => {
+    if (!table) return null
+    if (schemaCacheRef.current.has(table)) {
+      return schemaCacheRef.current.get(table)
+    }
+
+    setSchemaLoading(true)
+    try {
+      const res = await api.get(`/admin/import/schema/${table}`)
+      const schema = res.data ?? null
+      schemaCacheRef.current.set(table, schema)
+      return schema
+    } finally {
+      setSchemaLoading(false)
+    }
+  }, [])
+
   return {
     loading,
     historyLoading,
+    schemaLoading,
     error,
     history,
     refreshHistory,
@@ -113,5 +133,6 @@ export default function useImportData() {
     confirmCsv,
     importDatabaseSql,
     downloadTemplate,
+    getTableSchema,
   }
 }

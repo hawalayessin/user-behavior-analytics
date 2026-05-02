@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import uuid
@@ -303,8 +303,9 @@ class SMSETL:
 
 
 if __name__ == '__main__':
-    source_url = os.getenv('HAWALA_CONN') or os.getenv('HAWALACONN')
+    source_url = os.getenv('PROD_CONN') or os.getenv('PRODCONN')
     target_url = os.getenv('ANALYTICS_CONN') or os.getenv('ANALYTICSCONN')
     if not source_url or not target_url:
-        raise RuntimeError('Missing HAWALA_CONN/HAWALACONN or ANALYTICS_CONN/ANALYTICSCONN in environment')
+        raise RuntimeError('Missing PROD_CONN/PRODCONN or ANALYTICS_CONN/ANALYTICSCONN in environment')
     SMSETL(source_url, target_url, truncate_target=True).run()
+

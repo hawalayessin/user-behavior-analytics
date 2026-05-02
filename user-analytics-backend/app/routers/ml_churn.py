@@ -204,9 +204,23 @@ def get_churn_scores(
     threshold: float = Query(default=0.4, ge=0.0, le=1.0),
     store: bool = Query(default=False, description="Store predictions into SQL table churn_predictions."),
     use_cached: bool = Query(default=True, description="Read precomputed scores from churn_scores_cache when available."),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
+    service_id: str | None = Query(default=None),
 ):
+    has_filters = bool(start_date or end_date or service_id)
+
     if store:
-        return _compute_churn_scores(db, top=top, threshold=threshold, store=store, use_cached=use_cached)
+        return _compute_churn_scores(
+            db,
+            top=top,
+            threshold=threshold,
+            store=store,
+            use_cached=False,
+            service_id=service_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
     cache_key = build_cache_key(
         "ml:churn:scores",
@@ -215,6 +229,9 @@ def get_churn_scores(
             "threshold": float(threshold),
             "store": bool(store),
             "use_cached": bool(use_cached),
+            "service_id": service_id or "all",
+            "start_date": start_date or "auto",
+            "end_date": end_date or "auto",
         },
     )
 
@@ -227,7 +244,10 @@ def get_churn_scores(
                 top=top,
                 threshold=threshold,
                 store=store,
-                use_cached=use_cached,
+                use_cached=(use_cached and not has_filters),
+                service_id=service_id,
+                start_date=start_date,
+                end_date=end_date,
             )
         ),
     )
@@ -240,6 +260,9 @@ def _compute_churn_scores(
     threshold: float,
     store: bool,
     use_cached: bool,
+    service_id: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> ChurnScoresResponse:
     if use_cached:
         cached_snapshot = _read_scores_snapshot(db, top=top, threshold=threshold)
@@ -253,6 +276,9 @@ def _compute_churn_scores(
             db,
             threshold=threshold,
             store_predictions=store,
+            service_id=service_id,
+            start_date=start_date,
+            end_date=end_date,
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

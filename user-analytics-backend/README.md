@@ -1,9 +1,9 @@
-# User Analytics Platform - PFE DigMaco
+﻿# User Analytics Platform - PFE DigMaco
 
 ## Stack
 - Backend: FastAPI + PostgreSQL + Alembic + SQLAlchemy
 - Frontend: React + Vite
-- ETL: Python scripts (hawala -> analytics_db)
+- ETL: Python scripts (prod_db -> analytics_db)
 
 ## Setup
 
@@ -30,6 +30,7 @@ npm run dev
 | make dev | Lancer FastAPI |
 | make migrate | Appliquer migrations |
 | make seed | Seeder la base analytics |
-| make etl | ETL hawala -> analytics |
+| make etl | ETL prod_db -> analytics |
 | make test | Tests unitaires |
 | make lint | Verifier le code |
+

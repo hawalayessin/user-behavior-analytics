@@ -31,13 +31,13 @@ export default function ChurnPieChart({ data }) {
   const total = pieData.reduce((sum, item) => sum + item.value, 0);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 h-full">
       <h3 className="text-sm font-semibold text-slate-100 mb-4">
         Churn Breakdown
       </h3>
 
       <div className="relative flex justify-center">
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={240}>
           <PieChart>
             <Pie
               data={pieData}

@@ -14,7 +14,11 @@ const TOOLTIP_TEXT =
   "NRR measures how much of last month's revenue was retained this month from existing subscribers. 100% = perfect retention. >100% = revenue growth. <100% = revenue loss from existing users.";
 
 function currency(value) {
-  return `$${Number(value || 0).toLocaleString()}`;
+  return `${Number(value || 0).toLocaleString()} DT`;
+}
+
+function currencyAbs(value) {
+  return `${Math.abs(Number(value || 0)).toLocaleString()} DT`;
 }
 
 function getStatus(nrrPercent) {
@@ -226,7 +230,7 @@ export default function NRRCard({ data, loading, error, size = "compact" }) {
                     type="number"
                     domain={[0, maxValue * 1.1]}
                     tick={{ fill: "#94A3B8", fontSize: isExpanded ? 11 : 10 }}
-                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}k DT`}
                   />
                   <YAxis
                     type="category"
@@ -256,7 +260,7 @@ export default function NRRCard({ data, loading, error, size = "compact" }) {
               </div>
               <div className="flex items-center justify-between">
                 <span>Churned</span>
-                <span>-{currency(data?.revenue_churned)}</span>
+                <span>-{currencyAbs(data?.revenue_churned)}</span>
               </div>
             </div>
           </div>

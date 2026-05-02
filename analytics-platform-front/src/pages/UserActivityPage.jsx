@@ -9,6 +9,7 @@ import UserGrowthChart from "../components/dashboard/userActivity/UserGrowthChar
 import UserDistributionByServiceChart from "../components/dashboard/userActivity/UserDistributionByServiceChart";
 import ActivityHeatmap from "../components/dashboard/userActivity/ActivityHeatmap";
 import { useUserActivity } from "../hooks/useUserActivity";
+import { useOverview } from "../hooks/useOverview";
 import { DEFAULT_ANALYTICS_FILTERS } from "../constants/dateFilters";
 import {
   Users,
@@ -40,6 +41,26 @@ export default function UserActivityPage() {
     refetch: refetchActivity,
   } = useUserActivity(filters);
 
+  const { data: overviewData } = useOverview(filters);
+
+  const subscriptionDistributionData = useMemo(() => {
+    const fromOverview = (overviewData?.top_services ?? [])
+      .map((row) => ({
+        service_name: row?.name,
+        subscriptions: Number(row?.total || 0),
+        active_subscriptions: Number(row?.active_subs || 0),
+      }))
+      .filter((row) => row.service_name && row.subscriptions > 0);
+
+    if (fromOverview.length > 0) return fromOverview;
+
+    return (activityData?.by_service ?? []).map((row) => ({
+      service_name: row.service_name,
+      subscriptions: Number(row.subscriptions || 0),
+      active_subscriptions: Number(row.active_users || 0),
+    }));
+  }, [activityData?.by_service, overviewData?.top_services]);
+
   const kpis = useMemo(() => {
     if (!activityData?.kpis) return null;
     return {
@@ -50,7 +71,7 @@ export default function UserActivityPage() {
       inactive_count: activityData.kpis.inactive_count ?? 0,
       avg_lifetime_days: activityData.kpis.avg_lifetime_days ?? 0,
     };
-  }, [activityData?.kpis]);
+  }, [activityData]);
 
   const handleApplyFilters = (f) => {
     setFilters(f);
@@ -190,10 +211,7 @@ export default function UserActivityPage() {
                 <div>
                   <UserGrowthChart data={activityData?.user_growth ?? []} />
                   <UserDistributionByServiceChart
-                    data={(activityData?.by_service ?? []).map((row) => ({
-                      service_name: row.service_name,
-                      subscriptions: Number(row.subscriptions || 0),
-                    }))}
+                    data={subscriptionDistributionData}
                   />
                 </div>
               </>

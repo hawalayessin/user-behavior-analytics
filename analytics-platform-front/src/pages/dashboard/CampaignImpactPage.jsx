@@ -904,10 +904,22 @@ export default function CampaignImpactPage() {
         </div>
 
         {!dashLoading && qualityAlerts.length > 0 && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 space-y-3 mt-6">
+          <div
+            className="rounded-xl p-5 space-y-3 mt-6"
+            style={{
+              backgroundColor: "var(--color-warning-bg)",
+              border: "1px solid rgba(234, 88, 12, 0.28)",
+            }}
+          >
             <div className="flex items-center gap-2">
-              <AlertCircle size={18} className="text-amber-300" />
-              <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wide">
+              <AlertCircle
+                size={18}
+                style={{ color: "var(--color-warning)" }}
+              />
+              <h3
+                className="text-sm font-bold uppercase tracking-wide"
+                style={{ color: "var(--color-warning)" }}
+              >
                 Data Quality Alerts
               </h3>
             </div>
@@ -915,11 +927,20 @@ export default function CampaignImpactPage() {
               {qualityAlerts.map((alert, idx) => (
                 <div
                   key={`${alert.level}-${idx}`}
-                  className={`rounded-lg border px-3 py-2 text-sm ${
+                  className="rounded-lg border px-3 py-2 text-sm"
+                  style={
                     alert.level === "critical"
-                      ? "bg-red-500/10 border-red-500/30 text-red-200"
-                      : "bg-amber-500/10 border-amber-500/30 text-amber-100"
-                  }`}
+                      ? {
+                          backgroundColor: "var(--color-danger-bg)",
+                          borderColor: "rgba(220, 38, 38, 0.28)",
+                          color: "var(--color-danger)",
+                        }
+                      : {
+                          backgroundColor: "var(--color-warning-bg)",
+                          borderColor: "rgba(234, 88, 12, 0.28)",
+                          color: "var(--color-warning)",
+                        }
+                  }
                 >
                   {alert.text}
                 </div>

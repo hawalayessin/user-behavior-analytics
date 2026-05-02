@@ -1,84 +1,85 @@
-import { useMemo, useState } from "react"
-import PropTypes from "prop-types"
+import { useMemo, useState } from "react";
+import PropTypes from "prop-types";
 
-const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+const DAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function getColorForCount(count, maxCount) {
   // Palette aligned with the rest of charts (indigo/violet accent)
-  if (count === 0) return "#0B1220"      // near bg
-  const r = Math.max(0, Math.min(1, count / (maxCount || 1)))
-  if (r < 0.25) return "#312E81"        // indigo-900
-  if (r < 0.5)  return "#4F46E5"        // indigo-600
-  if (r < 0.75) return "#7C3AED"        // violet-600
-  if (r < 0.95) return "#A855F7"        // purple-500
-  return "#C084FC"                      // purple-300
+  if (count === 0) return "#0B1220"; // near bg
+  const r = Math.max(0, Math.min(1, count / (maxCount || 1)));
+  if (r < 0.25) return "#312E81"; // indigo-900
+  if (r < 0.5) return "#4F46E5"; // indigo-600
+  if (r < 0.75) return "#7C3AED"; // violet-600
+  if (r < 0.95) return "#A855F7"; // purple-500
+  return "#C084FC"; // purple-300
 }
 
 function detectPeakInsight(data) {
-  if (!Array.isArray(data) || data.length === 0) return null
+  if (!Array.isArray(data) || data.length === 0) return null;
 
-  let maxEntry = data[0]
+  let maxEntry = data[0];
   data.forEach((entry) => {
     if ((entry.count || 0) > (maxEntry.count || 0)) {
-      maxEntry = entry
+      maxEntry = entry;
     }
-  })
+  });
 
-  if (!maxEntry || maxEntry.count === 0) return null
+  if (!maxEntry || maxEntry.count === 0) return null;
 
   // Group by day and hour to find peak period
-  const dayHourMap = {}
+  const dayHourMap = {};
   data.forEach((entry) => {
-    const key = `${entry.day}_${entry.hour}`
+    const key = `${entry.day}_${entry.hour}`;
     if (!dayHourMap[key] || entry.count > dayHourMap[key].count) {
-      dayHourMap[key] = entry
+      dayHourMap[key] = entry;
     }
-  })
+  });
 
   const peakDayHour = Object.values(dayHourMap).reduce((max, curr) =>
-    (curr.count || 0) > (max.count || 0) ? curr : max
-  )
+    (curr.count || 0) > (max.count || 0) ? curr : max,
+  );
 
-  const dayName = DAYS_FR[peakDayHour.day] || "?"
-  const hours = `${peakDayHour.hour}h-${peakDayHour.hour + 3}h`
+  const dayName = DAYS_EN[peakDayHour.day] || "?";
+  const hours = `${peakDayHour.hour}h-${peakDayHour.hour + 3}h`;
 
   return {
     dayName,
     hours,
     count: peakDayHour.count,
-  }
+  };
 }
 
 export default function ActivityHeatmap({ data }) {
-  const [hoveredCell, setHoveredCell] = useState(null)
+  const [hoveredCell, setHoveredCell] = useState(null);
 
   const { grid, maxCount, peak } = useMemo(() => {
     if (!Array.isArray(data) || data.length === 0) {
-      return { grid: {}, maxCount: 0, peak: null }
+      return { grid: {}, maxCount: 0, peak: null };
     }
 
-    const grid = {}
-    let maxCount = 0
+    const grid = {};
+    let maxCount = 0;
 
     data.forEach((entry) => {
-      const key = `${entry.day}_${entry.hour}`
-      grid[key] = entry.count || 0
-      maxCount = Math.max(maxCount, entry.count || 0)
-    })
+      const key = `${entry.day}_${entry.hour}`;
+      grid[key] = entry.count || 0;
+      maxCount = Math.max(maxCount, entry.count || 0);
+    });
 
     return {
       grid,
       maxCount: maxCount || 1,
       peak: detectPeakInsight(data),
-    }
-  }, [data])
+    };
+  }, [data]);
 
   if (!data || data.length === 0) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
         <p className="text-slate-400 text-center py-8">No data available</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -95,7 +96,10 @@ export default function ActivityHeatmap({ data }) {
             <div className="flex">
               <div className="w-12" />
               {Array.from({ length: 24 }).map((_, hour) => (
-                <div key={`hour-${hour}`} className="w-10 text-center text-xs text-slate-500">
+                <div
+                  key={`hour-${hour}`}
+                  className="w-10 text-center text-xs text-slate-500"
+                >
                   {[0, 6, 12, 18, 23].includes(hour) ? hour : ""}
                 </div>
               ))}
@@ -111,10 +115,10 @@ export default function ActivityHeatmap({ data }) {
 
                 {/* Cells */}
                 {Array.from({ length: 24 }).map((_, hour) => {
-                  const key = `${dayIndex}_${hour}`
-                  const count = grid[key] || 0
-                  const color = getColorForCount(count, maxCount)
-                  const isHovered = hoveredCell === key
+                  const key = `${dayIndex}_${hour}`;
+                  const count = grid[key] || 0;
+                  const color = getColorForCount(count, maxCount);
+                  const isHovered = hoveredCell === key;
 
                   return (
                     <div key={key} className="relative">
@@ -135,7 +139,7 @@ export default function ActivityHeatmap({ data }) {
                         </div>
                       )}
                     </div>
-                  )
+                  );
                 })}
               </div>
             ))}
@@ -144,7 +148,9 @@ export default function ActivityHeatmap({ data }) {
 
         {/* Legend */}
         <div className="mt-8 space-y-2">
-          <p className="text-xs font-semibold text-slate-400 uppercase">Légende</p>
+          <p className="text-xs font-semibold text-slate-400 uppercase">
+            Légende
+          </p>
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6" style={{ backgroundColor: "#1A1D27" }} />
@@ -175,15 +181,15 @@ export default function ActivityHeatmap({ data }) {
         <div className="border-l-4 border-purple-500 bg-slate-900/50 p-4 rounded-r-lg">
           <p className="text-sm text-slate-200">
             <span className="mr-2">💡</span>
-            <span className="font-semibold">Pic détecté :</span>
+            <span className="font-semibold">Peak detected:</span>
             <span className="text-slate-400 ml-1">
-              {peak.dayName} {peak.hours} → Créneau optimal pour campagnes SMS
+              {peak.dayName} {peak.hours} - Optimal slot for SMS campaigns
             </span>
           </p>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 ActivityHeatmap.propTypes = {
@@ -192,6 +198,6 @@ ActivityHeatmap.propTypes = {
       day: PropTypes.number.isRequired,
       hour: PropTypes.number.isRequired,
       count: PropTypes.number,
-    })
+    }),
   ),
-}
+};

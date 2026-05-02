@@ -8,8 +8,8 @@ router = APIRouter(prefix="/services", tags=["Services"])
 @router.get("")
 def get_services(db: Session = Depends(get_db)):
     rows = db.execute(text("""
-        SELECT id, name
+        SELECT id, name, url
         FROM services
         ORDER BY name ASC
     """)).fetchall()
-    return [{"id": row.id, "name": row.name} for row in rows]
+    return [{"id": row.id, "name": row.name, "url": row.url} for row in rows]

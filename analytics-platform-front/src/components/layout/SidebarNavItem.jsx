@@ -13,8 +13,10 @@ export default function SidebarNavItem({
   label,
   route,
   isCollapsed,
+  badgeCount = 0,
 }) {
   const tooltipVisibleClass = isCollapsed ? "group-hover:visible" : "invisible";
+  const showBadge = Number(badgeCount || 0) > 0;
 
   return (
     <NavLink
@@ -46,6 +48,16 @@ export default function SidebarNavItem({
             <span className="text-sm font-medium truncate">{label}</span>
           )}
 
+          {!isCollapsed && showBadge && (
+            <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-[10px] font-bold">
+              {Number(badgeCount) > 99 ? "99+" : Number(badgeCount)}
+            </span>
+          )}
+
+          {isCollapsed && showBadge && (
+            <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-400 border border-slate-900" />
+          )}
+
           {isCollapsed && (
             <div
               className={`absolute left-full ml-2 px-3 py-1.5 bg-slate-800 text-slate-200 text-xs whitespace-nowrap rounded shadow-lg pointer-events-none ${tooltipVisibleClass} transition-visibility duration-200`}
@@ -56,6 +68,7 @@ export default function SidebarNavItem({
               }}
             >
               {label}
+              {showBadge ? ` (${Number(badgeCount)})` : ""}
             </div>
           )}
         </>

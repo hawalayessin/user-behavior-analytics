@@ -1,357 +1,357 @@
-# PROJECT_REPORT
+﻿# PROJECT_REPORT
 
 ## Executive Summary
-Le projet est globalement structuré et couvre une chaîne complète analytics (ETL -> API FastAPI -> UI React), avec plusieurs KPI déjà présents côté hooks/services/pages. L’architecture est avancée sur les modules churn/retention/campaign/trial, mais la couverture de tests reste partielle et certaines zones montrent des traces TODO/FIXME/prints et des implémentations heuristiques à stabiliser (notamment la documentation exacte de toutes les requêtes SQL/ORM et la standardisation auth/roles sur tous les endpoints).
+Le projet est globalement structurÃ© et couvre une chaÃ®ne complÃ¨te analytics (ETL -> API FastAPI -> UI React), avec plusieurs KPI dÃ©jÃ  prÃ©sents cÃ´tÃ© hooks/services/pages. Lâ€™architecture est avancÃ©e sur les modules churn/retention/campaign/trial, mais la couverture de tests reste partielle et certaines zones montrent des traces TODO/FIXME/prints et des implÃ©mentations heuristiques Ã  stabiliser (notamment la documentation exacte de toutes les requÃªtes SQL/ORM et la standardisation auth/roles sur tous les endpoints).
 
 ## 1. Project Structure
 
 ### Full Directory Tree
 ```text
 .
-├── .agents
-│   └── skills
-│       └── supabase-postgres-best-practices
-│           ├── references
-│           │   ├── _contributing.md
-│           │   ├── _sections.md
-│           │   ├── _template.md
-│           │   ├── advanced-full-text-search.md
-│           │   ├── advanced-jsonb-indexing.md
-│           │   ├── conn-idle-timeout.md
-│           │   ├── conn-limits.md
-│           │   ├── conn-pooling.md
-│           │   ├── conn-prepared-statements.md
-│           │   ├── data-batch-inserts.md
-│           │   ├── data-n-plus-one.md
-│           │   ├── data-pagination.md
-│           │   ├── data-upsert.md
-│           │   ├── lock-advisory.md
-│           │   ├── lock-deadlock-prevention.md
-│           │   ├── lock-short-transactions.md
-│           │   ├── lock-skip-locked.md
-│           │   ├── monitor-explain-analyze.md
-│           │   ├── monitor-pg-stat-statements.md
-│           │   ├── monitor-vacuum-analyze.md
-│           │   ├── query-composite-indexes.md
-│           │   ├── query-covering-indexes.md
-│           │   ├── query-index-types.md
-│           │   ├── query-missing-indexes.md
-│           │   ├── query-partial-indexes.md
-│           │   ├── schema-constraints.md
-│           │   ├── schema-data-types.md
-│           │   ├── schema-foreign-key-indexes.md
-│           │   ├── schema-lowercase-identifiers.md
-│           │   ├── schema-partitioning.md
-│           │   ├── schema-primary-keys.md
-│           │   ├── security-privileges.md
-│           │   ├── security-rls-basics.md
-│           │   └── security-rls-performance.md
-│           ├── AGENTS.md
-│           ├── CLAUDE.md
-│           ├── README.md
-│           └── SKILL.md
-├── .vscode
-│   └── settings.json
-├── analytics-platform-front
-│   ├── .vite
-│   ├── public
-│   │   └── digmaco.png
-│   ├── src
-│   │   ├── assets
-│   │   │   ├── digmaco.png
-│   │   │   └── react.svg
-│   │   ├── components
-│   │   │   ├── admin
-│   │   │   │   └── management
-│   │   │   │       ├── CampaignModal.jsx
-│   │   │   │       ├── CampaignTable.jsx
-│   │   │   │       ├── DeleteConfirmModal.jsx
-│   │   │   │       ├── ServiceModal.jsx
-│   │   │   │       └── ServiceTable.jsx
-│   │   │   ├── dashboard
-│   │   │   │   ├── campaign
-│   │   │   │   │   ├── CampaignFunnelChart.jsx
-│   │   │   │   │   ├── CampaignPerformanceChart.jsx
-│   │   │   │   │   ├── CampaignVsOrganicChart.jsx
-│   │   │   │   │   └── ServiceCampaignComparison.jsx
-│   │   │   │   ├── churn
-│   │   │   │   │   ├── ChartContainer.jsx
-│   │   │   │   │   ├── ChurnCurveChart.jsx
-│   │   │   │   │   ├── ChurnReasonsChart.jsx
-│   │   │   │   │   ├── RiskSegmentsPanel.jsx
-│   │   │   │   │   └── TimeToChurnChart.jsx
-│   │   │   │   ├── churn_prediction
-│   │   │   │   │   └── churn_dashboard.jsx
-│   │   │   │   ├── retention
-│   │   │   │   │   ├── CohortHeatmap.jsx
-│   │   │   │   │   ├── RetentionCurve.jsx
-│   │   │   │   │   └── ServiceRetentionRadar.jsx
-│   │   │   │   ├── tabs
-│   │   │   │   │   ├── EngagementTab.jsx
-│   │   │   │   │   ├── OverviewTab.jsx
-│   │   │   │   │   ├── RevenueTab.jsx
-│   │   │   │   │   └── TrialChurnTab.jsx
-│   │   │   │   ├── userActivity
-│   │   │   │   │   ├── ActivityHeatmap.jsx
-│   │   │   │   │   ├── DAUTrendChart.jsx
-│   │   │   │   │   ├── InactivityAnalysis.jsx
-│   │   │   │   │   ├── ServiceActivityTable.jsx
-│   │   │   │   │   └── UserGrowthChart.jsx
-│   │   │   │   ├── BIInsightsPanel.jsx
-│   │   │   │   ├── ChurnPieChart.jsx
-│   │   │   │   ├── EngagementHealthPanel.jsx
-│   │   │   │   ├── FilterBar.jsx
-│   │   │   │   ├── KPICard.jsx
-│   │   │   │   ├── KPICardsRow1.jsx
-│   │   │   │   ├── KPICardsRow2.jsx
-│   │   │   │   ├── SubscriptionDonutChart.jsx
-│   │   │   │   ├── TabNavigation.jsx
-│   │   │   │   ├── TopServicesTable.jsx
-│   │   │   │   └── TrialDropoffChart.jsx
-│   │   │   ├── directory
-│   │   │   │   └── Directory.jsx
-│   │   │   ├── layout
-│   │   │   │   ├── AppLayout.jsx
-│   │   │   │   ├── Footer.jsx
-│   │   │   │   ├── navConfig.js
-│   │   │   │   ├── Sidebar.jsx
-│   │   │   │   ├── SidebarNavItem.jsx
-│   │   │   │   ├── SidebarSection.jsx
-│   │   │   │   └── Topbar.jsx
-│   │   │   ├── platform-users
-│   │   │   │   ├── ConfirmDeleteModal.jsx
-│   │   │   │   ├── CreateUserModal.jsx
-│   │   │   │   ├── EditUserModal.jsx
-│   │   │   │   ├── UserFilters.jsx
-│   │   │   │   ├── UserKPICards.jsx
-│   │   │   │   └── UserTable.jsx
-│   │   │   └── subscribers
-│   │   │       └── UserRowDetail.jsx
-│   │   ├── constants
-│   │   │   └── dateFilters.js
-│   │   ├── context
-│   │   │   └── AuthContext.jsx
-│   │   ├── hooks
-│   │   │   ├── useCampaignComparison.js
-│   │   │   ├── useCampaignImpactDashboard.js
-│   │   │   ├── useCampaignKPIs.js
-│   │   │   ├── useCampaignPerformance.js
-│   │   │   ├── useCampaignTimeline.js
-│   │   │   ├── useChurnBreakdown.js
-│   │   │   ├── useChurnCurve.js
-│   │   │   ├── useChurnDashboard.js
-│   │   │   ├── useChurnKPIs.js
-│   │   │   ├── useChurnPredictionMetrics.js
-│   │   │   ├── useChurnPredictionScores.js
-│   │   │   ├── useChurnPredictionTrain.js
-│   │   │   ├── useChurnReasons.js
-│   │   │   ├── useCohortsTable.js
-│   │   │   ├── useCrossService.js
-│   │   │   ├── useDashboardMetrics.js
-│   │   │   ├── useImportData.js
-│   │   │   ├── useManagement.js
-│   │   │   ├── useRetentionCurve.js
-│   │   │   ├── useRetentionHeatmap.js
-│   │   │   ├── useRetentionKPIs.js
-│   │   │   ├── useRiskSegments.js
-│   │   │   ├── useTimeToChurn.js
-│   │   │   ├── useToast.jsx
-│   │   │   ├── useTrialDropoffByDay.js
-│   │   │   ├── useTrialKPIs.js
-│   │   │   ├── useTrialUsers.js
-│   │   │   ├── useUserActivity.js
-│   │   │   └── useUsers.js
-│   │   ├── pages
-│   │   │   ├── admin
-│   │   │   │   ├── ImportDataPage.jsx
-│   │   │   │   └── ManagementPage.jsx
-│   │   │   ├── auth
-│   │   │   │   └── LoginPage.jsx
-│   │   │   ├── dashboard
-│   │   │   │   ├── AIChurnInsights.jsx
-│   │   │   │   ├── CampaignImpactPage.jsx
-│   │   │   │   ├── ChurnAnalysisPage.jsx
-│   │   │   │   ├── CrossServiceBehaviorPage.jsx
-│   │   │   │   ├── DashboardPage.jsx
-│   │   │   │   ├── FreeTrialBehaviorPage.jsx
-│   │   │   │   └── RetentionPage.jsx
-│   │   │   ├── platform-users
-│   │   │   │   └── PlatformUsersPage.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── RootRedirect.jsx
-│   │   │   ├── SubscribersPage.jsx
-│   │   │   └── UserActivityPage.jsx
-│   │   ├── router
-│   │   │   ├── AdminRoute.jsx
-│   │   │   └── PrivateRoute.jsx
-│   │   ├── services
-│   │   │   └── api.js
-│   │   ├── utils
-│   │   │   └── apiError.js
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   ├── index.css
-│   │   └── main.jsx
-│   ├── .dockerignore
-│   ├── .env.example
-│   ├── .gitignore
-│   ├── Dockerfile
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── README.md
-│   ├── tailwind.config.js
-│   └── vite.config.js
-├── docs
-│   ├── tmp
-│   │   ├── pdfs
-│   │   │   ├── cahier_charges_extract.txt
-│   │   │   ├── rapport_avancement_extract.txt
-│   │   │   ├── Rapport_Avancement_PFE_2026-03-23_p1.png
-│   │   │   └── Rapport_Avancement_PFE_2026-03-24.pdf
-│   │   └── generate_rapport.py
-│   ├── architecture.md
-│   ├── Digital Campaign Objectives & Service Overview.pdf
-│   ├── etl_prod_readme.md
-│   ├── kpis.md
-│   ├── ml_churn_report.md
-│   ├── Project 1 _ User Behavior Analytics & Insights Platform.pdf
-│   ├── Rapport_Avancement_PFE.pdf
-│   ├── REAL_DATA_INTEGRATION.md
-│   └── TRIAL_INTEGRATION_SUMMARY.md
-├── tmp
-│   └── generate_project_report.py
-├── user-analytics-backend
-│   ├── alembic
-│   │   ├── versions
-│   │   │   ├── 3939f80c5a66_seeders.py
-│   │   │   ├── 6c076db13bed_add_analytics_performance_indexes.py
-│   │   │   ├── 8ce268d4732a_initial_migration.py
-│   │   │   ├── ded5564102c8_initial_migration3.py
-│   │   │   └── dff7e0993f3d_initial_migration1.py
-│   │   ├── env.py
-│   │   ├── README
-│   │   └── script.py.mako
-│   ├── app
-│   │   ├── api
-│   │   │   ├── v1
-│   │   │   │   └── __init__.py
-│   │   │   └── __init__.py
-│   │   ├── core
-│   │   │   ├── __init__.py
-│   │   │   ├── config.py
-│   │   │   ├── database.py
-│   │   │   ├── date_ranges.py
-│   │   │   ├── dependencies.py
-│   │   │   └── security.py
-│   │   ├── models
-│   │   │   ├── __init__.py
-│   │   │   ├── analytics.py
-│   │   │   ├── billing_events.py
-│   │   │   ├── campaigns.py
-│   │   │   ├── cohorts.py
-│   │   │   ├── import_logs.py
-│   │   │   ├── platform_users.py
-│   │   │   ├── service_types.py
-│   │   │   ├── services.py
-│   │   │   ├── sms_events.py
-│   │   │   ├── subscriptions.py
-│   │   │   ├── unsubscriptions.py
-│   │   │   ├── user_activities.py
-│   │   │   └── users.py
-│   │   ├── repositories
-│   │   │   ├── __init__.py
-│   │   │   ├── campaign_repo.py
-│   │   │   └── churn_repo.py
-│   │   ├── routers
-│   │   │   ├── admin_import.py
-│   │   │   ├── analyticsOverview.py
-│   │   │   ├── auth.py
-│   │   │   ├── campaign_impact.py
-│   │   │   ├── churn_analysis.py
-│   │   │   ├── cross_service.py
-│   │   │   ├── management.py
-│   │   │   ├── ml_churn.py
-│   │   │   ├── platform_user.py
-│   │   │   ├── retention.py
-│   │   │   ├── service.py
-│   │   │   ├── trialAnalytics.py
-│   │   │   ├── userActivity.py
-│   │   │   └── users.py
-│   │   ├── schemas
-│   │   │   ├── __init__.py
-│   │   │   ├── auth.py
-│   │   │   ├── BillingEvent.py
-│   │   │   ├── Campaigns.py
-│   │   │   ├── churn_analysis.py
-│   │   │   ├── Cohorts.py
-│   │   │   ├── ml_churn.py
-│   │   │   ├── platform_user_schemas.py
-│   │   │   ├── Services.py
-│   │   │   ├── ServicesTypes.py
-│   │   │   ├── SmsEvents.py
-│   │   │   ├── Subscriptions.py
-│   │   │   ├── Unsubscriptions.py
-│   │   │   ├── UserActivities.py
-│   │   │   └── users.py
-│   │   ├── services
-│   │   │   ├── __init__.py
-│   │   │   ├── campaign_service.py
-│   │   │   ├── churn_service.py
-│   │   │   └── platform_user_service.py
-│   │   ├── utils
-│   │   │   ├── __init__.py
-│   │   │   └── temporal.py
-│   │   ├── __init__.py
-│   │   └── main.py
-│   ├── logs
-│   │   └── .gitkeep
-│   ├── migrations
-│   │   └── create_import_logs.sql
-│   ├── ml_models
-│   │   ├── __init__.py
-│   │   ├── churn_metrics.joblib
-│   │   ├── churn_model.joblib
-│   │   └── churn_predictor.py
-│   ├── scripts
-│   │   ├── etl
-│   │   │   ├── __init__.py
-│   │   │   ├── etl_prod_to_analytics.py
-│   │   │   ├── fix_services_mapping.py
-│   │   │   ├── link_campaigns_to_subscriptions.py
-│   │   │   ├── recalcul_cohorts.py
-│   │   │   └── seed_campaigns.py
-│   │   ├── seeder
-│   │   │   ├── __init__.py
-│   │   │   └── seed_missing_data.py
-│   │   ├── sql
-│   │   │   └── diagnostics.sql
-│   │   ├── compute_cohorts.py
-│   │   └── verify_data.py
-│   ├── tests
-│   │   └── __init__.py
-│   ├── .dockerignore
-│   ├── .env
-│   ├── .env.example
-│   ├── alembic.ini
-│   ├── Dockerfile
-│   ├── Makefile
-│   ├── note.txt
-│   ├── pyproject.toml
-│   ├── README.md
-│   └── requirements.txt
-├── .env
-├── .gitignore
-├── .gitignore.bak.20260328_115606
-├── .report_all_files.txt
-├── docker-compose.yml
-├── mcp.json
-├── reorganize_project.py
-├── reorganize_report.json
-├── reorganize_report_apply.json
-└── skills-lock.json
+â”œâ”€â”€ .agents
+â”‚   â””â”€â”€ skills
+â”‚       â””â”€â”€ supabase-postgres-best-practices
+â”‚           â”œâ”€â”€ references
+â”‚           â”‚   â”œâ”€â”€ _contributing.md
+â”‚           â”‚   â”œâ”€â”€ _sections.md
+â”‚           â”‚   â”œâ”€â”€ _template.md
+â”‚           â”‚   â”œâ”€â”€ advanced-full-text-search.md
+â”‚           â”‚   â”œâ”€â”€ advanced-jsonb-indexing.md
+â”‚           â”‚   â”œâ”€â”€ conn-idle-timeout.md
+â”‚           â”‚   â”œâ”€â”€ conn-limits.md
+â”‚           â”‚   â”œâ”€â”€ conn-pooling.md
+â”‚           â”‚   â”œâ”€â”€ conn-prepared-statements.md
+â”‚           â”‚   â”œâ”€â”€ data-batch-inserts.md
+â”‚           â”‚   â”œâ”€â”€ data-n-plus-one.md
+â”‚           â”‚   â”œâ”€â”€ data-pagination.md
+â”‚           â”‚   â”œâ”€â”€ data-upsert.md
+â”‚           â”‚   â”œâ”€â”€ lock-advisory.md
+â”‚           â”‚   â”œâ”€â”€ lock-deadlock-prevention.md
+â”‚           â”‚   â”œâ”€â”€ lock-short-transactions.md
+â”‚           â”‚   â”œâ”€â”€ lock-skip-locked.md
+â”‚           â”‚   â”œâ”€â”€ monitor-explain-analyze.md
+â”‚           â”‚   â”œâ”€â”€ monitor-pg-stat-statements.md
+â”‚           â”‚   â”œâ”€â”€ monitor-vacuum-analyze.md
+â”‚           â”‚   â”œâ”€â”€ query-composite-indexes.md
+â”‚           â”‚   â”œâ”€â”€ query-covering-indexes.md
+â”‚           â”‚   â”œâ”€â”€ query-index-types.md
+â”‚           â”‚   â”œâ”€â”€ query-missing-indexes.md
+â”‚           â”‚   â”œâ”€â”€ query-partial-indexes.md
+â”‚           â”‚   â”œâ”€â”€ schema-constraints.md
+â”‚           â”‚   â”œâ”€â”€ schema-data-types.md
+â”‚           â”‚   â”œâ”€â”€ schema-foreign-key-indexes.md
+â”‚           â”‚   â”œâ”€â”€ schema-lowercase-identifiers.md
+â”‚           â”‚   â”œâ”€â”€ schema-partitioning.md
+â”‚           â”‚   â”œâ”€â”€ schema-primary-keys.md
+â”‚           â”‚   â”œâ”€â”€ security-privileges.md
+â”‚           â”‚   â”œâ”€â”€ security-rls-basics.md
+â”‚           â”‚   â””â”€â”€ security-rls-performance.md
+â”‚           â”œâ”€â”€ AGENTS.md
+â”‚           â”œâ”€â”€ CLAUDE.md
+â”‚           â”œâ”€â”€ README.md
+â”‚           â””â”€â”€ SKILL.md
+â”œâ”€â”€ .vscode
+â”‚   â””â”€â”€ settings.json
+â”œâ”€â”€ analytics-platform-front
+â”‚   â”œâ”€â”€ .vite
+â”‚   â”œâ”€â”€ public
+â”‚   â”‚   â””â”€â”€ digmaco.png
+â”‚   â”œâ”€â”€ src
+â”‚   â”‚   â”œâ”€â”€ assets
+â”‚   â”‚   â”‚   â”œâ”€â”€ digmaco.png
+â”‚   â”‚   â”‚   â””â”€â”€ react.svg
+â”‚   â”‚   â”œâ”€â”€ components
+â”‚   â”‚   â”‚   â”œâ”€â”€ admin
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ management
+â”‚   â”‚   â”‚   â”‚       â”œâ”€â”€ CampaignModal.jsx
+â”‚   â”‚   â”‚   â”‚       â”œâ”€â”€ CampaignTable.jsx
+â”‚   â”‚   â”‚   â”‚       â”œâ”€â”€ DeleteConfirmModal.jsx
+â”‚   â”‚   â”‚   â”‚       â”œâ”€â”€ ServiceModal.jsx
+â”‚   â”‚   â”‚   â”‚       â””â”€â”€ ServiceTable.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ dashboard
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ campaign
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CampaignFunnelChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CampaignPerformanceChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CampaignVsOrganicChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â””â”€â”€ ServiceCampaignComparison.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ churn
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ChartContainer.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ChurnCurveChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ChurnReasonsChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ RiskSegmentsPanel.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â””â”€â”€ TimeToChurnChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ churn_prediction
+â”‚   â”‚   â”‚   â”‚   â”‚   â””â”€â”€ churn_dashboard.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ retention
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CohortHeatmap.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ RetentionCurve.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â””â”€â”€ ServiceRetentionRadar.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ tabs
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ EngagementTab.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ OverviewTab.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ RevenueTab.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â””â”€â”€ TrialChurnTab.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ userActivity
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ActivityHeatmap.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ DAUTrendChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ InactivityAnalysis.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ServiceActivityTable.jsx
+â”‚   â”‚   â”‚   â”‚   â”‚   â””â”€â”€ UserGrowthChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ BIInsightsPanel.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ChurnPieChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ EngagementHealthPanel.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ FilterBar.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ KPICard.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ KPICardsRow1.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ KPICardsRow2.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ SubscriptionDonutChart.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ TabNavigation.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ TopServicesTable.jsx
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ TrialDropoffChart.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ directory
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ Directory.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ layout
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ AppLayout.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ Footer.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ navConfig.js
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ Sidebar.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ SidebarNavItem.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ SidebarSection.jsx
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ Topbar.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ platform-users
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ConfirmDeleteModal.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CreateUserModal.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ EditUserModal.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ UserFilters.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ UserKPICards.jsx
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ UserTable.jsx
+â”‚   â”‚   â”‚   â””â”€â”€ subscribers
+â”‚   â”‚   â”‚       â””â”€â”€ UserRowDetail.jsx
+â”‚   â”‚   â”œâ”€â”€ constants
+â”‚   â”‚   â”‚   â””â”€â”€ dateFilters.js
+â”‚   â”‚   â”œâ”€â”€ context
+â”‚   â”‚   â”‚   â””â”€â”€ AuthContext.jsx
+â”‚   â”‚   â”œâ”€â”€ hooks
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCampaignComparison.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCampaignImpactDashboard.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCampaignKPIs.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCampaignPerformance.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCampaignTimeline.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnBreakdown.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnCurve.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnDashboard.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnKPIs.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnPredictionMetrics.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnPredictionScores.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnPredictionTrain.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useChurnReasons.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCohortsTable.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useCrossService.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useDashboardMetrics.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useImportData.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useManagement.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useRetentionCurve.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useRetentionHeatmap.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useRetentionKPIs.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useRiskSegments.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useTimeToChurn.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useToast.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ useTrialDropoffByDay.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useTrialKPIs.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useTrialUsers.js
+â”‚   â”‚   â”‚   â”œâ”€â”€ useUserActivity.js
+â”‚   â”‚   â”‚   â””â”€â”€ useUsers.js
+â”‚   â”‚   â”œâ”€â”€ pages
+â”‚   â”‚   â”‚   â”œâ”€â”€ admin
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ImportDataPage.jsx
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ ManagementPage.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ auth
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ LoginPage.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ dashboard
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ AIChurnInsights.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CampaignImpactPage.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ChurnAnalysisPage.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ CrossServiceBehaviorPage.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ DashboardPage.jsx
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ FreeTrialBehaviorPage.jsx
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ RetentionPage.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ platform-users
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ PlatformUsersPage.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ Dashboard.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ RootRedirect.jsx
+â”‚   â”‚   â”‚   â”œâ”€â”€ SubscribersPage.jsx
+â”‚   â”‚   â”‚   â””â”€â”€ UserActivityPage.jsx
+â”‚   â”‚   â”œâ”€â”€ router
+â”‚   â”‚   â”‚   â”œâ”€â”€ AdminRoute.jsx
+â”‚   â”‚   â”‚   â””â”€â”€ PrivateRoute.jsx
+â”‚   â”‚   â”œâ”€â”€ services
+â”‚   â”‚   â”‚   â””â”€â”€ api.js
+â”‚   â”‚   â”œâ”€â”€ utils
+â”‚   â”‚   â”‚   â””â”€â”€ apiError.js
+â”‚   â”‚   â”œâ”€â”€ App.css
+â”‚   â”‚   â”œâ”€â”€ App.jsx
+â”‚   â”‚   â”œâ”€â”€ index.css
+â”‚   â”‚   â””â”€â”€ main.jsx
+â”‚   â”œâ”€â”€ .dockerignore
+â”‚   â”œâ”€â”€ .env.example
+â”‚   â”œâ”€â”€ .gitignore
+â”‚   â”œâ”€â”€ Dockerfile
+â”‚   â”œâ”€â”€ eslint.config.js
+â”‚   â”œâ”€â”€ index.html
+â”‚   â”œâ”€â”€ package-lock.json
+â”‚   â”œâ”€â”€ package.json
+â”‚   â”œâ”€â”€ postcss.config.js
+â”‚   â”œâ”€â”€ README.md
+â”‚   â”œâ”€â”€ tailwind.config.js
+â”‚   â””â”€â”€ vite.config.js
+â”œâ”€â”€ docs
+â”‚   â”œâ”€â”€ tmp
+â”‚   â”‚   â”œâ”€â”€ pdfs
+â”‚   â”‚   â”‚   â”œâ”€â”€ cahier_charges_extract.txt
+â”‚   â”‚   â”‚   â”œâ”€â”€ rapport_avancement_extract.txt
+â”‚   â”‚   â”‚   â”œâ”€â”€ Rapport_Avancement_PFE_2026-03-23_p1.png
+â”‚   â”‚   â”‚   â””â”€â”€ Rapport_Avancement_PFE_2026-03-24.pdf
+â”‚   â”‚   â””â”€â”€ generate_rapport.py
+â”‚   â”œâ”€â”€ architecture.md
+â”‚   â”œâ”€â”€ Digital Campaign Objectives & Service Overview.pdf
+â”‚   â”œâ”€â”€ etl_prod_readme.md
+â”‚   â”œâ”€â”€ kpis.md
+â”‚   â”œâ”€â”€ ml_churn_report.md
+â”‚   â”œâ”€â”€ Project 1 _ User Behavior Analytics & Insights Platform.pdf
+â”‚   â”œâ”€â”€ Rapport_Avancement_PFE.pdf
+â”‚   â”œâ”€â”€ REAL_DATA_INTEGRATION.md
+â”‚   â””â”€â”€ TRIAL_INTEGRATION_SUMMARY.md
+â”œâ”€â”€ tmp
+â”‚   â””â”€â”€ generate_project_report.py
+â”œâ”€â”€ user-analytics-backend
+â”‚   â”œâ”€â”€ alembic
+â”‚   â”‚   â”œâ”€â”€ versions
+â”‚   â”‚   â”‚   â”œâ”€â”€ 3939f80c5a66_seeders.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ 6c076db13bed_add_analytics_performance_indexes.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ 8ce268d4732a_initial_migration.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ ded5564102c8_initial_migration3.py
+â”‚   â”‚   â”‚   â””â”€â”€ dff7e0993f3d_initial_migration1.py
+â”‚   â”‚   â”œâ”€â”€ env.py
+â”‚   â”‚   â”œâ”€â”€ README
+â”‚   â”‚   â””â”€â”€ script.py.mako
+â”‚   â”œâ”€â”€ app
+â”‚   â”‚   â”œâ”€â”€ api
+â”‚   â”‚   â”‚   â”œâ”€â”€ v1
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ __init__.py
+â”‚   â”‚   â”‚   â””â”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ core
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ config.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ database.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ date_ranges.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ dependencies.py
+â”‚   â”‚   â”‚   â””â”€â”€ security.py
+â”‚   â”‚   â”œâ”€â”€ models
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ analytics.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ billing_events.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ campaigns.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ cohorts.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ import_logs.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ platform_users.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ service_types.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ services.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ sms_events.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ subscriptions.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ unsubscriptions.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ user_activities.py
+â”‚   â”‚   â”‚   â””â”€â”€ users.py
+â”‚   â”‚   â”œâ”€â”€ repositories
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ campaign_repo.py
+â”‚   â”‚   â”‚   â””â”€â”€ churn_repo.py
+â”‚   â”‚   â”œâ”€â”€ routers
+â”‚   â”‚   â”‚   â”œâ”€â”€ admin_import.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ analyticsOverview.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ auth.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ campaign_impact.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ churn_analysis.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ cross_service.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ management.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ ml_churn.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ platform_user.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ retention.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ service.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ trialAnalytics.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ userActivity.py
+â”‚   â”‚   â”‚   â””â”€â”€ users.py
+â”‚   â”‚   â”œâ”€â”€ schemas
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ auth.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ BillingEvent.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ Campaigns.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ churn_analysis.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ Cohorts.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ ml_churn.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ platform_user_schemas.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ Services.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ ServicesTypes.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ SmsEvents.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ Subscriptions.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ Unsubscriptions.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ UserActivities.py
+â”‚   â”‚   â”‚   â””â”€â”€ users.py
+â”‚   â”‚   â”œâ”€â”€ services
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ campaign_service.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ churn_service.py
+â”‚   â”‚   â”‚   â””â”€â”€ platform_user_service.py
+â”‚   â”‚   â”œâ”€â”€ utils
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â””â”€â”€ temporal.py
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â””â”€â”€ main.py
+â”‚   â”œâ”€â”€ logs
+â”‚   â”‚   â””â”€â”€ .gitkeep
+â”‚   â”œâ”€â”€ migrations
+â”‚   â”‚   â””â”€â”€ create_import_logs.sql
+â”‚   â”œâ”€â”€ ml_models
+â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”œâ”€â”€ churn_metrics.joblib
+â”‚   â”‚   â”œâ”€â”€ churn_model.joblib
+â”‚   â”‚   â””â”€â”€ churn_predictor.py
+â”‚   â”œâ”€â”€ scripts
+â”‚   â”‚   â”œâ”€â”€ etl
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ etl_prod_to_analytics.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ fix_services_mapping.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ link_campaigns_to_subscriptions.py
+â”‚   â”‚   â”‚   â”œâ”€â”€ recalcul_cohorts.py
+â”‚   â”‚   â”‚   â””â”€â”€ seed_campaigns.py
+â”‚   â”‚   â”œâ”€â”€ seeder
+â”‚   â”‚   â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”‚   â”‚   â””â”€â”€ seed_missing_data.py
+â”‚   â”‚   â”œâ”€â”€ sql
+â”‚   â”‚   â”‚   â””â”€â”€ diagnostics.sql
+â”‚   â”‚   â”œâ”€â”€ compute_cohorts.py
+â”‚   â”‚   â””â”€â”€ verify_data.py
+â”‚   â”œâ”€â”€ tests
+â”‚   â”‚   â””â”€â”€ __init__.py
+â”‚   â”œâ”€â”€ .dockerignore
+â”‚   â”œâ”€â”€ .env
+â”‚   â”œâ”€â”€ .env.example
+â”‚   â”œâ”€â”€ alembic.ini
+â”‚   â”œâ”€â”€ Dockerfile
+â”‚   â”œâ”€â”€ Makefile
+â”‚   â”œâ”€â”€ note.txt
+â”‚   â”œâ”€â”€ pyproject.toml
+â”‚   â”œâ”€â”€ README.md
+â”‚   â””â”€â”€ requirements.txt
+â”œâ”€â”€ .env
+â”œâ”€â”€ .gitignore
+â”œâ”€â”€ .gitignore.bak.20260328_115606
+â”œâ”€â”€ .report_all_files.txt
+â”œâ”€â”€ docker-compose.yml
+â”œâ”€â”€ mcp.json
+â”œâ”€â”€ reorganize_project.py
+â”œâ”€â”€ reorganize_report.json
+â”œâ”€â”€ reorganize_report_apply.json
+â””â”€â”€ skills-lock.json
 ```
 
 ### Folder Roles
@@ -643,7 +643,7 @@ class ServiceBase(BaseModel):  # No docstring
 class ServiceCreate(ServiceBase):  # No docstring
 class ServiceUpdate(BaseModel):  # No docstring
 class ServiceRead(ServiceBase):  # No docstring
-class ServiceReadWithType(ServiceRead):  # Service avec les détails du service_type imbriqué.
+class ServiceReadWithType(ServiceRead):  # Service avec les dÃ©tails du service_type imbriquÃ©.
 ```
 - Placeholders/missing patterns:
   - pass statement found
@@ -725,7 +725,7 @@ class UserStatsResponse(BaseModel):  # No docstring
 - Status: Empty file
 
 ### user-analytics-backend/scripts/etl/etl_prod_to_analytics.py
-- Purpose: ETL Hawala (prod) -> analytics_db (PFE)
+- Purpose: ETL prod_db (prod) -> analytics_db (PFE)
 - Important constants/configuration:
   - PROJECT_ROOT = Path(__file__).resolve().parents[2]
   - USER_NS = uuid.UUID('11111111-1111-1111-1111-111111111111')
@@ -769,7 +769,7 @@ class ETLRunner(object):  # No docstring
     def _fetch_subscription_map(self: Any, subscription_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[uuid.UUID, uuid.UUID]]: ...  # No docstring
     def etl_subscriptions(self: Any) -> None: ...  # No docstring
     def etl_billing_events(self: Any) -> None: ...  # No docstring
-    def etl_unsubscriptions(self: Any) -> None: ...  # FIX #3 : Source = transaction_histories WHERE type = 4 (unsub) depuis hawala.
+    def etl_unsubscriptions(self: Any) -> None: ...  # FIX #3 : Source = transaction_histories WHERE type = 4 (unsub) depuis prod_db.
     def etl_user_activities(self: Any) -> None: ...  # No docstring
     def etl_sms_events(self: Any) -> None: ...  # No docstring
     def etl_cohorts(self: Any) -> None: ...  # No docstring
@@ -812,10 +812,10 @@ def link_campaigns_to_subscriptions() -> Any: ...  # Update subscriptions.campai
 - Functions/classes: None detected
 
 ### user-analytics-backend/scripts/etl/seed_campaigns.py
-- Purpose: seed_campaigns.py — Version FINALE
+- Purpose: seed_campaigns.py â€” Version FINALE
 - Important constants/configuration:
   - CAMPAIGN_NS = uuid.UUID('88888888-8888-8888-8888-888888888888')
-  - TEMPLATES = [('ussd-ramadan-2025', 'Ramadan USSD Promo 2025', 'PROMOTIONAL', 'Campagne SMS push Ramadan — 50% sur abonnement mensuel', 120000, 50000.0), ('ussd-back-school-25', 'Rentrée Scolaire USSD 2025', 'ACQUISITION', 'Push USSD ciblé étudiants/parents rentrée septembre 2025', 80000, 35000.0), ('ussd-eid-offer-25', 'Offre Aïd USSD 2025', 'PROMOTIONAL', 'Offre spéciale Aïd El Adha — 3 jours accès gratuit', 95000, 40000.0), ('ussd-summer-25', 'Promo Été USSD 2025', 'PROMOTIONAL', 'Campagne été — tarif réduit juillet-août 2025', 70000, 30000.0), ('ussd-retention-q4', 'Rétention Q4 USSD 2025', 'RETENTION', 'Relance abonnés inactifs depuis 15 jours via SMS', 45000, 25000.0), ('ussd-reactivation-25', 'Réactivation Inactifs USSD', 'REACTIVATION', 'Ciblage désabonnés des 60 derniers jours — offre retour', 30000, 20000.0), ('web-launch-sept-25', 'Lancement Sept WEB 2025', 'ACQUISITION', 'Bannières web et push notif — nouvelle offre septembre 2025', 25000, 15000.0), ('web-promo-oct-25', 'Promo Octobre WEB 2025', 'PROMOTIONAL', 'Display octobre — réduction 30% premier mois', 22000, 12000.0), ('web-loyalty-25', 'Fidélité WEB 2025', 'RETENTION', 'Programme fidélité — email+push abonnés 6+ mois', 18000, 10000.0), ('web-upsell-25', 'Upsell Premium WEB 2025', 'UPSELL', 'Upgrade vers offre premium — abonnés plan standard', 15000, 8000.0), ('organic-direct', 'Organique / Direct', 'ORGANIC', 'Souscriptions directes sans campagne payante', 500000, 0.0)]
+  - TEMPLATES = [('ussd-ramadan-2025', 'Ramadan USSD Promo 2025', 'PROMOTIONAL', 'Campagne SMS push Ramadan â€” 50% sur abonnement mensuel', 120000, 50000.0), ('ussd-back-school-25', 'RentrÃ©e Scolaire USSD 2025', 'ACQUISITION', 'Push USSD ciblÃ© Ã©tudiants/parents rentrÃ©e septembre 2025', 80000, 35000.0), ('ussd-eid-offer-25', 'Offre AÃ¯d USSD 2025', 'PROMOTIONAL', 'Offre spÃ©ciale AÃ¯d El Adha â€” 3 jours accÃ¨s gratuit', 95000, 40000.0), ('ussd-summer-25', 'Promo Ã‰tÃ© USSD 2025', 'PROMOTIONAL', 'Campagne Ã©tÃ© â€” tarif rÃ©duit juillet-aoÃ»t 2025', 70000, 30000.0), ('ussd-retention-q4', 'RÃ©tention Q4 USSD 2025', 'RETENTION', 'Relance abonnÃ©s inactifs depuis 15 jours via SMS', 45000, 25000.0), ('ussd-reactivation-25', 'RÃ©activation Inactifs USSD', 'REACTIVATION', 'Ciblage dÃ©sabonnÃ©s des 60 derniers jours â€” offre retour', 30000, 20000.0), ('web-launch-sept-25', 'Lancement Sept WEB 2025', 'ACQUISITION', 'BanniÃ¨res web et push notif â€” nouvelle offre septembre 2025', 25000, 15000.0), ('web-promo-oct-25', 'Promo Octobre WEB 2025', 'PROMOTIONAL', 'Display octobre â€” rÃ©duction 30% premier mois', 22000, 12000.0), ('web-loyalty-25', 'FidÃ©litÃ© WEB 2025', 'RETENTION', 'Programme fidÃ©litÃ© â€” email+push abonnÃ©s 6+ mois', 18000, 10000.0), ('web-upsell-25', 'Upsell Premium WEB 2025', 'UPSELL', 'Upgrade vers offre premium â€” abonnÃ©s plan standard', 15000, 8000.0), ('organic-direct', 'Organique / Direct', 'ORGANIC', 'Souscriptions directes sans campagne payante', 500000, 0.0)]
   - INSERT_SQL = text('\n    INSERT INTO campaigns\n        (id, name, description, service_id,\n         send_datetime, target_size, cost, campaign_type, status)\n    VALUES\n        (:id, :name, :description, :service_id,\n         :send_datetime, :target_size, :cost, :campaign_type, :status)\n    ON CONFLICT (id) DO UPDATE SET\n        name          = EXCLUDED.name,\n        description   = EXCLUDED.description,\n        service_id    = EXCLUDED.service_id,\n        send_datetime = EXCLUDED.send_datetime,\n        target_size   = EXCLUDED.target_size,\n        cost          = EXCLUDED.cost,\n        campaign_type = EXCLUDED.campaign_type,\n        status        = EXCLUDED.status\n')
   - ASSIGN_BATCH_SQL = text('\n    WITH locked_subscriptions AS (\n        SELECT\n            s.id,\n            s.service_id,\n            s.subscription_start_date\n        FROM subscriptions s\n        WHERE s.campaign_id IS NULL\n        LIMIT :batch_size\n        FOR UPDATE OF s SKIP LOCKED\n    ),\n    candidates AS (\n        SELECT\n            ls.id                     AS sub_id,\n            c.id                      AS campaign_id,\n            ls.subscription_start_date AS sub_start,\n            c.send_datetime           AS send_dt,\n            ROW_NUMBER() OVER (\n                PARTITION BY ls.id\n                ORDER BY ABS(EXTRACT(EPOCH FROM (ls.subscription_start_date - c.send_datetime))), c.send_datetime DESC\n            ) AS rn\n        FROM locked_subscriptions ls\n        JOIN campaigns c ON c.service_id = ls.service_id\n    )\n    UPDATE subscriptions s\n    SET    campaign_id = c.campaign_id\n    FROM   candidates c\n    WHERE  s.id = c.sub_id\n      AND  c.rn = 1\n\n')
   - ASSIGN_ORGANIC_FALLBACK_BATCH_SQL = text("\n    WITH organic_campaign AS (\n        SELECT id\n        FROM campaigns\n        WHERE campaign_type = 'ORGANIC'\n        ORDER BY send_datetime DESC\n        LIMIT 1\n    ),\n    locked_subscriptions AS (\n        SELECT s.id\n        FROM subscriptions s\n        WHERE s.campaign_id IS NULL\n        LIMIT :batch_size\n        FOR UPDATE OF s SKIP LOCKED\n    )\n    UPDATE subscriptions s\n    SET campaign_id = oc.id\n    FROM organic_campaign oc, locked_subscriptions ls\n    WHERE s.id = ls.id\n")
@@ -824,7 +824,7 @@ def log(msg: str, **kw: Any) -> None: ...  # No docstring
 def get_anchor(engine: Any) -> datetime: ...  # No docstring
 def get_services(engine: Any) -> list[dict[str, Any]]: ...  # No docstring
 def build(anchor: datetime, services: list[dict[str, Any]]) -> list[dict]: ...  # No docstring
-def db_rows(campaigns: list[dict]) -> list[dict]: ...  # Retourne seulement les clés sans préfixe _ pour l'INSERT.
+def db_rows(campaigns: list[dict]) -> list[dict]: ...  # Retourne seulement les clÃ©s sans prÃ©fixe _ pour l'INSERT.
 def do_insert(engine: Any, campaigns: Any, dry_run: bool, pre_clean: bool) -> int: ...  # No docstring
 def do_assign(engine: Any, dry_run: bool) -> int: ...  # No docstring
 def do_clear(engine: Any) -> None: ...  # No docstring
@@ -894,9 +894,9 @@ def get_all_users(db: Session, skip: int, limit: int, search: str | None, role: 
 def get_user_by_id(db: Session, user_id: UUID) -> PlatformUser: ...  # Return a single platform user or raise 404.
 def create_user(db: Session, data: PlatformUserCreate) -> PlatformUser: ...  # Create a new platform user, raise 400 if email already registered.
 def update_user(db: Session, user_id: UUID, data: PlatformUserUpdate) -> PlatformUser: ...  # Update name, email and/or role of a platform user.
-def update_user_status(db: Session, user_id: UUID, is_active: bool, current_user_id: UUID) -> PlatformUser: ...  # Toggle active/inactive status — admin cannot deactivate themselves.
-def update_user_role(db: Session, user_id: UUID, role: str, current_user_id: UUID) -> PlatformUser: ...  # Change user role — admin cannot change their own role.
-def delete_user(db: Session, user_id: UUID, current_user_id: UUID) -> None: ...  # Permanently delete a platform user — admin cannot delete themselves.
+def update_user_status(db: Session, user_id: UUID, is_active: bool, current_user_id: UUID) -> PlatformUser: ...  # Toggle active/inactive status â€” admin cannot deactivate themselves.
+def update_user_role(db: Session, user_id: UUID, role: str, current_user_id: UUID) -> PlatformUser: ...  # Change user role â€” admin cannot change their own role.
+def delete_user(db: Session, user_id: UUID, current_user_id: UUID) -> None: ...  # Permanently delete a platform user â€” admin cannot delete themselves.
 ```
 
 ## Files Group: API routes
@@ -1028,7 +1028,7 @@ def get_platform_user(user_id: UUID, db: Session, _: PlatformUser) -> PlatformUs
 def create_platform_user(data: PlatformUserCreate, db: Session, _: PlatformUser) -> PlatformUserResponse: ...  # Create a new platform user account.
 def update_platform_user(user_id: UUID, data: PlatformUserUpdate, db: Session, _: PlatformUser) -> PlatformUserResponse: ...  # Update name, email and/or role of a platform user.
 def update_user_status(user_id: UUID, body: UpdateStatusRequest, db: Session, current_user: PlatformUser) -> dict: ...  # Toggle active/inactive status of a platform user.
-def update_user_role(user_id: UUID, body: UpdateRoleRequest, db: Session, current_user: PlatformUser) -> dict: ...  # Change role of a platform user (admin ↔ analyst).
+def update_user_role(user_id: UUID, body: UpdateRoleRequest, db: Session, current_user: PlatformUser) -> dict: ...  # Change role of a platform user (admin â†” analyst).
 def delete_platform_user(user_id: UUID, db: Session, current_user: PlatformUser) -> dict: ...  # Permanently delete a platform user.
 ```
 
@@ -1939,7 +1939,7 @@ def get_day_window(db: Session, source: AnchorSource) -> tuple[datetime, datetim
 - Purpose: Non-Python/non-frontend artifact (.md)
 
 ### docs/tmp/generate_rapport.py
-- Purpose: Rapport d'Avancement PFE — User Behavior Analytics & Insights Platform
+- Purpose: Rapport d'Avancement PFE â€” User Behavior Analytics & Insights Platform
 - Important constants/configuration:
   - DARK_BLUE = HexColor('#1a237e')
   - MED_BLUE = HexColor('#283593')
@@ -1981,10 +1981,10 @@ def build_pdf(output_path: Any) -> Any: ...  # No docstring
 - Purpose: Python module implementing reorganize project
 - Important constants/configuration:
   - COMBINED_GITIGNORE = '# Python\n__pycache__/\n*.py[cod]\n*.pyo\n.pytest_cache/\n.coverage\nhtmlcov/\ndist/\n*.egg-info/\nvenv/\n.venv/\nenv/\n\n# Environnement\n.env\n*.env.local\n\n# Logs\nlogs/\n*.log\n\n# IDE\n.vscode/settings.json\n.idea/\n*.swp\n\n# OS\n.DS_Store\nThumbs.db\n\n# Node\nnode_modules/\ndist/\nbuild/\n\n# Data\n*.csv\n*.xlsx\n__pycache__\n'
-  - BACKEND_ENV_EXAMPLE = '# Database\nANALYTICS_CONN=postgresql+psycopg2://user:password@localhost:5432/analytics_db\nPROD_CONN=postgresql+psycopg2://user:password@hawala_host:5432/hawala_db\n\n# API\nSECRET_KEY=your-secret-key-here\nALGORITHM=HS256\nACCESS_TOKEN_EXPIRE_MINUTES=1440\n\n# App\nENVIRONMENT=development\nDEBUG=true\nCORS_ORIGINS=["http://localhost:5173"]\n\n# Frontend\nVITE_API_BASE_URL=http://localhost:8000/api/v1\n'
+  - BACKEND_ENV_EXAMPLE = '# Database\nANALYTICS_CONN=postgresql+psycopg2://user:password@localhost:5432/analytics_db\nPROD_CONN=postgresql+psycopg2://user:password@prod_db_host:5432/prod_db\n\n# API\nSECRET_KEY=your-secret-key-here\nALGORITHM=HS256\nACCESS_TOKEN_EXPIRE_MINUTES=1440\n\n# App\nENVIRONMENT=development\nDEBUG=true\nCORS_ORIGINS=["http://localhost:5173"]\n\n# Frontend\nVITE_API_BASE_URL=http://localhost:8000/api/v1\n'
   - MAKEFILE_CONTENT = '.PHONY: dev migrate seed test lint\n\ndev:\n\tuvicorn app.main:app --reload --host 0.0.0.0 --port 8000\n\nmigrate:\n\talembic upgrade head\n\nseed:\n\tpython scripts/seeder/seed_missing_data.py\n\nseed-dry:\n\tpython scripts/seeder/seed_missing_data.py --dry-run\n\ntest:\n\tpytest tests/ -v\n\nlint:\n\truff check app/ scripts/\n\tblack app/ scripts/ --check\n\nformat:\n\tblack app/ scripts/\n\truff check app/ scripts/ --fix\n\netl:\n\tpython scripts/etl/etl_prod_to_analytics.py\n\netl-fix:\n\tpython scripts/etl/fix_services_mapping.py\n'
   - PYPROJECT_CONTENT = '[project]\nname = "user-analytics-backend"\nversion = "1.0.0"\nrequires-python = ">=3.11"\n\ndependencies = [\n    "fastapi>=0.111.0",\n    "uvicorn[standard]>=0.29.0",\n    "sqlalchemy>=2.0.0",\n    "alembic>=1.13.0",\n    "psycopg2-binary>=2.9.9",\n    "pydantic>=2.7.0",\n    "pydantic-settings>=2.2.0",\n    "python-dotenv>=1.0.0",\n    "python-jose[cryptography]>=3.3.0",\n    "passlib[bcrypt]>=1.7.4",\n    "faker>=24.0.0",\n    "tqdm>=4.66.0",\n    "pandas>=2.2.0",\n    "openpyxl>=3.1.0",\n]\n\n[tool.ruff]\nline-length = 100\ntarget-version = "py311"\n\n[tool.black]\nline-length = 100\ntarget-version = ["py311"]\n'
-  - README_CONTENT = '# User Analytics Platform - PFE DigMaco\n\n## Stack\n- Backend: FastAPI + PostgreSQL + Alembic + SQLAlchemy\n- Frontend: React + Vite\n- ETL: Python scripts (hawala -> analytics_db)\n\n## Setup\n\n### Backend\n```bash\ncp .env.example .env\npip install -e .\nmake migrate\nmake seed\nmake dev\n```\n\n### Frontend\n```bash\ncd user-analytics-frontend\ncp .env.example .env\nnpm install\nnpm run dev\n```\n\n## Commandes utiles\n| Commande | Action |\n|----------|--------|\n| make dev | Lancer FastAPI |\n| make migrate | Appliquer migrations |\n| make seed | Seeder la base analytics |\n| make etl | ETL hawala -> analytics |\n| make test | Tests unitaires |\n| make lint | Verifier le code |\n'
+  - README_CONTENT = '# User Analytics Platform - PFE DigMaco\n\n## Stack\n- Backend: FastAPI + PostgreSQL + Alembic + SQLAlchemy\n- Frontend: React + Vite\n- ETL: Python scripts (prod_db -> analytics_db)\n\n## Setup\n\n### Backend\n```bash\ncp .env.example .env\npip install -e .\nmake migrate\nmake seed\nmake dev\n```\n\n### Frontend\n```bash\ncd user-analytics-frontend\ncp .env.example .env\nnpm install\nnpm run dev\n```\n\n## Commandes utiles\n| Commande | Action |\n|----------|--------|\n| make dev | Lancer FastAPI |\n| make migrate | Appliquer migrations |\n| make seed | Seeder la base analytics |\n| make etl | ETL prod_db -> analytics |\n| make test | Tests unitaires |\n| make lint | Verifier le code |\n'
 ```python
 def parse_args() -> argparse.Namespace: ...  # No docstring
 def main() -> None: ...  # No docstring
@@ -2127,7 +2127,7 @@ def downgrade() -> None: ...  # Downgrade schema.
 ### user-analytics-backend/app/core/database.py
 - Purpose: Python module implementing database
 - Important constants/configuration:
-  - DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:12345hawala@localhost:5433/analytics_db')
+  - DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:12345prod_db@localhost:5433/analytics_db')
 ```python
 def get_db() -> Any: ...  # No docstring
 ```
@@ -2239,7 +2239,7 @@ class ChurnPredictor(object):  # Logistic Regression based churn predictor.
 - Purpose: Non-Python/non-frontend artifact (.txt)
 
 ### user-analytics-backend/scripts/compute_cohorts.py
-- Purpose: ETL Script — Compute & populate cohorts table
+- Purpose: ETL Script â€” Compute & populate cohorts table
 - Important constants/configuration: None detected
 ```python
 def compute_cohorts() -> Any: ...  # No docstring
@@ -2275,7 +2275,7 @@ class SeedMetrics(object):  # No docstring
 - Purpose: Raw SQL script
 ```sql
 -- Verification queries for services mapping consistency
--- Source: hawala
+-- Source: prod_db
 -- Target: analytics_db
 
 -- 1) Source distribution by real service mapping (service_subscription_type_id -> service_id)
@@ -2350,7 +2350,7 @@ LEFT JOIN services sv ON sv.id = sub.service_id;
 ```
 
 ### user-analytics-backend/scripts/verify_data.py
-- Purpose: Post-fix verification for Hawala -> analytics data pipeline.
+- Purpose: Post-fix verification for prod_db -> analytics data pipeline.
 - Important constants/configuration:
   - DATA_START_DATE = '2025-09-01'
 ```python
@@ -2393,7 +2393,7 @@ CREATE INDEX IF NOT EXISTS ix_import_logs_admin_id ON import_logs(admin_id);
 ### Source file: user-analytics-backend/scripts/sql/diagnostics.sql
 ```sql
 -- Verification queries for services mapping consistency
--- Source: hawala
+-- Source: prod_db
 -- Target: analytics_db
 
 -- 1) Source distribution by real service mapping (service_subscription_type_id -> service_id)
@@ -4361,7 +4361,7 @@ SELECT
             sub.subscription_end_date                            AS trial_end,
             sub.status,
 
-            -- ✅ GREATEST(0, ...) évite les durées négatives
+            -- âœ… GREATEST(0, ...) Ã©vite les durÃ©es nÃ©gatives
             GREATEST(0,
                 ROUND(
                     EXTRACT(DAY FROM
@@ -4899,7 +4899,7 @@ Update name, email and/or role of a platform user.
 
 ### Inline SQL in: user-analytics-backend/app/services/platform_user_service.py
 ```sql
-Permanently delete a platform user — admin cannot delete themselves.
+Permanently delete a platform user â€” admin cannot delete themselves.
 ```
 - KPI/data computed: Context-dependent business metric/query
 - Input parameters: Function args / bound params around execution
@@ -5390,7 +5390,7 @@ WITH first_sub AS (
                     date_trunc('month', fp.first_sub_date)::date AS cohort_date,
                     fp.service_id,
 
-                    -- D7: toujours abonné 7 jours après sa première sub
+                    -- D7: toujours abonnÃ© 7 jours aprÃ¨s sa premiÃ¨re sub
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM subscriptions s2
                         WHERE s2.user_id = fp.user_id
@@ -6029,7 +6029,7 @@ INSERT INTO campaigns
 
 ### Inline SQL in: user-analytics-backend/scripts/etl/seed_campaigns.py
 ```sql
-Retourne seulement les clés sans préfixe _ pour l'INSERT.
+Retourne seulement les clÃ©s sans prÃ©fixe _ pour l'INSERT.
 ```
 - KPI/data computed: Context-dependent business metric/query
 - Input parameters: Function args / bound params around execution
@@ -8257,7 +8257,7 @@ SELECT COUNT(*) FROM
 - Known issues/incomplete sections: None detected
 
 ## 7. ETL Pipeline Analysis
-### Source tables read from hawala_db (heuristic extraction)
+### Source tables read from prod_db (heuristic extraction)
 - user-analytics-backend/scripts/compute_cohorts.py: FROM app.core.database
 - user-analytics-backend/scripts/compute_cohorts.py: FROM cohort_base
 - user-analytics-backend/scripts/compute_cohorts.py: FROM cohorts
@@ -8289,7 +8289,7 @@ SELECT COUNT(*) FROM
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM dataclasses
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM datetime
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM dotenv
-- user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM hawala.subscribed_clients.
+- user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM prod_db.subscribed_clients.
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM service_subscription_types
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM services
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: FROM sqlalchemy
@@ -8529,14 +8529,14 @@ select>
 ```sql
 selected criteria.
 Functional Description
-● Generate a report by:
-○ Date range selection
-○ Single service or all services combined
-● Reports should summarize:
-○ Key KPIs
-○ User behavior insights
-○ Trial → paid conversion
-○ Churn and retention
+â— Generate a report by:
+â—‹ Date range selection
+â—‹ Single service or all services combined
+â— Reports should summarize:
+â—‹ Key KPIs
+â—‹ User behavior insights
+â—‹ Trial â†’ paid conversion
+â—‹ Churn and retention
 ```
   - stickiness = DAU / MAU
 - Known bugs/corrections: See Known Issues section
@@ -8589,28 +8589,28 @@ Functional Description
 - POSTGRES_USER=postgres
 - POSTGRES_PASSWORD=***
 - POSTGRES_DB=analytics_db
-- DATABASE_URL=postgresql://postgres:12345hawala@host.docker.internal:5433/analytics_db
+- DATABASE_URL=postgresql://postgres:12345prod_db@host.docker.internal:5433/analytics_db
 ### Database connection strings (masked)
 - .env: postgresql://postgres:***@host.docker.internal:5433/analytics_db
-- docs/etl_prod_readme.md: postgresql://postgres:***@localhost:5432/hawala
+- docs/etl_prod_readme.md: postgresql://postgres:***@localhost:5432/prod_db
 - docs/etl_prod_readme.md: postgresql://postgres:***@localhost:5432/analytics_db
 - mcp.json: postgresql://postgres:***@localhost:5433/analytics_db
-- mcp.json: postgresql://postgres:***@localhost:5433/hawala
+- mcp.json: postgresql://postgres:***@localhost:5433/prod_db
 - user-analytics-backend/.env: postgresql://postgres:***@localhost:5433/analytics_db
-- user-analytics-backend/.env: postgresql://postgres:***@localhost:5433/hawala
+- user-analytics-backend/.env: postgresql://postgres:***@localhost:5433/prod_db
 - user-analytics-backend/.env: postgresql://postgres:***@localhost:5433/analytics_db
 - user-analytics-backend/alembic.ini: postgresql://postgres:***@localhost:5433/analytics_db
 - user-analytics-backend/app/core/database.py: postgresql://postgres:***@localhost:5433/analytics_db
-- user-analytics-backend/scripts/etl/etl_prod_to_analytics.py: postgresql://postgres:***@localhost:5433/hawala
+- user-analytics-backend/scripts/etl/etl_prod_to_analytics.py: postgresql://postgres:***@localhost:5433/prod_db
 - user-analytics-backend/scripts/etl/etl_prod_to_analytics.py: postgresql://postgres:***@localhost:5433/analytics_db
-- user-analytics-backend/scripts/etl/fix_services_mapping.py: postgresql://postgres:***@localhost:5432/hawala
+- user-analytics-backend/scripts/etl/fix_services_mapping.py: postgresql://postgres:***@localhost:5432/prod_db
 - user-analytics-backend/scripts/etl/fix_services_mapping.py: postgresql://postgres:***@localhost:5432/analytics_db
 - user-analytics-backend/scripts/etl/seed_campaigns.py: postgresql://postgres:***@localhost:5433/analytics_db
-- user-analytics-backend/scripts/verify_data.py: postgresql://postgres:***@localhost:5432/hawala
+- user-analytics-backend/scripts/verify_data.py: postgresql://postgres:***@localhost:5432/prod_db
 - user-analytics-backend/scripts/verify_data.py: postgresql://postgres:***@localhost:5433/analytics_db
 ### Hardcoded values that should be configurable
 - reorganize_project.py:54 -> ANALYTICS_CONN=postgresql+psycopg2://user:password@localhost:5432/analytics_db
-- reorganize_project.py:55 -> PROD_CONN=postgresql+psycopg2://user:password@hawala_host:5432/hawala_db
+- reorganize_project.py:55 -> PROD_CONN=postgresql+psycopg2://user:password@prod_db_host:5432/prod_db
 - reorganize_project.py:65 -> CORS_ORIGINS=[\"http://localhost:5173\"]
 - reorganize_project.py:68 -> VITE_API_BASE_URL=http://localhost:8000/api/v1
 - reorganize_project.py:74 -> \tuvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -8623,17 +8623,17 @@ Functional Description
 - tmp/generate_project_report.py:741 -> if hardcoded:
 - tmp/generate_project_report.py:742 -> for f, i, l in hardcoded[:200]:
 - tmp/generate_project_report.py:745 -> md.append("- No obvious hardcoded config values found by heuristic scan")
-- user-analytics-backend/app/core/database.py:7 -> # Fallback localhost pour le développement sans Docker
-- user-analytics-backend/app/core/database.py:10 -> "postgresql://postgres:12345hawala@localhost:5433/analytics_db"
+- user-analytics-backend/app/core/database.py:7 -> # Fallback localhost pour le dÃ©veloppement sans Docker
+- user-analytics-backend/app/core/database.py:10 -> "postgresql://postgres:12345prod_db@localhost:5433/analytics_db"
 - user-analytics-backend/app/main.py:36 -> "http://localhost:5173",
 - user-analytics-backend/app/main.py:37 -> "http://127.0.0.1:5173",
-- user-analytics-backend/scripts/etl/etl_prod_to_analytics.py:1409 -> source_url = os.getenv("HAWALA_CONN",    "postgresql://postgres:12345hawala@localhost:5433/hawala")
-- user-analytics-backend/scripts/etl/etl_prod_to_analytics.py:1410 -> target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345hawala@localhost:5433/analytics_db")
-- user-analytics-backend/scripts/etl/fix_services_mapping.py:318 -> source_engine = get_engine("HAWALA_CONN", "postgresql://postgres:password@localhost:5432/hawala")
+- user-analytics-backend/scripts/etl/etl_prod_to_analytics.py:1409 -> source_url = os.getenv("PROD_CONN",    "postgresql://postgres:12345prod_db@localhost:5433/prod_db")
+- user-analytics-backend/scripts/etl/etl_prod_to_analytics.py:1410 -> target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db")
+- user-analytics-backend/scripts/etl/fix_services_mapping.py:318 -> source_engine = get_engine("PROD_CONN", "postgresql://postgres:password@localhost:5432/prod_db")
 - user-analytics-backend/scripts/etl/fix_services_mapping.py:319 -> target_engine = get_engine("ANALYTICS_CONN", "postgresql://postgres:password@localhost:5432/analytics_db")
-- user-analytics-backend/scripts/etl/seed_campaigns.py:314 -> url    = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345hawala@localhost:5433/analytics_db")
-- user-analytics-backend/scripts/verify_data.py:31 -> hawala_conn = os.getenv("HAWALA_CONN", "postgresql://postgres:password@localhost:5432/hawala")
-- user-analytics-backend/scripts/verify_data.py:32 -> analytics_conn = os.getenv("ANALYTICS_CONN", os.getenv("DATABASE_URL", "postgresql://postgres:12345hawala@localhost:5433/analytics_db"))
+- user-analytics-backend/scripts/etl/seed_campaigns.py:314 -> url    = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db")
+- user-analytics-backend/scripts/verify_data.py:31 -> PROD_CONN = os.getenv("PROD_CONN", "postgresql://postgres:password@localhost:5432/prod_db")
+- user-analytics-backend/scripts/verify_data.py:32 -> analytics_conn = os.getenv("ANALYTICS_CONN", os.getenv("DATABASE_URL", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db"))
 
 ## 11. Known Issues & TODOs
 - .agents/skills/supabase-postgres-best-practices/AGENTS.md:60 -> - Supabase-specific notes (when applicable)
@@ -8667,17 +8667,17 @@ Functional Description
 - analytics-platform-front/package-lock.json:3275 -> "debug": {
 - analytics-platform-front/package-lock.json:5239 -> "url": "https://github.com/sponsors/colinhacks"
 - docs/etl_prod_readme.md:95 -> ## Notes importantes
-- docs/kpis.md:419 -> ### 8. Notes & Benchmarks (à adapter pour le jury)
+- docs/kpis.md:419 -> ### 8. Notes & Benchmarks (Ã  adapter pour le jury)
 - docs/Project 1 _ User Behavior Analytics & Insights Platform.pdf:3965 -> <</Title (Scope Notes )
 - docs/Project 1 _ User Behavior Analytics & Insights Platform.pdf:4145 -> <</Title (10. Notes for the Intern )
 - docs/tmp/generate_rapport.py:290 -> Paragraph("<b>Note</b>", body_bold)],
 - docs/tmp/generate_rapport.py:678 -> "<b>Note :</b> Le cahier des charges exige au minimum 5 recommandations. "
 - docs/tmp/generate_rapport.py:680 -> ParagraphStyle("note", parent=body_style, textColor=ORANGE)
-- docs/tmp/generate_rapport.py:829 -> print(f"\n✅ PDF généré avec succès : {output_path}")
+- docs/tmp/generate_rapport.py:829 -> print(f"\nâœ… PDF gÃ©nÃ©rÃ© avec succÃ¨s : {output_path}")
 - docs/tmp/generate_rapport.py:830 -> print(f"   Taille : {os.path.getsize(output_path) / 1024:.1f} Ko")
 - docs/tmp/pdfs/cahier_charges_extract.txt:132 -> Scope Notes
 - docs/tmp/pdfs/cahier_charges_extract.txt:269 -> 10. Notes for the Intern
-- docs/tmp/pdfs/rapport_avancement_extract.txt:632 -> Note: Les données de cohortes sont désormais disponibles dans la
+- docs/tmp/pdfs/rapport_avancement_extract.txt:632 -> Note: Les donnÃ©es de cohortes sont dÃ©sormais disponibles dans la
 - docs/tmp/pdfs/rapport_avancement_extract.txt:658 -> [4] Ellis, S. (2017). Hacking Growth: How Today's Fastest-Growing
 - reorganize_project.py:64 -> DEBUG=true
 - reorganize_project.py:244 -> print(json.dumps(payload, ensure_ascii=True))
@@ -8692,7 +8692,7 @@ Functional Description
 - tmp/generate_project_report.py:332 -> return {"endpoints": endpoints, "states": states, "todos": todos, "feature": feature}
 - tmp/generate_project_report.py:405 -> todos: List[Dict[str, str]] = []
 - tmp/generate_project_report.py:411 -> todos.extend(extract_todos(f, txt))
-- tmp/generate_project_report.py:447 -> md.append("Le projet est globalement structuré et couvre une chaîne complète analytics (ETL -> API FastAPI -> UI React), avec plusieurs KPI déjà présents côté hooks/services/pages. L’architecture est avancée sur les modules churn/retention/campaign/trial, mais la couverture de tests reste partielle 
+- tmp/generate_project_report.py:447 -> md.append("Le projet est globalement structurÃ© et couvre une chaÃ®ne complÃ¨te analytics (ETL -> API FastAPI -> UI React), avec plusieurs KPI dÃ©jÃ  prÃ©sents cÃ´tÃ© hooks/services/pages. Lâ€™architecture est avancÃ©e sur les modules churn/retention/campaign/trial, mais la couverture de tests reste partielle 
 - tmp/generate_project_report.py:551 -> if rinf.get("todos"):
 - tmp/generate_project_report.py:553 -> for t in rinf["todos"]:
 - tmp/generate_project_report.py:571 -> md.append("- Nearby TODO/issues: See section 11")
@@ -8722,44 +8722,44 @@ Functional Description
 - user-analytics-backend/ml_models/churn_predictor.py:30 -> Notes:
 - user-analytics-backend/ml_models/churn_predictor.py:429 -> # Store only for API debugging / jury export.
 - user-analytics-backend/scripts/compute_cohorts.py:18 -> print("=" * 60)
-- user-analytics-backend/scripts/compute_cohorts.py:19 -> print("🚀 ETL — Cohorts computation started")
+- user-analytics-backend/scripts/compute_cohorts.py:19 -> print("ðŸš€ ETL â€” Cohorts computation started")
 - user-analytics-backend/scripts/compute_cohorts.py:20 -> print(f"   Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 - user-analytics-backend/scripts/compute_cohorts.py:21 -> print("=" * 60)
-- user-analytics-backend/scripts/compute_cohorts.py:28 -> print("\n🔍 ÉTAPE 0 — Diagnostic des statuts disponibles...")
+- user-analytics-backend/scripts/compute_cohorts.py:28 -> print("\nðŸ” Ã‰TAPE 0 â€” Diagnostic des statuts disponibles...")
 - user-analytics-backend/scripts/compute_cohorts.py:37 -> print(f"   {'Status':<20} {'Count':>10}")
 - user-analytics-backend/scripts/compute_cohorts.py:38 -> print(f"   {'-'*20} {'-'*10}")
 - user-analytics-backend/scripts/compute_cohorts.py:40 -> print(f"   {str(row.status):<20} {row.cnt:>10}")
-- user-analytics-backend/scripts/compute_cohorts.py:51 -> print(f"\n   ⚠️  Aucun statut 'active' trouvé.")
-- user-analytics-backend/scripts/compute_cohorts.py:52 -> print(f"   ⚠️  Fallback sur le statut dominant: '{active_statuses_str}'")
-- user-analytics-backend/scripts/compute_cohorts.py:59 -> print(f"\n   → Statuts considérés comme actifs: {active_statuses_str}")
-- user-analytics-backend/scripts/compute_cohorts.py:64 -> print("\n📊 ÉTAPE 1 — Vérification données sources...")
-- user-analytics-backend/scripts/compute_cohorts.py:76 -> print(f"   ✅ Total subscriptions : {counts.total_subscriptions}")
-- user-analytics-backend/scripts/compute_cohorts.py:77 -> print(f"   ✅ Unique users         : {counts.unique_users}")
-- user-analytics-backend/scripts/compute_cohorts.py:78 -> print(f"   ✅ Unique services      : {counts.unique_services}")
-- user-analytics-backend/scripts/compute_cohorts.py:79 -> print(f"   ✅ Plage dates          : {counts.min_date} → {counts.max_date}")
-- user-analytics-backend/scripts/compute_cohorts.py:82 -> print("\n❌ Table subscriptions vide. Relancer l'ETL principal d'abord.")
-- user-analytics-backend/scripts/compute_cohorts.py:92 -> print(f"   ✅ Type subscription_end_date : {col_type}")
-- user-analytics-backend/scripts/compute_cohorts.py:102 -> print("\n📊 ÉTAPE 2 — Calcul des cohortes (first_subscription_date)...")
+- user-analytics-backend/scripts/compute_cohorts.py:51 -> print(f"\n   âš ï¸  Aucun statut 'active' trouvÃ©.")
+- user-analytics-backend/scripts/compute_cohorts.py:52 -> print(f"   âš ï¸  Fallback sur le statut dominant: '{active_statuses_str}'")
+- user-analytics-backend/scripts/compute_cohorts.py:59 -> print(f"\n   â†’ Statuts considÃ©rÃ©s comme actifs: {active_statuses_str}")
+- user-analytics-backend/scripts/compute_cohorts.py:64 -> print("\nðŸ“Š Ã‰TAPE 1 â€” VÃ©rification donnÃ©es sources...")
+- user-analytics-backend/scripts/compute_cohorts.py:76 -> print(f"   âœ… Total subscriptions : {counts.total_subscriptions}")
+- user-analytics-backend/scripts/compute_cohorts.py:77 -> print(f"   âœ… Unique users         : {counts.unique_users}")
+- user-analytics-backend/scripts/compute_cohorts.py:78 -> print(f"   âœ… Unique services      : {counts.unique_services}")
+- user-analytics-backend/scripts/compute_cohorts.py:79 -> print(f"   âœ… Plage dates          : {counts.min_date} â†’ {counts.max_date}")
+- user-analytics-backend/scripts/compute_cohorts.py:82 -> print("\nâŒ Table subscriptions vide. Relancer l'ETL principal d'abord.")
+- user-analytics-backend/scripts/compute_cohorts.py:92 -> print(f"   âœ… Type subscription_end_date : {col_type}")
+- user-analytics-backend/scripts/compute_cohorts.py:102 -> print("\nðŸ“Š Ã‰TAPE 2 â€” Calcul des cohortes (first_subscription_date)...")
 - user-analytics-backend/scripts/compute_cohorts.py:125 -> print(f"\n   {'Cohorte':<15} {'Service ID':<40} {'Users':>8}")
 - user-analytics-backend/scripts/compute_cohorts.py:126 -> print(f"   {'-'*15} {'-'*40} {'-'*8}")
 - user-analytics-backend/scripts/compute_cohorts.py:128 -> print(f"   {str(row.cohort_date):<15} {str(row.service_id):<40} {row.total_users:>8}")
 - user-analytics-backend/scripts/compute_cohorts.py:130 -> print(f"   ... et {len(cohort_preview) - 10} autres cohortes")
-- user-analytics-backend/scripts/compute_cohorts.py:133 -> print(f"\n   → {total_cohorts} cohortes détectées")
-- user-analytics-backend/scripts/compute_cohorts.py:136 -> print("\n⚠️  Aucune cohorte calculable. Vérifier subscription_start_date.")
-- user-analytics-backend/scripts/compute_cohorts.py:142 -> print("\n📊 ÉTAPE 3 — Calcul retention D7 / D14 / D30...")
-- user-analytics-backend/scripts/compute_cohorts.py:153 -> print(f"\n   📅 Durée des données disponibles : ~{int(data_span)} jours")
-- user-analytics-backend/scripts/compute_cohorts.py:155 -> print(f"   ⚠️  Moins de 30 jours de données → D30 sera 0% ou incomplet (normal)")
+- user-analytics-backend/scripts/compute_cohorts.py:133 -> print(f"\n   â†’ {total_cohorts} cohortes dÃ©tectÃ©es")
+- user-analytics-backend/scripts/compute_cohorts.py:136 -> print("\nâš ï¸  Aucune cohorte calculable. VÃ©rifier subscription_start_date.")
+- user-analytics-backend/scripts/compute_cohorts.py:142 -> print("\nðŸ“Š Ã‰TAPE 3 â€” Calcul retention D7 / D14 / D30...")
+- user-analytics-backend/scripts/compute_cohorts.py:153 -> print(f"\n   ðŸ“… DurÃ©e des donnÃ©es disponibles : ~{int(data_span)} jours")
+- user-analytics-backend/scripts/compute_cohorts.py:155 -> print(f"   âš ï¸  Moins de 30 jours de donnÃ©es â†’ D30 sera 0% ou incomplet (normal)")
 - user-analytics-backend/scripts/compute_cohorts.py:239 -> print(f"\n   {'Cohorte':<12} {'D7':>8} {'D14':>8} {'D30':>8} {'Users':>8}")
 - user-analytics-backend/scripts/compute_cohorts.py:240 -> print(f"   {'-'*12} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
 - user-analytics-backend/scripts/compute_cohorts.py:248 -> print(
-- user-analytics-backend/scripts/compute_cohorts.py:259 -> print("\n💾 ÉTAPE 4 — Insertion dans la table cohorts...")
-- user-analytics-backend/scripts/compute_cohorts.py:366 -> print(f"\n   ✅ {final} cohortes présentes dans la table cohorts")
-- user-analytics-backend/scripts/compute_cohorts.py:367 -> print(f"\n   Échantillon des dernières cohortes insérées:")
+- user-analytics-backend/scripts/compute_cohorts.py:259 -> print("\nðŸ’¾ Ã‰TAPE 4 â€” Insertion dans la table cohorts...")
+- user-analytics-backend/scripts/compute_cohorts.py:366 -> print(f"\n   âœ… {final} cohortes prÃ©sentes dans la table cohorts")
+- user-analytics-backend/scripts/compute_cohorts.py:367 -> print(f"\n   Ã‰chantillon des derniÃ¨res cohortes insÃ©rÃ©es:")
 - user-analytics-backend/scripts/compute_cohorts.py:369 -> print(f"   {row.cohort_date} | users={row.total_users}"
 - user-analytics-backend/scripts/compute_cohorts.py:374 -> print("\n" + "=" * 60)
-- user-analytics-backend/scripts/compute_cohorts.py:375 -> print("✅ ETL terminé avec succès !")
+- user-analytics-backend/scripts/compute_cohorts.py:375 -> print("âœ… ETL terminÃ© avec succÃ¨s !")
 - user-analytics-backend/scripts/compute_cohorts.py:376 -> print("=" * 60)
-- user-analytics-backend/scripts/compute_cohorts.py:380 -> print(f"\n❌ ERREUR : {e}")
+- user-analytics-backend/scripts/compute_cohorts.py:380 -> print(f"\nâŒ ERREUR : {e}")
 - user-analytics-backend/scripts/compute_cohorts.py:382 -> traceback.print_exc()  # Stack trace complet pour debug
 - user-analytics-backend/scripts/etl/etl_prod_to_analytics.py:160 -> print(f"ETL termine: {imported_rows} lignes importees, periode {min_date} -> {max_date}")
 - user-analytics-backend/scripts/etl/fix_services_mapping.py:61 -> print(json.dumps(payload, ensure_ascii=True))
@@ -8780,9 +8780,9 @@ Functional Description
 - user-analytics-backend/scripts/etl/seed_campaigns.py:297 -> print("-"*78)
 - user-analytics-backend/scripts/etl/seed_campaigns.py:299 -> print(f"  {r.name:<40} {r.campaign_type:<14} {r.sub_count:>8,}  {r.send_date}")
 - user-analytics-backend/scripts/etl/seed_campaigns.py:300 -> print("-"*78)
-- user-analytics-backend/scripts/etl/seed_campaigns.py:302 -> print(f"  Assignées : {assigned:,} / {total:,}  ({pct}%)")
+- user-analytics-backend/scripts/etl/seed_campaigns.py:302 -> print(f"  AssignÃ©es : {assigned:,} / {total:,}  ({pct}%)")
 - user-analytics-backend/scripts/etl/seed_campaigns.py:303 -> print("="*78 + "\n")
-- user-analytics-backend/scripts/etl/seed_campaigns.py:329 -> sample_send=str(campaigns[0]["send_datetime"]))      # ← debug visible
+- user-analytics-backend/scripts/etl/seed_campaigns.py:329 -> sample_send=str(campaigns[0]["send_datetime"]))      # â† debug visible
 - user-analytics-backend/scripts/seeder/seed_missing_data.py:48 -> print(json.dumps(payload, ensure_ascii=True))
 - user-analytics-backend/scripts/verify_data.py:37 -> print("== VERIFY PROD DB ==")
 - user-analytics-backend/scripts/verify_data.py:47 -> print(f"PROD transaction_histories: total={int(row.total or 0)} range={row.min_d} -> {row.max_d}")
@@ -9120,3 +9120,4 @@ Functional Description
 - user-analytics-backend/scripts/sql/diagnostics.sql
 - user-analytics-backend/scripts/verify_data.py
 - user-analytics-backend/tests/__init__.py
+

@@ -305,50 +305,54 @@ def get_avg_lifetime_days_filtered(
     return round(float(result), 1) if result else 0.0
 
 
-def get_trial_vs_paid_churn(db: Session, start_date: date | datetime | None = None, end_date: date | datetime | None = None) -> dict[str, Any]:
+def get_trial_vs_paid_churn(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+    service_id: str | None = None,
+) -> dict[str, Any]:
     start, end = _normalize_range(db, start_date, end_date, source="churn")
 
-    dedupe_key = _subscription_dedupe_key()
+    service_filter = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
+    row = db.execute(
+        text(
+            """
+            WITH churn_events AS (
+                SELECT
+                    u.subscription_id,
+                    GREATEST(
+                        0,
+                        COALESCE(
+                            u.days_since_subscription,
+                            EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
+                        )
+                    ) AS churn_day,
+                    COALESCE(st.trial_duration_days, 0) AS trial_duration_days
+                FROM unsubscriptions u
+                JOIN subscriptions s ON s.id = u.subscription_id
+                JOIN services sv ON sv.id = s.service_id
+                JOIN service_types st ON st.id = sv.service_type_id
+                WHERE u.unsubscription_datetime >= :start_dt
+                  AND u.unsubscription_datetime <= :end_dt
+                  {service_filter}
+            )
+            SELECT
+                COUNT(DISTINCT subscription_id) AS total_churn,
+                COUNT(DISTINCT subscription_id) FILTER (
+                    WHERE churn_day <= trial_duration_days
+                ) AS trial_churns
+            FROM churn_events
+            """.format(service_filter=service_filter)
+        ),
+        {
+            "start_dt": start,
+            "end_dt": end,
+            **({"service_id": service_id} if service_id else {}),
+        },
+    ).fetchone()
 
-    total_churn = (
-        db.query(func.count(UserActivity.id))
-        .filter(UserActivity.activity_type == "churn_event")
-        .filter(UserActivity.activity_datetime >= start)
-        .filter(UserActivity.activity_datetime <= end)
-        .scalar()
-        or 0
-    )
-
-    if total_churn == 0:
-        total_churn = (
-            db.query(func.count(func.distinct(dedupe_key)))
-            .filter(Subscription.status.in_(["cancelled", "expired"]))
-            .filter(Subscription.subscription_end_date.isnot(None))
-            .filter(Subscription.subscription_end_date >= start)
-            .filter(Subscription.subscription_end_date <= end)
-            .scalar()
-            or 0
-        )
-
-    trial_churns = (
-        db.query(func.count(func.distinct(dedupe_key)))
-        .filter(Subscription.status == "cancelled")
-        .filter(Subscription.subscription_end_date.isnot(None))
-        .filter(Subscription.subscription_end_date >= start)
-        .filter(Subscription.subscription_end_date <= end)
-        .join(
-            UserActivity,
-            and_(
-                UserActivity.user_id == Subscription.user_id,
-                UserActivity.service_id == Subscription.service_id,
-                UserActivity.activity_type == "subscription",
-                UserActivity.activity_datetime <= Subscription.subscription_end_date,
-            ),
-        )
-        .scalar()
-        or 0
-    )
-
+    total_churn = int((row.total_churn if row else 0) or 0)
+    trial_churns = int((row.trial_churns if row else 0) or 0)
     paid_churns = max(total_churn - trial_churns, 0)
     denom = total_churn or 1
 
@@ -636,6 +640,118 @@ def get_churn_trend_daily(
         by_day[day]["new_subs"] = int(row.new_subs or 0)
 
     return [by_day[k] for k in sorted(by_day.keys())]
+
+
+def get_churn_curve(
+    db: Session,
+    start_date: date | datetime | None = None,
+    end_date: date | datetime | None = None,
+    service_id: str | None = None,
+    *,
+    max_day: int = 60,
+    step_day: int = 15,
+) -> list[dict[str, Any]]:
+    start, end = _normalize_range(db, start_date, end_date, source="churn")
+    service_filter = "AND u.service_id = CAST(:service_id AS uuid)" if service_id else ""
+
+    rows = db.execute(
+        text(
+            """
+            WITH churn_events AS (
+                SELECT
+                    u.subscription_id,
+                    GREATEST(
+                        0,
+                        COALESCE(
+                            u.days_since_subscription,
+                            EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
+                        )
+                    ) AS churn_day,
+                    CASE
+                        WHEN GREATEST(
+                            0,
+                            COALESCE(
+                                u.days_since_subscription,
+                                EXTRACT(DAY FROM (u.unsubscription_datetime - s.subscription_start_date))::int
+                            )
+                        ) <= COALESCE(st.trial_duration_days, 0) THEN 'trial'
+                        ELSE 'paid'
+                    END AS churn_segment
+                FROM unsubscriptions u
+                JOIN subscriptions s ON s.id = u.subscription_id
+                JOIN services sv ON sv.id = s.service_id
+                JOIN service_types st ON st.id = sv.service_type_id
+                WHERE u.unsubscription_datetime >= :start_dt
+                  AND u.unsubscription_datetime <= :end_dt
+                  {service_filter}
+            ),
+            segment_counts AS (
+                SELECT
+                    churn_segment,
+                    LEAST(churn_day, :max_day) AS day_bucket,
+                    COUNT(DISTINCT subscription_id) AS cnt
+                FROM churn_events
+                GROUP BY churn_segment, LEAST(churn_day, :max_day)
+            ),
+            totals AS (
+                SELECT COUNT(DISTINCT subscription_id) AS total_churn
+                FROM churn_events
+            ),
+            days AS (
+                SELECT generate_series(0, :max_day, :step_day) AS day_point
+            ),
+            segments AS (
+                SELECT 'trial'::text AS segment
+                UNION ALL
+                SELECT 'paid'::text
+            ),
+            curve AS (
+                SELECT
+                    d.day_point,
+                    s.segment,
+                    COALESCE(SUM(sc.cnt), 0) AS cumulative_cnt
+                FROM days d
+                CROSS JOIN segments s
+                LEFT JOIN segment_counts sc
+                  ON sc.churn_segment = s.segment
+                 AND sc.day_bucket <= d.day_point
+                GROUP BY d.day_point, s.segment
+            )
+            SELECT
+                c.day_point,
+                ROUND(
+                    MAX(CASE WHEN c.segment = 'trial' THEN c.cumulative_cnt ELSE 0 END) * 100.0
+                    / NULLIF((SELECT total_churn FROM totals), 0),
+                    2
+                ) AS trial_rate,
+                ROUND(
+                    MAX(CASE WHEN c.segment = 'paid' THEN c.cumulative_cnt ELSE 0 END) * 100.0
+                    / NULLIF((SELECT total_churn FROM totals), 0),
+                    2
+                ) AS paid_rate
+            FROM curve c
+            GROUP BY c.day_point
+            ORDER BY c.day_point ASC
+            """.format(service_filter=service_filter)
+        ),
+        {
+            "start_dt": start,
+            "end_dt": end,
+            "max_day": max_day,
+            "step_day": step_day,
+            **({"service_id": service_id} if service_id else {}),
+        },
+    ).fetchall()
+
+    return [
+        {
+            "day": int(row.day_point or 0),
+            "label": f"DAY {int(row.day_point or 0)}",
+            "trial": float(row.trial_rate or 0),
+            "paid": float(row.paid_rate or 0),
+        }
+        for row in rows
+    ]
 
 
 def get_churn_by_service(

@@ -414,7 +414,7 @@ export default function FreeTrialBehaviorPage() {
                 <KPICard
                   title="Day 3 Drop-off Rate"
                   value={`${kpis.dropoff_j3.toFixed(0)}%`}
-                  subtitle="Users who drop-off by day 3"
+                  subtitle="Share of all trial starts that drop by day 3"
                   icon={AlertTriangle}
                   iconColor="#F59E0B"
                   iconBg="bg-amber-500/10"
@@ -435,7 +435,7 @@ export default function FreeTrialBehaviorPage() {
                 />
                 <KPICard
                   title="Total Drop-offs"
-                  value={`${dropoffCausesData?.summary?.total_dropoffs ?? 0}`}
+                  value={`${(dropoffCausesData?.summary?.total_dropoffs ?? 0).toLocaleString()}`}
                   subtitle="Cancelled and expired in selected period"
                   icon={TrendingDown}
                   iconColor="#EF4444"
@@ -447,7 +447,7 @@ export default function FreeTrialBehaviorPage() {
                 <KPICard
                   title="Early Drop-offs (D0-D3)"
                   value={`${dropoffCausesData?.summary?.early_dropoff_rate_pct ?? 0}%`}
-                  subtitle="Share of drop-offs in first 3 days"
+                  subtitle="Share of drop-offs (not all trials) in first 3 days"
                   icon={Clock}
                   iconColor="#F59E0B"
                   iconBg="bg-amber-500/10"

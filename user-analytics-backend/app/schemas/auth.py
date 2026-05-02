@@ -21,6 +21,22 @@ class RegisterRequest(BaseModel):
         return v
 
 
+class InviteUserRequest(BaseModel):
+    email: EmailStr
+
+
+class RegisterInviteRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8, max_length=128)
+    full_name: Optional[str] = Field(None, max_length=100)
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: Optional[str] = Field(None, max_length=100)
+    current_password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+    new_password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -41,6 +57,7 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     role: str
     is_active: bool
     created_at: datetime

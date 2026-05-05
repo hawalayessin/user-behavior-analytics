@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { getWithCache } from "../services/api"
 
-const SEGMENTATION_QUERY_VERSION = "2026-04-16-v4"
+const SEGMENTATION_QUERY_VERSION = "2026-05-05-v5-days-month"
 
 export function useSegmentationProfiles({ start_date, end_date, service_id } = {}) {
   const [data, setData] = useState(null)

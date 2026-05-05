@@ -32,6 +32,10 @@ class User(Base):
     last_activity_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    channel: Mapped[str | None] = mapped_column(
+        String(20), nullable=True,
+        comment="Activation channel from source (USSD/WEB)"
+    )
 
     # ── Relationships — lazy="select" : chargé UNIQUEMENT si accédé explicitement
     subscriptions: Mapped[list["Subscription"]] = relationship(

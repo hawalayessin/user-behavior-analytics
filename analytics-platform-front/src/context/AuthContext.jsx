@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth doit être utilisé dans un AuthProvider");
+    throw new Error("useAuth must be used inside an AuthProvider");
   }
   return context;
 };

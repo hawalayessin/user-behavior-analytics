@@ -18,6 +18,8 @@ export function useSubscribersKPIs() {
             atRiskUsers: Number(overview?.subscriptions?.at_risk_users ?? 0),
             loyaltyScoreAvg: Number(overview?.engagement?.stickiness_pct ?? 0),
             arpuTnd: Number(overview?.revenue?.arpu_current_month ?? 0),
+            channelUssd: Number(overview?.users?.channel_counts?.ussd ?? 0),
+            channelWeb: Number(overview?.users?.channel_counts?.web ?? 0),
             dataAnchor: overview?.data_anchor ?? null,
         }
     }, [data])

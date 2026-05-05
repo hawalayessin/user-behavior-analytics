@@ -55,3 +55,20 @@ export async function runAnomalyDetection(payload) {
     const res = await api.post("/anomalies/run-detection", body)
     return res.data
 }
+
+export async function startAnomalyDetectionJob(payload) {
+    const body = {
+        start_date: payload.startDate,
+        end_date: payload.endDate,
+        service_id: payload.serviceId ?? null,
+        metrics: payload.metrics ?? [],
+        severity: payload.severity ?? [],
+    }
+    const res = await api.post("/anomalies/run-detection/start", body)
+    return res.data
+}
+
+export async function getAnomalyDetectionJobStatus(jobId) {
+    const res = await api.get(`/anomalies/run-detection/${jobId}/status`)
+    return res.data
+}

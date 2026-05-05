@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Database,
@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import AppLayout from "../../components/layout/AppLayout";
 import useImportData from "../../hooks/useImportData";
+import { useETLPipeline } from "../../hooks/useETLPipeline";
 import { getApiErrorMessage } from "../../utils/apiError";
+import api from "../../services/api";
 
 const MAX_CSV_MB = 20;
 const MAX_SQL_MB = 50;
@@ -43,7 +45,7 @@ function ResultBox({ result }) {
         )}
         <div className="flex-1">
           <p className="text-sm font-semibold text-slate-100">
-            {ok ? "✅ Import réussi" : "❌ Import échoué"}
+            {ok ? "✅ Import succeeded" : "❌ Import failed"}
           </p>
           {ok && (
             <p className="text-xs text-slate-300 mt-1">
@@ -69,7 +71,7 @@ function ResultBox({ result }) {
           {!!result?.validation?.invalid_rows && (
             <div className="mt-3">
               <p className="text-xs font-semibold text-yellow-300">
-                ⚠️ Erreurs détectées ({result.validation.invalid_rows}):
+                ⚠️ Detected errors ({result.validation.invalid_rows}):
               </p>
               <div className="mt-2 space-y-1 max-h-40 overflow-auto pr-1">
                 {(result.validation.errors ?? []).slice(0, 30).map((e, idx) => (
@@ -227,6 +229,977 @@ function ValidationReportModal({
   );
 }
 
+function ETLConfigPanel({
+  mode,
+  setMode,
+  demoUsers,
+  setDemoUsers,
+  truncate,
+  setTruncate,
+  dryRun,
+  setDryRun,
+  onLaunch,
+  isLaunching,
+  isRunning,
+  error,
+}) {
+  return (
+    <div
+      className="relative overflow-hidden"
+      style={{
+        background:
+          "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-bg-card)) 0%, var(--color-bg-card) 55%, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 100%)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "20px",
+        padding: "28px",
+        boxShadow: "var(--color-card-shadow)",
+      }}
+    >
+      <div
+        className="pointer-events-none absolute -top-14 -right-10 h-44 w-44 rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 28%, transparent) 0%, transparent 70%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute -bottom-16 -left-12 h-52 w-52 rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle, color-mix(in srgb, var(--color-info) 24%, transparent) 0%, transparent 72%)",
+        }}
+      />
+      <p
+        className="relative mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+        style={{
+          borderColor: "var(--color-border)",
+          color: "var(--color-text-secondary)",
+          backgroundColor:
+            "color-mix(in srgb, var(--color-bg-elevated) 75%, transparent)",
+        }}
+      >
+        <Database size={14} />
+        Pipeline Orchestration
+      </p>
+      <div
+        className="relative"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
+        <div
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "10px",
+            backgroundColor: "var(--color-primary-bg)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-primary)"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+          </svg>
+        </div>
+        <div>
+          <h3
+            style={{
+              color: "var(--color-text-primary)",
+              fontSize: "20px",
+              fontWeight: 700,
+              margin: 0,
+            }}
+          >
+            ETL Pipeline — Control
+          </h3>
+          <p
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "13px",
+              margin: 0,
+            }}
+          >
+            Sync hawala_db → analytics_db
+          </p>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "20px" }}>
+        <label
+          style={{
+            display: "block",
+            color: "var(--color-text-secondary)",
+            fontSize: "13px",
+            fontWeight: 500,
+            marginBottom: "10px",
+          }}
+        >
+          Execution mode
+        </label>
+        <div style={{ display: "flex", gap: "12px" }}>
+          {[
+            {
+              value: "demo",
+              label: "Demo Mode",
+              desc: "Stratified sample",
+              icon: "⚡",
+              color: "var(--color-info)",
+            },
+            {
+              value: "prod",
+              label: "Production Mode",
+              desc: "Full dataset",
+              icon: "🗄️",
+              color: "var(--color-warning)",
+            },
+          ].map((opt) => (
+            <div
+              key={opt.value}
+              onClick={() => setMode(opt.value)}
+              style={{
+                flex: 1,
+                padding: "14px 16px",
+                borderRadius: "10px",
+                cursor: "pointer",
+                border: `2px solid ${mode === opt.value ? opt.color : "var(--color-border)"}`,
+                backgroundColor:
+                  mode === opt.value
+                    ? `color-mix(in srgb, ${opt.color} 10%, transparent)`
+                    : "var(--color-bg-elevated)",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <div style={{ fontSize: "20px", marginBottom: "4px" }}>
+                {opt.icon}
+              </div>
+              <div
+                style={{
+                  color:
+                    mode === opt.value
+                      ? opt.color
+                      : "var(--color-text-primary)",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+              >
+                {opt.label}
+              </div>
+              <div
+                style={{ color: "var(--color-text-muted)", fontSize: "12px" }}
+              >
+                {opt.desc}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {mode === "demo" && (
+        <div style={{ marginBottom: "20px" }}>
+          <label
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              color: "var(--color-text-secondary)",
+              fontSize: "13px",
+              fontWeight: 500,
+              marginBottom: "8px",
+            }}
+          >
+            <span>Number of users (demo)</span>
+            <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>
+              {demoUsers.toLocaleString("fr-FR")}
+            </span>
+          </label>
+          <input
+            type="range"
+            min={5000}
+            max={100000}
+            step={5000}
+            value={demoUsers}
+            onChange={(e) => setDemoUsers(Number(e.target.value))}
+            style={{ width: "100%", accentColor: "var(--color-primary)" }}
+          />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              color: "var(--color-text-disabled)",
+              fontSize: "11px",
+              marginTop: "4px",
+            }}
+          >
+            <span>5 000</span>
+            <span>50 000</span>
+            <span>100 000</span>
+          </div>
+        </div>
+      )}
+
+      <div
+        className="relative"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          marginBottom: "24px",
+          padding: "12px 14px",
+          backgroundColor: "var(--color-bg-elevated)",
+          borderRadius: "8px",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        <input
+          type="checkbox"
+          id="truncate-chk"
+          checked={truncate}
+          onChange={(e) => setTruncate(e.target.checked)}
+          disabled={dryRun}
+          style={{
+            width: "16px",
+            height: "16px",
+            accentColor: "var(--color-primary)",
+            cursor: "pointer",
+          }}
+        />
+        <label
+          htmlFor="truncate-chk"
+          style={{
+            cursor: dryRun ? "not-allowed" : "pointer",
+            color: "var(--color-text-secondary)",
+            fontSize: "13px",
+            opacity: dryRun ? 0.6 : 1,
+          }}
+        >
+          Truncate analytics_db before import
+          <span
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "12px",
+              marginLeft: "8px",
+            }}
+          >
+            {dryRun
+              ? "(disabled in dry-run)"
+              : "(recommended for a full reload)"}
+          </span>
+        </label>
+      </div>
+
+      <div
+        className="relative"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          marginBottom: "24px",
+          padding: "12px 14px",
+          backgroundColor: "var(--color-info-bg)",
+          borderRadius: "8px",
+          border: "1px solid var(--color-info)",
+        }}
+      >
+        <input
+          type="checkbox"
+          id="dry-run-chk"
+          checked={dryRun}
+          onChange={(e) => setDryRun(e.target.checked)}
+          style={{
+            width: "16px",
+            height: "16px",
+            accentColor: "var(--color-primary)",
+            cursor: "pointer",
+          }}
+        />
+        <label
+          htmlFor="dry-run-chk"
+          style={{
+            cursor: "pointer",
+            color: "var(--color-text-secondary)",
+            fontSize: "13px",
+          }}
+        >
+          Test mode (dry-run): no write into analytics_db
+        </label>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            padding: "12px 14px",
+            marginBottom: "16px",
+            borderRadius: "8px",
+            backgroundColor: "var(--color-danger-bg)",
+            border: "1px solid var(--color-danger)",
+            color: "var(--color-danger)",
+            fontSize: "13px",
+          }}
+        >
+          ⚠️ {error}
+        </div>
+      )}
+
+      <button
+        onClick={onLaunch}
+        disabled={isLaunching || isRunning}
+        style={{
+          width: "100%",
+          padding: "14px",
+          borderRadius: "10px",
+          border: "none",
+          cursor: isLaunching || isRunning ? "not-allowed" : "pointer",
+          backgroundColor:
+            isLaunching || isRunning
+              ? "var(--color-border)"
+              : "var(--color-primary)",
+          color:
+            isLaunching || isRunning ? "var(--color-text-disabled)" : "#ffffff",
+          fontSize: "15px",
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+          transition: "all 0.15s ease",
+        }}
+      >
+        {isLaunching ? (
+          <>
+            <span
+              style={{
+                display: "inline-block",
+                width: "16px",
+                height: "16px",
+                border: "2px solid #ffffff40",
+                borderTopColor: "#ffffff",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+            Starting...
+          </>
+        ) : isRunning ? (
+          <>⏳ Pipeline is running...</>
+        ) : (
+          <>▶ Run ETL pipeline</>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function ETLProgressPanel({ run, ETL_STEPS }) {
+  if (!run) return null;
+  const isRunning = run.status === "running";
+  const isSuccess = run.status === "success";
+  const isFailed = run.status === "failed";
+
+  const formatDuration = (sec) => {
+    if (!sec) return "0s";
+    if (sec < 60) return `${Math.round(sec)}s`;
+    return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+  };
+
+  const statusColor = isSuccess
+    ? "var(--color-success)"
+    : isFailed
+      ? "var(--color-danger)"
+      : "var(--color-primary)";
+
+  return (
+    <div
+      style={{
+        backgroundColor: "var(--color-bg-card)",
+        border: `1px solid ${statusColor}`,
+        borderRadius: "12px",
+        padding: "28px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "20px",
+        }}
+      >
+        <div>
+          <h3
+            style={{
+              color: "var(--color-text-primary)",
+              fontSize: "16px",
+              fontWeight: 600,
+              margin: 0,
+            }}
+          >
+            {isRunning && "⏳ Pipeline in progress..."}
+            {isSuccess && "✅ Pipeline completed successfully"}
+            {isFailed && "❌ Pipeline failed"}
+          </h3>
+          <p
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "13px",
+              margin: "4px 0 0 0",
+            }}
+          >
+            Mode{" "}
+            {run.mode === "demo"
+              ? `demo (${(run.demo_users || 50000).toLocaleString("en-US")} users)`
+              : "full production"}{" "}
+            {" · "}
+            {run.dry_run ? "dry-run (safe)" : "write enabled"} {" · "}Duration:{" "}
+            {formatDuration(run.duration_sec)}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "16px" }}>
+          {[
+            {
+              label: "Inserted rows",
+              value: (run.rows_inserted || 0).toLocaleString("en-US"),
+              color: "var(--color-success)",
+            },
+            {
+              label: "Skipped rows",
+              value: (run.rows_skipped || 0).toLocaleString("en-US"),
+              color: "var(--color-text-muted)",
+            },
+          ].map((stat) => (
+            <div key={stat.label} style={{ textAlign: "right" }}>
+              <div
+                style={{ color: stat.color, fontSize: "18px", fontWeight: 700 }}
+              >
+                {stat.value}
+              </div>
+              <div
+                style={{ color: "var(--color-text-muted)", fontSize: "11px" }}
+              >
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "24px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: "6px",
+          }}
+        >
+          <span
+            style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}
+          >
+            {isRunning
+              ? `Step ${run.current_step_num} / ${run.total_steps} — ${run.current_step_label || ""}`
+              : isSuccess
+                ? "All steps completed"
+                : `Failed at step ${run.current_step_num}`}
+          </span>
+          <span
+            style={{ color: statusColor, fontSize: "13px", fontWeight: 600 }}
+          >
+            {run.progress_pct}%
+          </span>
+        </div>
+        <div
+          style={{
+            height: "10px",
+            borderRadius: "5px",
+            backgroundColor: "var(--color-bg-elevated)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${run.progress_pct}%`,
+              backgroundColor: statusColor,
+              borderRadius: "5px",
+              transition: "width 0.5s ease",
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        {ETL_STEPS.map((step, idx) => {
+          const isDone = (run.steps_done || []).includes(step.key);
+          const isCurr = isRunning && run.current_step === step.key;
+          let dotColor = "var(--color-text-disabled)";
+          let textColor = "var(--color-text-disabled)";
+          if (isDone) {
+            dotColor = "var(--color-success)";
+            textColor = "var(--color-text-secondary)";
+          }
+          if (isCurr) {
+            dotColor = "var(--color-primary)";
+            textColor = "var(--color-text-primary)";
+          }
+          if (isFailed && isCurr) dotColor = "var(--color-danger)";
+
+          return (
+            <div
+              key={step.key}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "8px 12px",
+                borderRadius: "8px",
+                backgroundColor: isCurr
+                  ? "var(--color-primary-bg)"
+                  : "transparent",
+              }}
+            >
+              <div
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "13px",
+                  flexShrink: 0,
+                  backgroundColor: isDone
+                    ? "var(--color-success-bg)"
+                    : isCurr
+                      ? "var(--color-primary-bg)"
+                      : "var(--color-bg-elevated)",
+                  border: `1px solid ${dotColor}`,
+                  color: dotColor,
+                }}
+              >
+                {isDone ? "✓" : isCurr ? "⟳" : idx + 1}
+              </div>
+              <span
+                style={{
+                  color: textColor,
+                  fontSize: "13px",
+                  fontWeight: isCurr ? 500 : 400,
+                }}
+              >
+                {step.icon} {step.label}
+              </span>
+              {isDone && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    color: "var(--color-success)",
+                    fontSize: "11px",
+                  }}
+                >
+                  ✅ Done
+                </span>
+              )}
+              {isCurr && isRunning && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    color: "var(--color-primary)",
+                    fontSize: "11px",
+                    animation: "pulse 1.5s infinite",
+                  }}
+                >
+                  Running...
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {isFailed && run.error && (
+        <div
+          style={{
+            marginTop: "16px",
+            padding: "12px 14px",
+            borderRadius: "8px",
+            backgroundColor: "var(--color-danger-bg)",
+            border: "1px solid var(--color-danger)",
+            color: "var(--color-danger)",
+            fontSize: "12px",
+            fontFamily: "monospace",
+          }}
+        >
+          {run.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
+  const PAGE_SIZE = 5;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(history.length / PAGE_SIZE));
+  const pageStart = (page - 1) * PAGE_SIZE;
+  const pageItems = history.slice(pageStart, pageStart + PAGE_SIZE);
+  const formatDate = (iso) => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+  const formatDuration = (sec) => {
+    if (!sec) return "—";
+    if (sec < 60) return `${Math.round(sec)}s`;
+    return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+  };
+
+  const formatError = (value, rawValue) => {
+    if (!value && !rawValue) return "—";
+    const fallback = rawValue ? JSON.stringify(rawValue) : "";
+    const text = String(value).replace(/\s+/g, " ").trim();
+    const combined = text || fallback;
+    if (!combined) return "—";
+    return combined.length > 140 ? `${combined.slice(0, 140)}…` : combined;
+  };
+
+  const StatusBadge = ({ status }) => {
+    const styles = {
+      success: {
+        bg: "var(--color-success-bg)",
+        color: "var(--color-success)",
+        label: "✅ Success",
+      },
+      running: {
+        bg: "var(--color-primary-bg)",
+        color: "var(--color-primary)",
+        label: "⏳ Running",
+      },
+      failed: {
+        bg: "var(--color-danger-bg)",
+        color: "var(--color-danger)",
+        label: "❌ Failed",
+      },
+      pending: {
+        bg: "var(--color-amber-bg)",
+        color: "var(--color-amber)",
+        label: "⏸ Pending",
+      },
+    };
+    const s = styles[status] || styles.pending;
+    return (
+      <span
+        style={{
+          backgroundColor: s.bg,
+          color: s.color,
+          padding: "3px 10px",
+          borderRadius: "20px",
+          fontSize: "12px",
+          fontWeight: 500,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {s.label}
+      </span>
+    );
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: "var(--color-bg-card)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "12px",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "20px 24px",
+          borderBottom: "1px solid var(--color-border)",
+        }}
+      >
+        <div>
+          <h3
+            style={{
+              color: "var(--color-text-primary)",
+              fontSize: "16px",
+              fontWeight: 600,
+              margin: 0,
+            }}
+          >
+            ETL Pipeline History
+          </h3>
+          <p
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "13px",
+              margin: "2px 0 0 0",
+            }}
+          >
+            {history.length} run(s) recorded
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          style={{
+            padding: "8px 14px",
+            borderRadius: "8px",
+            border: "1px solid var(--color-border)",
+            backgroundColor: "var(--color-bg-elevated)",
+            color: "var(--color-text-secondary)",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          {loading ? "⟳" : "↻"} Refresh
+        </button>
+      </div>
+
+      {loading && history.length === 0 ? (
+        <div
+          style={{
+            padding: "48px",
+            textAlign: "center",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          Loading history...
+        </div>
+      ) : history.length === 0 ? (
+        <div
+          style={{
+            padding: "48px",
+            textAlign: "center",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>🗄️</div>
+          <div>No pipeline has been executed yet.</div>
+          <div style={{ fontSize: "12px", marginTop: "4px" }}>
+            Run your first ETL pipeline above.
+          </div>
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ backgroundColor: "var(--color-bg-elevated)" }}>
+                {[
+                  "Start date",
+                  "Mode",
+                  "Inserted rows",
+                  "Skipped rows",
+                  "Duration",
+                  "Status",
+                  "Error details",
+                  "Log",
+                ].map((col) => (
+                  <th
+                    key={col}
+                    style={{
+                      padding: "10px 16px",
+                      textAlign: "left",
+                      color: "var(--color-text-muted)",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      borderBottom: "1px solid var(--color-border)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pageItems.map((row, i) => (
+                <tr
+                  key={row.id}
+                  style={{
+                    backgroundColor:
+                      i % 2 === 0 ? "transparent" : "var(--color-bg-elevated)",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <td
+                    style={{
+                      padding: "12px 16px",
+                      color: "var(--color-text-secondary)",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {formatDate(row.started_at)}
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <span
+                      style={{
+                        backgroundColor:
+                          row.mode === "demo"
+                            ? "var(--color-info-bg)"
+                            : "var(--color-warning-bg)",
+                        color:
+                          row.mode === "demo"
+                            ? "var(--color-info)"
+                            : "var(--color-warning)",
+                        padding: "2px 10px",
+                        borderRadius: "20px",
+                        fontSize: "12px",
+                      }}
+                    >
+                      {row.mode === "demo" ? "Demo" : "Production"}
+                    </span>
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 16px",
+                      color: "var(--color-success)",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {(row.rows_inserted || 0).toLocaleString("en-US")}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 16px",
+                      color: "var(--color-text-muted)",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {(row.rows_skipped || 0).toLocaleString("en-US")}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 16px",
+                      color: "var(--color-text-secondary)",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {formatDuration(row.duration_sec)}
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <StatusBadge status={row.status} />
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 16px",
+                      color: "var(--color-text-muted)",
+                      fontSize: "12px",
+                      maxWidth: "360px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={
+                      row.error ||
+                      (row.error_raw ? JSON.stringify(row.error_raw) : "")
+                    }
+                  >
+                    {formatError(row.error, row.error_raw)}
+                  </td>
+                  <td style={{ padding: "12px 16px" }}>
+                    <button
+                      type="button"
+                      onClick={() => onViewLog?.(row)}
+                      disabled={!row?.id}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--color-border)",
+                        backgroundColor: "var(--color-bg-elevated)",
+                        color: "var(--color-text-secondary)",
+                        fontSize: "12px",
+                        cursor: row?.id ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      View log
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "12px 16px",
+              borderTop: "1px solid var(--color-border)",
+              color: "var(--color-text-muted)",
+              fontSize: "12px",
+            }}
+          >
+            <span>
+              Showing {pageStart + 1}-
+              {Math.min(pageStart + PAGE_SIZE, history.length)} of{" "}
+              {history.length}
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={page <= 1}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-border)",
+                  backgroundColor: "var(--color-bg-elevated)",
+                  color: "var(--color-text-secondary)",
+                  fontSize: "12px",
+                  cursor: page <= 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={page >= totalPages}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--color-border)",
+                  backgroundColor: "var(--color-bg-elevated)",
+                  color: "var(--color-text-secondary)",
+                  fontSize: "12px",
+                  cursor: page >= totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ImportDataPage() {
   const [activeTab, setActiveTab] = useState("csv");
   const [targetTable, setTargetTable] = useState("service_types");
@@ -240,6 +1213,11 @@ export default function ImportDataPage() {
   const [staged, setStaged] = useState(null); // { import_id, ...report }
   const [tableSchema, setTableSchema] = useState(null);
   const [tableSchemaError, setTableSchemaError] = useState("");
+  const [etlLogOpen, setEtlLogOpen] = useState(false);
+  const [etlLogContent, setEtlLogContent] = useState("");
+  const [etlLogError, setEtlLogError] = useState("");
+  const [etlLogLoading, setEtlLogLoading] = useState(false);
+  const [etlLogTitle, setEtlLogTitle] = useState("");
   const inputRef = useRef(null);
 
   const {
@@ -253,6 +1231,25 @@ export default function ImportDataPage() {
     downloadTemplate,
     getTableSchema,
   } = useImportData();
+  const {
+    mode: etlMode,
+    setMode: setEtlMode,
+    demoUsers,
+    setDemoUsers,
+    truncate,
+    setTruncate,
+    dryRun,
+    setDryRun,
+    activeRun,
+    isLaunching,
+    launchETL,
+    history: etlHistory,
+    historyLoading: etlHistoryLoading,
+    fetchHistory: fetchEtlHistory,
+    error: etlError,
+    ETL_STEPS,
+  } = useETLPipeline();
+  const isRunning = activeRun?.status === "running";
 
   useEffect(() => {
     let mounted = true;
@@ -334,6 +1331,25 @@ export default function ImportDataPage() {
     if (f) await handleFileSelected(f);
   };
 
+  const handleViewEtlLog = async (row) => {
+    if (!row?.id) return;
+    setEtlLogLoading(true);
+    setEtlLogError("");
+    setEtlLogContent("");
+    setEtlLogTitle(`ETL log — ${row.id}`);
+    setEtlLogOpen(true);
+    try {
+      const res = await api.get(`/admin/import/run-etl/${row.id}/log`, {
+        params: { limit: 300 },
+      });
+      setEtlLogContent(res.data?.log || "No log content returned.");
+    } catch (err) {
+      setEtlLogError(getApiErrorMessage(err, "Unable to load ETL log."));
+    } finally {
+      setEtlLogLoading(false);
+    }
+  };
+
   const submitCsv = async () => {
     if (!file) return;
     setResult(null);
@@ -376,17 +1392,93 @@ export default function ImportDataPage() {
   return (
     <AppLayout pageTitle="Import Data">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-100 mb-2">
-            Import Data
+        <div style={{ marginBottom: "32px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: activeRun ? "1fr 1fr" : "1fr",
+              gap: "24px",
+              marginBottom: "24px",
+            }}
+          >
+            <ETLConfigPanel
+              mode={etlMode}
+              setMode={setEtlMode}
+              demoUsers={demoUsers}
+              setDemoUsers={setDemoUsers}
+              truncate={truncate}
+              setTruncate={setTruncate}
+              dryRun={dryRun}
+              setDryRun={setDryRun}
+              onLaunch={launchETL}
+              isLaunching={isLaunching}
+              isRunning={isRunning}
+              error={etlError}
+            />
+            {activeRun && (
+              <ETLProgressPanel run={activeRun} ETL_STEPS={ETL_STEPS} />
+            )}
+          </div>
+
+          <ETLHistoryTable
+            history={etlHistory}
+            loading={etlHistoryLoading}
+            onRefresh={fetchEtlHistory}
+            onViewLog={handleViewEtlLog}
+          />
+        </div>
+
+        <div
+          className="relative overflow-hidden rounded-3xl border p-6 md:p-8"
+          style={{
+            borderColor: "var(--color-border)",
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-bg-card)) 0%, var(--color-bg-card) 55%, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 100%)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
+          <div
+            className="pointer-events-none absolute -top-14 -right-10 h-44 w-44 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 28%, transparent) 0%, transparent 70%)",
+            }}
+          />
+          <p
+            className="relative mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+            style={{
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-secondary)",
+              backgroundColor:
+                "color-mix(in srgb, var(--color-bg-elevated) 75%, transparent)",
+            }}
+          >
+            <Database size={14} />
+            Administration Pipeline & Imports
+          </p>
+          <h1
+            className="relative text-3xl font-bold tracking-tight md:text-4xl"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            Import Data Control Center
           </h1>
-          <p className="text-sm text-slate-400">
-            Admin only — CSV or SQL import
+          <p
+            className="relative mt-2 max-w-3xl text-sm md:text-base"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Manage CSV/SQL imports and ETL pipeline control from one unified
+            interface. All actions are logged and restricted to administrators.
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div
+          className="inline-flex gap-2 rounded-2xl border p-1.5"
+          style={{
+            borderColor: "var(--color-border)",
+            backgroundColor: "var(--color-bg-card)",
+          }}
+        >
           <button
             onClick={() => {
               setActiveTab("csv");
@@ -394,13 +1486,23 @@ export default function ImportDataPage() {
               resetStateForNewFile();
             }}
             className={[
-              "px-4 py-2 rounded-full text-sm font-semibold border transition",
-              activeTab === "csv"
-                ? "bg-violet-700 text-white border-violet-600"
-                : "bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800",
+              "px-4 py-2 rounded-xl text-sm font-semibold border transition",
             ].join(" ")}
+            style={
+              activeTab === "csv"
+                ? {
+                    backgroundColor: "var(--color-primary)",
+                    color: "#fff",
+                    borderColor: "var(--color-primary)",
+                  }
+                : {
+                    backgroundColor: "var(--color-bg-elevated)",
+                    color: "var(--color-text-secondary)",
+                    borderColor: "var(--color-border)",
+                  }
+            }
           >
-            📄 CSV Import
+            CSV Import
           </button>
           <button
             onClick={() => {
@@ -409,18 +1511,35 @@ export default function ImportDataPage() {
               resetStateForNewFile();
             }}
             className={[
-              "px-4 py-2 rounded-full text-sm font-semibold border transition",
-              activeTab === "sql"
-                ? "bg-violet-700 text-white border-violet-600"
-                : "bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800",
+              "px-4 py-2 rounded-xl text-sm font-semibold border transition",
             ].join(" ")}
+            style={
+              activeTab === "sql"
+                ? {
+                    backgroundColor: "var(--color-primary)",
+                    color: "#fff",
+                    borderColor: "var(--color-primary)",
+                  }
+                : {
+                    backgroundColor: "var(--color-bg-elevated)",
+                    color: "var(--color-text-secondary)",
+                    borderColor: "var(--color-border)",
+                  }
+            }
           >
-            🗄️ SQL Import
+            SQL Import
           </button>
         </div>
 
         {/* Main card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+        <div
+          className="rounded-3xl border p-6 space-y-6"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            borderColor: "var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
           {activeTab === "csv" ? (
             <>
               {/* Table select */}
@@ -575,7 +1694,7 @@ export default function ImportDataPage() {
                       checked={mode === "append"}
                       onChange={() => setMode("append")}
                     />
-                    Append (ajouter)
+                    Append
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -584,7 +1703,7 @@ export default function ImportDataPage() {
                       checked={mode === "replace"}
                       onChange={() => setMode("replace")}
                     />
-                    Replace (remplacer)
+                    Replace
                   </label>
                 </div>
               </div>
@@ -606,20 +1725,49 @@ export default function ImportDataPage() {
             onDrop={onDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => inputRef.current?.click()}
-            className="border-dashed border-2 border-slate-600 rounded-2xl p-6 bg-slate-950/30 hover:border-purple-500 hover:bg-slate-800/20 transition cursor-pointer"
+            className="border-dashed border-2 rounded-2xl p-6 transition cursor-pointer"
+            style={{
+              borderColor:
+                "color-mix(in srgb, var(--color-primary) 40%, var(--color-border))",
+              background:
+                "linear-gradient(180deg, color-mix(in srgb, var(--color-primary-bg) 60%, transparent) 0%, color-mix(in srgb, var(--color-bg-elevated) 55%, transparent) 100%)",
+            }}
           >
             <div className="flex items-center gap-3">
-              <Upload className="text-slate-400" />
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-xl border"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-bg-elevated)",
+                  color: "var(--color-primary)",
+                }}
+              >
+                <Upload size={18} />
+              </div>
               <div className="flex-1">
-                <p className="text-sm text-slate-200 font-semibold">
-                  Glisser le fichier {activeTab === "csv" ? "CSV" : "SQL"} ici
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--color-text-primary)" }}
+                >
+                  Drag and drop your {activeTab === "csv" ? "CSV" : "SQL"} file
+                  here
                 </p>
-                <p className="text-xs text-slate-500">
-                  ou cliquer pour sélectionner (max {maxMb}MB)
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  or click to select (max {maxMb}MB)
                 </p>
               </div>
               {file && (
-                <span className="text-xs text-slate-300 bg-slate-800 border border-slate-700 px-2 py-1 rounded-lg">
+                <span
+                  className="text-xs px-2 py-1 rounded-lg"
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    backgroundColor: "var(--color-bg-elevated)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
                   {file.name} ({bytesToMb(file.size)}MB)
                 </span>
               )}
@@ -675,7 +1823,13 @@ export default function ImportDataPage() {
           <button
             disabled={!canSubmit || loading}
             onClick={handleSubmit}
-            className="w-full px-4 py-3 rounded-xl bg-violet-700 hover:bg-violet-800 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 75%, var(--color-info)) 100%)",
+              boxShadow:
+                "0 10px 30px color-mix(in srgb, var(--color-primary) 30%, transparent)",
+            }}
           >
             {loading
               ? "Working..."
@@ -697,11 +1851,25 @@ export default function ImportDataPage() {
         )}
 
         {/* History */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
-          <h3 className="text-sm font-semibold text-slate-100">
+        <div
+          className="rounded-2xl border p-6 space-y-3"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            borderColor: "var(--color-border)",
+            boxShadow: "var(--color-card-shadow)",
+          }}
+        >
+          <h3
+            className="text-sm font-semibold"
+            style={{ color: "var(--color-text-primary)" }}
+          >
             Import history
           </h3>
-          {historyLoading && <p className="text-xs text-slate-500">Loading…</p>}
+          {historyLoading && (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Loading…
+            </p>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="bg-slate-800 border-b border-slate-700">
@@ -827,7 +1995,54 @@ export default function ImportDataPage() {
             }
           }}
         />
+
+        <ETLLogModal
+          open={etlLogOpen}
+          title={etlLogTitle}
+          content={etlLogContent}
+          error={etlLogError}
+          loading={etlLogLoading}
+          onClose={() => setEtlLogOpen(false)}
+        />
       </div>
     </AppLayout>
+  );
+}
+
+function ETLLogModal({ open, title, content, error, loading, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">{title}</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Showing latest lines from the ETL runner log.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-800 text-slate-400"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          {loading && (
+            <div className="text-sm text-slate-400">Loading log...</div>
+          )}
+          {!loading && error && (
+            <div className="text-sm text-red-300">{error}</div>
+          )}
+          {!loading && !error && (
+            <pre className="text-xs text-slate-200 bg-slate-950 border border-slate-800 rounded-xl p-4 max-h-[60vh] overflow-auto whitespace-pre-wrap">
+              {content || "No log content available."}
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

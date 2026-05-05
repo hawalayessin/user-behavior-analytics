@@ -5,22 +5,17 @@ from __future__ import annotations
 import random
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
-import joblib
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
 from sqlalchemy.orm import Session
 
 from app.repositories import segmentation_repo
 from app.utils.temporal import get_data_bounds
+from ml_models.segmentation_trainer import run_segmentation_training
 
 
 _DASHBOARD_CACHE_TTL_SECONDS = 30
 _MAX_CLUSTER_POINTS = 600
-_MODEL_PATH = Path(__file__).resolve().parents[2] / "ml_models" / "segmentation_kmeans.joblib"
 
 _kpis_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
 _clusters_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
@@ -175,69 +170,40 @@ def train_segmentation_model(
     end_date: Optional[datetime] = None,
     service_id: Optional[str] = None,
 ) -> dict:
-    """Real KMeans training on bounded features from SQL repository."""
+    """Train segmentation model using launcher in ml_models."""
+    logs: list[dict] = []
+
+    def log_step(message: str, **extra: object) -> None:
+        payload = {"ts": datetime.utcnow().isoformat(), "message": message}
+        payload.update(extra)
+        logs.append(payload)
+
+    t_global = time.monotonic()
     _kpis_cache.clear()
     _clusters_cache.clear()
     _profiles_cache.clear()
 
-    start_date, end_date = _to_window(db, start_date, end_date)
-    segments = segmentation_repo.get_user_segments(db, start_date, end_date, service_id)
-
-    if len(segments) < 4:
-        return {
-            "status": "error",
-            "message": f"Not enough data: {len(segments)} users",
-        }
-
-    feature_matrix = np.array(
-        [[float(row.get("x") or 0.0), float(row.get("y") or 0.0)] for row in segments],
-        dtype=float,
+    result = run_segmentation_training(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        service_id=service_id,
+        progress_callback=log_step,
     )
 
-    scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(feature_matrix)
-
-    model = KMeans(n_clusters=4, random_state=42, n_init=10)
-    labels = model.fit_predict(x_scaled)
-
-    cluster_revenue: dict[int, float] = {}
-    cluster_count: dict[int, int] = {}
-    for row, label in zip(segments, labels):
-        cluster_revenue[label] = cluster_revenue.get(label, 0.0) + float(row.get("revenue") or 0.0)
-        cluster_count[label] = cluster_count.get(label, 0) + 1
-
-    mean_revenue = {
-        cluster: (cluster_revenue[cluster] / max(cluster_count.get(cluster, 1), 1))
-        for cluster in cluster_revenue
-    }
-    ordered_clusters = [c for c, _ in sorted(mean_revenue.items(), key=lambda item: item[1])]
-    names_low_to_high = ["Trial Only", "Occasional Users", "Regular Loyals", "Power Users"]
-    rank_map = {cluster: names_low_to_high[idx] for idx, cluster in enumerate(ordered_clusters)}
-
-    distribution: dict[str, int] = {}
-    for label in labels:
-        name = rank_map.get(int(label), "Occasional Users")
-        distribution[name] = distribution.get(name, 0) + 1
-
-    _MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(
-        {
-            "model": model,
-            "scaler": scaler,
-            "rank_map": rank_map,
-            "trained_at": datetime.utcnow().isoformat(),
-            "window": {
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "service_id": service_id,
-            },
-        },
-        _MODEL_PATH,
-    )
-
+    total_sec = round(time.monotonic() - t_global, 2)
+    log_step("Training completed", total_elapsed_sec=total_sec)
+    meta = result.get("meta") or {}
     return {
-        "status": "success",
-        "message": f"KMeans trained on {len(segments)} users",
+        "status": result.get("status", "error"),
+        "message": result.get("message", "Segmentation training finished"),
+        "logs": logs,
+        "summary": {
+            "users": meta.get("users"),
+            "window_start": meta.get("window_start"),
+            "window_end": meta.get("window_end"),
+            "total_elapsed_sec": total_sec,
+        },
     }
 
 

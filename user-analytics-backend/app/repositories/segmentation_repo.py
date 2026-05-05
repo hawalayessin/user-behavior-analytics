@@ -414,6 +414,8 @@ def get_segment_profiles(
                         0
                     ) AS revenue,
                     COUNT(DISTINCT DATE(be.event_datetime)) AS active_days,
+                    COUNT(DISTINCT DATE(be.event_datetime))
+                        FILTER (WHERE be.event_datetime >= :end - INTERVAL '30 day') AS active_days_30d,
                     MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
@@ -452,6 +454,7 @@ def get_segment_profiles(
                     END AS segment,
                     us.revenue,
                     us.active_days,
+                    us.active_days_30d,
                     us.has_churn
                 FROM user_stats us
                 CROSS JOIN pct
@@ -468,6 +471,7 @@ def get_segment_profiles(
                     seg.segment,
                     AVG(seg.revenue) AS avg_arpu,
                     AVG(seg.active_days) AS avg_active_days,
+                    AVG(seg.active_days_30d) AS avg_active_days_30d,
                     COUNT(*) AS user_count
                 FROM segmented seg
                 GROUP BY seg.segment
@@ -476,6 +480,7 @@ def get_segment_profiles(
                 ps.segment,
                 ROUND(ps.avg_arpu::numeric, 2) AS arpu,
                 ROUND(ps.avg_active_days::numeric, 1) AS avg_active_days,
+                ROUND(ps.avg_active_days_30d::numeric, 1) AS avg_active_days_30d,
                 COALESCE(ROUND(c.churn_rate::numeric, 1), 0) AS churn_rate,
                 ps.user_count
             FROM profile_stats ps
@@ -497,18 +502,22 @@ def get_segment_profiles(
         row = rows_by_seg.get(segment)
         if row:
             avg_days = float(row["avg_active_days"] or 0.0)
-            hours_day = (avg_days / total_days) * 24.0
-            if hours_day >= 1:
-                duration = f"{int(hours_day)}h / day"
-            elif hours_day >= 0.1:
-                duration = f"{hours_day:.1f}h / day"
+            avg_days_30d = float(row["avg_active_days_30d"] or 0.0)
+            activity_ratio_30d = (avg_days_30d / 30.0) * 100.0
+            days_month = (avg_days / total_days) * 30.0
+            if days_month >= 1:
+                duration = f"{days_month:.1f} days/month"
+            elif days_month > 0:
+                duration = "0.1 days/month"
             else:
-                duration = "0h / day"
+                duration = "0 days/month"
 
             profiles.append(
                 {
                     "segment": segment,
                     "avg_duration": duration,
+                    "active_days_30d": round(avg_days_30d, 1),
+                    "activity_ratio_30d": round(activity_ratio_30d, 1),
                     "arpu": float(row["arpu"] or 0.0),
                     "churn_rate": float(row["churn_rate"] or 0.0),
                 }
@@ -517,7 +526,9 @@ def get_segment_profiles(
             profiles.append(
                 {
                     "segment": segment,
-                    "avg_duration": "0h / day",
+                    "avg_duration": "0 days/month",
+                    "active_days_30d": 0.0,
+                    "activity_ratio_30d": 0.0,
                     "arpu": 0.0,
                     "churn_rate": 0.0,
                 }

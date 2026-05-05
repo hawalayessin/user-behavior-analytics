@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+    getAnomalyDetectionJobStatus,
     getAnomalyDetails,
     getAnomalyDistribution,
     getAnomalyHeatmap,
     getAnomalyInsights,
     getAnomalySummary,
     getAnomalyTimeline,
-    runAnomalyDetection,
+    startAnomalyDetectionJob,
 } from "../services/anomalies"
 
 const EMPTY_ERRORS = {
@@ -43,6 +44,8 @@ export function useAnomalies({
     const [detailsLoading, setDetailsLoading] = useState(false)
     const [insightsLoading, setInsightsLoading] = useState(false)
     const [runDetectionLoading, setRunDetectionLoading] = useState(false)
+    const [detectionJob, setDetectionJob] = useState(null)
+    const pollRef = useRef(null)
 
     const [errors, setErrors] = useState(EMPTY_ERRORS)
 
@@ -144,17 +147,47 @@ export function useAnomalies({
 
     const runDetection = useCallback(async () => {
         setRunDetectionLoading(true)
+        setDetectionJob(null)
         try {
-            const result = await runAnomalyDetection({
+            const startRes = await startAnomalyDetectionJob({
                 startDate: apiFilters.startDate,
                 endDate: apiFilters.endDate,
                 serviceId: apiFilters.serviceId,
                 metrics: apiFilters.metrics,
                 severity: apiFilters.severity,
             })
-            await refetchAll()
-            return result
+            const jobId = startRes?.job_id
+            if (!jobId) throw new Error("Unable to start anomaly detection job")
+
+            return await new Promise((resolve, reject) => {
+                pollRef.current = setInterval(async () => {
+                    try {
+                        const current = await getAnomalyDetectionJobStatus(jobId)
+                        setDetectionJob(current)
+                        if (!current) return
+                        if (current.status === "success") {
+                            clearInterval(pollRef.current)
+                            pollRef.current = null
+                            await refetchAll()
+                            resolve(current.result ?? null)
+                        } else if (current.status === "failed" || current.status === "not_found") {
+                            clearInterval(pollRef.current)
+                            pollRef.current = null
+                            const msg = current.error || current.message || "Detection failed"
+                            reject(new Error(msg))
+                        }
+                    } catch (pollErr) {
+                        clearInterval(pollRef.current)
+                        pollRef.current = null
+                        reject(pollErr)
+                    }
+                }, 1500)
+            })
         } finally {
+            if (pollRef.current) {
+                clearInterval(pollRef.current)
+                pollRef.current = null
+            }
             setRunDetectionLoading(false)
         }
     }, [apiFilters, refetchAll])
@@ -178,6 +211,7 @@ export function useAnomalies({
         detailsLoading,
         insightsLoading,
         runDetectionLoading,
+        detectionJob,
         runDetection,
         refetchAll,
     }

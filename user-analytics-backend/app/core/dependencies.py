@@ -20,7 +20,7 @@ def get_current_user(
 ) -> PlatformUser:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token invalide ou expiré.",
+        detail="Invalid or expired token.",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -47,7 +47,7 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Ce compte est désactivé.",
+            detail="This account is disabled.",
         )
 
     return user
@@ -60,6 +60,6 @@ def require_admin(
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Accès réservé aux administrateurs.",
+            detail="Admin access only.",
         )
     return current_user

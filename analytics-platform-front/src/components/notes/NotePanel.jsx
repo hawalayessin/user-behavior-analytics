@@ -45,7 +45,9 @@ export default function NotePanel({
       content: initialNote.content || "",
     });
     setIsGlobal(
-      !initialNote.service_id && !initialNote.campaign_id && !initialNote.metric,
+      !initialNote.service_id &&
+        !initialNote.campaign_id &&
+        !initialNote.metric,
     );
   }, [initialNote]);
 
@@ -58,7 +60,10 @@ export default function NotePanel({
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setError("");
-    if (isGlobal && (name === "service_id" || name === "campaign_id" || name === "metric")) {
+    if (
+      isGlobal &&
+      (name === "service_id" || name === "campaign_id" || name === "metric")
+    ) {
       setIsGlobal(false);
     }
   };
@@ -133,10 +138,7 @@ export default function NotePanel({
               onChange={handleGlobalToggle}
               className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-500"
             />
-            <label
-              htmlFor="global-note"
-              className="text-sm text-slate-300"
-            >
+            <label htmlFor="global-note" className="text-sm text-slate-300">
               Global note (no service, campaign, or metric)
             </label>
           </div>

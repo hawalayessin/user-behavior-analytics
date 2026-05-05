@@ -31,7 +31,7 @@ from app.utils.temporal import (
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
-OVERVIEW_CACHE_VERSION = "2026-04-16-churn-rate-base-v5"
+OVERVIEW_CACHE_VERSION = "2026-04-27-users-channel-kpis-v1"
 
 _summary_executor = ThreadPoolExecutor(max_workers=7)
 
@@ -669,6 +669,16 @@ def _compute_overview_payload(
         FROM users
     """), params).fetchone()
 
+    channel_counts = db.execute(text("""
+        SELECT
+            COUNT(*) FILTER (WHERE LOWER(TRIM(COALESCE(channel, ''))) = 'ussd') AS ussd,
+            COUNT(*) FILTER (WHERE LOWER(TRIM(COALESCE(channel, ''))) = 'web') AS web,
+            COUNT(*) FILTER (
+                WHERE COALESCE(NULLIF(TRIM(channel), ''), '') NOT IN ('ussd', 'web')
+            ) AS unknown
+        FROM users
+    """), params).fetchone()
+
     subs_query = text(f"""
         WITH normalized_subs AS (
             SELECT
@@ -1010,6 +1020,11 @@ def _compute_overview_payload(
             "active": users.active_users,
             "inactive": users.inactive_users,
             "new_last_30_days": users.new_last_30_days,
+            "channel_counts": {
+                "ussd": int(channel_counts.ussd or 0),
+                "web": int(channel_counts.web or 0),
+                "unknown": int(channel_counts.unknown or 0),
+            },
         },
         "subscriptions": {
             "total": subs.total,

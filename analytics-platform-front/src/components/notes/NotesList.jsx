@@ -80,7 +80,9 @@ export default function NotesList({
                     </td>
                   )}
                   <td className="px-4 py-3 text-slate-300">
-                    {!note.service_name && !note.metric ? "Global" : note.service_name || "—"}
+                    {!note.service_name && !note.metric
+                      ? "Global"
+                      : note.service_name || "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-300">
                     {note.metric || "—"}

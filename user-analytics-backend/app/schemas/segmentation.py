@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class ClusterPoint(BaseModel):
@@ -20,6 +20,8 @@ class SegmentProfile(BaseModel):
     """Detailed profile of a segment"""
     segment: str
     avg_duration: str
+    active_days_30d: float = 0.0
+    activity_ratio_30d: float = 0.0
     arpu: float
     churn_rate: float
 
@@ -50,3 +52,5 @@ class TrainResponse(BaseModel):
     """Model training response"""
     status: str
     message: str
+    logs: Optional[List[Dict[str, Any]]] = None
+    summary: Optional[Dict[str, Any]] = None

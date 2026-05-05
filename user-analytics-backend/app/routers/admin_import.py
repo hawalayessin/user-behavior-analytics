@@ -1,20 +1,27 @@
 import io
 import json
 import re
+import os
+import asyncio
+import sys
 import time
 import uuid
+import traceback
+import subprocess
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.core.dependencies import require_admin
+from app.core.config import settings
+from app.core.database import SessionLocal, get_db
+from app.core.dependencies import get_current_user, require_admin
 from app.models.import_logs import ImportLog
 from app.models.platform_users import PlatformUser
 
@@ -942,3 +949,437 @@ def download_template(
         headers={"Content-Disposition": f'attachment; filename="{table}_template.csv"'},
     )
 
+
+ETL_STEPS = [
+    {"num": 1, "key": "etl_service_types", "label": "Types de services"},
+    {"num": 2, "key": "etl_services", "label": "Services"},
+    {"num": 3, "key": "etl_users", "label": "Utilisateurs"},
+    {"num": 4, "key": "etl_subscriptions", "label": "Abonnements"},
+    {"num": 5, "key": "etl_billing_events", "label": "Evenements de facturation"},
+    {"num": 6, "key": "etl_unsubscriptions", "label": "Desabonnements"},
+    {"num": 7, "key": "etl_user_activities", "label": "Activites utilisateurs"},
+    {"num": 8, "key": "etl_sms_events", "label": "Evenements SMS"},
+    {"num": 9, "key": "etl_cohorts", "label": "Cohortes de retention"},
+]
+
+_active_runs: dict[str, dict[str, Any]] = {}
+
+
+@router.post(
+    "/run-etl",
+    summary="Lancer le pipeline ETL complet",
+    dependencies=[Depends(require_admin)],
+)
+async def run_etl_pipeline(
+    background_tasks: BackgroundTasks,
+    mode: str = "demo",
+    demo_users: int = 50000,
+    truncate: bool = True,
+    dry_run: bool = True,
+    current_user: PlatformUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    active = [v for v in _active_runs.values() if v.get("status") == "running"]
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail="Un pipeline ETL est deja en cours d'execution.",
+        )
+
+    if mode not in {"demo", "prod"}:
+        raise HTTPException(status_code=400, detail="Mode invalide. Utilisez 'demo' ou 'prod'.")
+    # Safety: dry-run must never truncate target data.
+    effective_truncate = truncate and (not dry_run)
+
+    log_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc)
+
+    _active_runs[log_id] = {
+        "log_id": log_id,
+        "status": "running",
+        "mode": mode,
+        "dry_run": dry_run,
+        "demo_users": demo_users if mode == "demo" else None,
+        "current_step": ETL_STEPS[0]["key"],
+        "current_step_num": 1,
+        "current_step_label": ETL_STEPS[0]["label"],
+        "total_steps": len(ETL_STEPS),
+        "progress_pct": 0,
+        "rows_inserted": 0,
+        "rows_skipped": 0,
+        "duration_sec": 0.0,
+        "started_at": started_at.isoformat(),
+        "completed_at": None,
+        "error": None,
+        "steps_done": [],
+        "triggered_by": str(current_user.id),
+    }
+
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO import_logs (
+                    id, file_name, file_type, target_table,
+                    mode, status, current_step, current_step_num,
+                    total_steps, progress_pct, rows_inserted,
+                    rows_skipped, started_at, admin_id
+                ) VALUES (
+                    :id, :file_name, :file_type, :target_table,
+                    :mode, :status, :current_step, :current_step_num,
+                    :total_steps, :progress_pct, :rows_inserted,
+                    :rows_skipped, :started_at, :admin_id
+                )
+                """
+            ),
+            {
+                "id": log_id,
+                "file_name": "etl_prod_to_analytics.py",
+                "file_type": "etl_pipeline",
+                "target_table": "all",
+                "mode": mode,
+                "status": "running",
+                "current_step": ETL_STEPS[0]["key"],
+                "current_step_num": 1,
+                "total_steps": len(ETL_STEPS),
+                "progress_pct": 0,
+                "rows_inserted": 0,
+                "rows_skipped": 0,
+                "started_at": started_at,
+                "admin_id": str(current_user.id),
+            },
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    background_tasks.add_task(
+        _execute_etl_background,
+        log_id=log_id,
+        mode=mode,
+        demo_users=demo_users,
+        truncate=effective_truncate,
+        dry_run=dry_run,
+    )
+
+    return {
+        "log_id": log_id,
+        "status": "running",
+        "message": f"Pipeline ETL demarre en mode {mode}",
+        "mode": mode,
+        "dry_run": dry_run,
+        "truncate": effective_truncate,
+        "demo_users": demo_users if mode == "demo" else None,
+    }
+
+
+async def _execute_etl_background(
+    log_id: str,
+    mode: str,
+    demo_users: int,
+    truncate: bool,
+    dry_run: bool,
+):
+    start_time = datetime.now(timezone.utc)
+    run = _active_runs[log_id]
+
+    python_exe = sys.executable
+    etl_script = str(
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "etl"
+        / "etl_prod_to_analytics.py"
+    )
+    cmd = [python_exe, etl_script, "--batch-size", "50000"]
+
+    if mode == "demo":
+        cmd += ["--limit", str(demo_users)]
+    if dry_run:
+        cmd += ["--dry-run"]
+    if truncate:
+        cmd += ["--truncate-target"]
+
+    log_dir = Path(__file__).resolve().parents[2] / "logs" / "etl_runs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"{log_id}.log"
+    run["log_path"] = str(log_path)
+
+    try:
+        prod_conn = settings.PROD_CONN or settings.prod_conn
+        analytics_conn = settings.ANALYTICS_CONN or settings.analytics_conn or settings.DATABASE_URL
+        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+        if prod_conn:
+            env["PROD_CONN"] = prod_conn
+        if analytics_conn:
+            env["ANALYTICS_CONN"] = analytics_conn
+        with log_path.open("w", encoding="utf-8") as log_file:
+            log_file.write(f"Command: {' '.join(cmd)}\n")
+            log_file.write(f"Mode: {mode} | Dry run: {dry_run} | Truncate: {truncate}\n")
+            log_file.write("--- ETL output ---\n")
+
+            def _run_process():
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    env=env,
+                    text=True,
+                    bufsize=1,
+                )
+
+                rows_inserted = 0
+                rows_skipped = 0
+                completed_steps: list[str] = []
+                output_tail: list[str] = []
+
+                if process.stdout is None:
+                    raise RuntimeError("Impossible de lire la sortie ETL.")
+
+                for raw_line in process.stdout:
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    log_file.write(line + "\n")
+                    output_tail.append(line)
+                    if len(output_tail) > 20:
+                        output_tail = output_tail[-20:]
+
+                    try:
+                        log_data = json.loads(line)
+                    except Exception:
+                        continue
+
+                    msg = str(log_data.get("message", ""))
+
+                    for step in ETL_STEPS:
+                        if (
+                            "Step done" in msg
+                            and step["key"].replace("etl_", "") in msg
+                            and step["key"] not in completed_steps
+                        ):
+                            completed_steps.append(step["key"])
+                            next_num = len(completed_steps) + 1
+                            next_step = ETL_STEPS[next_num - 1] if next_num <= len(ETL_STEPS) else ETL_STEPS[-1]
+                            pct = int(len(completed_steps) / len(ETL_STEPS) * 100)
+
+                            rows_inserted += int(log_data.get("upserted", 0) or 0)
+                            rows_skipped += int(log_data.get("skipped", 0) or 0)
+
+                            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+
+                            run.update(
+                                {
+                                    "current_step": next_step["key"],
+                                    "current_step_num": min(next_num, len(ETL_STEPS)),
+                                    "current_step_label": next_step["label"],
+                                    "progress_pct": pct,
+                                    "rows_inserted": rows_inserted,
+                                    "rows_skipped": rows_skipped,
+                                    "duration_sec": round(elapsed, 1),
+                                    "steps_done": completed_steps.copy(),
+                                }
+                            )
+                            break
+
+                process.wait()
+                return process.returncode, output_tail, rows_inserted, rows_skipped
+
+            returncode, output_tail, rows_inserted, rows_skipped = await asyncio.to_thread(_run_process)
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+
+            final_status = "success" if returncode == 0 else "failed"
+            error_msg = None
+            if final_status == "failed":
+                error_msg = "\n".join(output_tail[-8:]) if output_tail else ""
+                if not error_msg:
+                    error_msg = f"ETL process exited with code {returncode}"
+            log_file.write(f"--- ETL finished: {final_status} ---\n")
+            run.update(
+                {
+                    "status": final_status,
+                    "progress_pct": 100 if final_status == "success" else run["progress_pct"],
+                    "duration_sec": round(elapsed, 1),
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                    "rows_inserted": rows_inserted,
+                    "rows_skipped": rows_skipped,
+                    "error": error_msg,
+                }
+            )
+
+    except Exception as exc:
+        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+        exc_type = type(exc).__name__
+        exc_text = str(exc)
+        run.update(
+            {
+                "status": "failed",
+                "error": f"{exc_type}: {exc_text}" if exc_text else exc_type,
+                "duration_sec": round(elapsed, 1),
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        try:
+            log_path.write_text(
+                "".join(
+                    [
+                        f"ETL runner exception: {exc_type}\n",
+                        f"Message: {exc_text}\n",
+                        "--- Traceback ---\n",
+                        traceback.format_exc(),
+                    ]
+                ),
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+    try:
+        db2 = SessionLocal()
+        db2.execute(
+            text(
+                """
+                UPDATE import_logs SET
+                    status           = :status,
+                    progress_pct     = :pct,
+                    rows_inserted    = :inserted,
+                    rows_skipped     = :skipped,
+                    duration_sec     = :duration,
+                    completed_at     = :completed,
+                    current_step     = :current_step,
+                    current_step_num = :current_step_num,
+                    error_details    = CAST(:error AS jsonb)
+                WHERE id = CAST(:id AS uuid)
+                """
+            ),
+            {
+                "id": log_id,
+                "status": run["status"],
+                "pct": run["progress_pct"],
+                "inserted": run["rows_inserted"],
+                "skipped": run["rows_skipped"],
+                "duration": run["duration_sec"],
+                "completed": datetime.now(timezone.utc),
+                "current_step": run.get("current_step"),
+                "current_step_num": run.get("current_step_num"),
+                "error": json.dumps({"message": run.get("error")}),
+            },
+        )
+        db2.commit()
+        db2.close()
+    except Exception:
+        pass
+
+
+@router.get(
+    "/run-etl/{log_id}/status",
+    summary="Statut temps reel du pipeline ETL",
+    dependencies=[Depends(require_admin)],
+)
+async def get_etl_status(
+    log_id: str,
+    current_user: PlatformUser = Depends(get_current_user),
+):
+    _ = current_user
+    run = _active_runs.get(log_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Aucun pipeline trouve pour cet identifiant.")
+    return run
+
+
+@router.get(
+    "/run-etl/{log_id}/log",
+    summary="Lire le log ETL",
+    dependencies=[Depends(require_admin)],
+)
+def get_etl_log(
+    log_id: str,
+    limit: int = 200,
+):
+    log_path = Path(__file__).resolve().parents[2] / "logs" / "etl_runs" / f"{log_id}.log"
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Aucun log ETL pour cet identifiant.")
+
+    content = log_path.read_text(encoding="utf-8", errors="replace")
+    lines = content.splitlines()
+    if limit > 0:
+        lines = lines[-limit:]
+    return {
+        "log_id": log_id,
+        "line_count": len(lines),
+        "log": "\n".join(lines),
+    }
+
+
+@router.get(
+    "/etl-history",
+    summary="Historique des pipelines ETL",
+    dependencies=[Depends(require_admin)],
+)
+def get_etl_history(
+    limit: int = 20,
+    current_user: PlatformUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _ = current_user
+    rows = db.execute(
+        text(
+            """
+            SELECT
+                id,
+                mode,
+                status,
+                rows_inserted,
+                rows_skipped,
+                duration_sec,
+                progress_pct,
+                error_details,
+                started_at,
+                completed_at,
+                current_step
+            FROM import_logs
+            WHERE file_type = 'etl_pipeline'
+            ORDER BY started_at DESC
+            LIMIT :limit
+            """
+        ),
+        {"limit": limit},
+    ).fetchall()
+
+    response = []
+    for r in rows:
+        error_message = None
+        if r.error_details:
+            if isinstance(r.error_details, dict):
+                error_message = r.error_details.get("message")
+            else:
+                try:
+                    parsed = json.loads(r.error_details)
+                    if isinstance(parsed, dict):
+                        error_message = parsed.get("message")
+                    else:
+                        error_message = str(parsed)
+                except Exception:
+                    error_message = str(r.error_details)
+        if not error_message:
+            run = _active_runs.get(str(r.id))
+            if run:
+                error_message = run.get("error")
+        if not error_message and r.status == "failed":
+            error_message = "Unknown ETL error (no output captured). Check backend logs."
+        response.append(
+            {
+                "id": str(r.id),
+                "mode": r.mode,
+                "status": r.status,
+                "rows_inserted": r.rows_inserted or 0,
+                "rows_skipped": r.rows_skipped or 0,
+                "duration_sec": r.duration_sec or 0,
+                "progress_pct": r.progress_pct or 0,
+                "error": error_message,
+                "error_raw": r.error_details,
+                "started_at": (r.started_at.isoformat() if r.started_at else None),
+                "completed_at": (r.completed_at.isoformat() if r.completed_at else None),
+                "current_step": r.current_step,
+            }
+        )
+    return response

@@ -11,8 +11,18 @@ import pandas as pd
 from sqlalchemy.orm import Session
 
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import brier_score_loss, classification_report, roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    brier_score_loss,
+    classification_report,
+    confusion_matrix,
+    precision_recall_fscore_support,
+    roc_auc_score,
+)
+from sklearn.model_selection import learning_curve
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 RiskCategory = Literal["Low", "Medium", "High"]
@@ -41,27 +51,38 @@ class ChurnPredictor:
         metrics_path: str | None = None,
         query_timeout_ms: int | None = None,
         random_state: int = 42,
+        max_positive_ratio: float | None = None,
+        use_all_rows_for_training: bool = True,
     ):
-        self.feature_names = [
+        self.training_feature_names = [
             "days_since_last_activity",
             "nb_activities_7d",
             "nb_activities_30d",
             "billing_failures_30d",
             "days_since_first_charge",
-            "is_trial_churn",
             "avg_retention_d7",
-            "service_billing_frequency",
-            "days_to_first_unsub",
+            # service_billing_frequency removed: low-cardinality proxy of service type
         ]
+        # NOTE: is_trial_churn excluded from scoring (always 0 for active subscriptions)
+        self.scoring_feature_names = self.training_feature_names.copy()
+        self.feature_names = self.training_feature_names
 
         models_dir = Path(__file__).resolve().parent
         self.model_path = Path(model_path or models_dir / "churn_model.joblib")
         self.metrics_path = Path(metrics_path or models_dir / "churn_metrics.joblib")
 
-        self.model = LogisticRegression(
-            class_weight="balanced",
-            random_state=random_state,
-            max_iter=2000,
+        self.model = Pipeline(
+            [
+                ("scaler", StandardScaler()),
+                (
+                    "clf",
+                    LogisticRegression(
+                        class_weight="balanced",
+                        random_state=random_state,
+                        max_iter=2000,
+                    ),
+                ),
+            ]
         )
         # Training/scoring feature SQL can be expensive on large datasets.
         # Allow a higher per-request timeout than the DB default.
@@ -70,10 +91,85 @@ class ChurnPredictor:
             if query_timeout_ms is not None
             else os.getenv("CHURN_SQL_TIMEOUT_MS", "120000")
         )
+        self.max_positive_ratio = float(max_positive_ratio) if max_positive_ratio is not None else None
+        self.use_all_rows_for_training = bool(use_all_rows_for_training)
+        self.default_threshold = 0.4
 
-    def _feature_profile_from_df(self, df: pd.DataFrame) -> dict[str, dict[str, float]]:
+    def _select_optimal_threshold(
+        self,
+        y_true: pd.Series,
+        y_proba: np.ndarray,
+        *,
+        beta: float = 1.0,
+    ) -> dict[str, Any]:
+        if len(y_true) == 0:
+            return {
+                "optimal_threshold": self.default_threshold,
+                "selection_metric": "f1",
+                "candidates": [],
+                "fallback_used": True,
+            }
+
+        yt = np.asarray(y_true).astype(int)
+        yp = np.asarray(y_proba).astype(float)
+        candidates = np.unique(np.round(np.linspace(0.05, 0.95, 37), 3))
+        scored: list[dict[str, Any]] = []
+        best: dict[str, Any] | None = None
+
+        for th in candidates:
+            pred = (yp >= th).astype(int)
+            precision, recall, fbeta, _ = precision_recall_fscore_support(
+                yt, pred, average="binary", zero_division=0, beta=beta
+            )
+            row = {
+                "threshold": float(th),
+                "precision": float(precision),
+                "recall": float(recall),
+                "f1_score": float(fbeta),
+            }
+            scored.append(row)
+            if best is None or row["f1_score"] > best["f1_score"] or (
+                row["f1_score"] == best["f1_score"] and row["recall"] > best["recall"]
+            ):
+                best = row
+
+        if not best:
+            return {
+                "optimal_threshold": self.default_threshold,
+                "selection_metric": "f1",
+                "candidates": scored,
+                "fallback_used": True,
+            }
+
+        return {
+            "optimal_threshold": float(best["threshold"]),
+            "selection_metric": f"f{beta:g}",
+            "candidates": scored,
+            "fallback_used": False,
+        }
+
+    def _resolve_threshold(self, requested: float | None) -> float:
+        if requested is not None:
+            return float(requested)
+        metrics = self.load_metrics() or {}
+        opt = (
+            ((metrics.get("governance") or {}).get("protocol") or {}).get("optimal_threshold")
+            or metrics.get("optimal_threshold")
+        )
+        if opt is None:
+            return self.default_threshold
+        try:
+            return float(opt)
+        except Exception:
+            return self.default_threshold
+
+    def _feature_profile_from_df(
+        self,
+        df: pd.DataFrame,
+        features: list[str] | None = None,
+    ) -> dict[str, dict[str, float]]:
         profile: dict[str, dict[str, float]] = {}
-        for feature in self.feature_names:
+        for feature in (features or self.feature_names):
             if feature not in df.columns:
                 continue
             s = pd.to_numeric(df[feature], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
@@ -145,6 +241,60 @@ class ChurnPredictor:
             "bins": rows,
         }
 
+    def compute_learning_curve(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        *,
+        cv: int = 5,
+        n_points: int = 7,
+    ) -> list[dict[str, Any]]:
+        from sklearn.model_selection import StratifiedShuffleSplit, learning_curve
+
+        if len(X) == 0 or len(y) == 0 or y.nunique() < 2:
+            return []
+
+        total = len(X)
+        test_size = 0.2
+        max_train = max(1, int(total * (1.0 - test_size)))
+
+        # Cap train sizes to the max fold train size for StratifiedShuffleSplit.
+        train_sizes = np.unique(
+            np.concatenate(
+                [
+                    np.linspace(max(1, int(total * 0.01)), int(total * 0.08), 3, dtype=int),
+                    np.linspace(int(total * 0.08), max_train, 4, dtype=int),
+                ]
+            )
+        )
+
+        cv_strategy = StratifiedShuffleSplit(
+            n_splits=3,
+            test_size=test_size,
+            random_state=42,
+        )
+        train_sizes_abs, train_scores, val_scores = learning_curve(
+            self.model,
+            X,
+            y,
+            train_sizes=train_sizes,
+            cv=cv_strategy,
+            scoring="roc_auc",
+            n_jobs=-1,
+            shuffle=True,
+            random_state=42,
+        )
+        return [
+            {
+                "train_size": int(ts),
+                "train_score": round(float(tr.mean()), 4),
+                "val_score": round(float(val.mean()), 4),
+                "train_score_std": round(float(tr.std()), 4),
+                "val_score_std": round(float(val.std()), 4),
+            }
+            for ts, tr, val in zip(train_sizes_abs, train_scores, val_scores)
+        ]
+
     def _compute_feature_drift(
         self,
         train_profile: dict[str, dict[str, float]],
@@ -154,7 +304,7 @@ class ChurnPredictor:
         high_count = 0
         medium_count = 0
 
-        for feature in self.feature_names:
+        for feature in self.scoring_feature_names:
             t = train_profile.get(feature) or {}
             c = current_profile.get(feature) or {}
             train_mean = float(t.get("mean") or 0.0)
@@ -211,8 +361,7 @@ class ChurnPredictor:
         Granularity: (user_id, service_id, subscription_id)
         """
 
-        # IMPORTANT: Use subscription_end_date as reference ("ref_time") for churned subscriptions
-        # to prevent label leakage from future activity/billing.
+        # Critical anti-leakage rule: build features at ref_time (T0+7d), then label churn in next 30 days.
         return f"""
         WITH base AS (
           SELECT
@@ -222,18 +371,14 @@ class ChurnPredictor:
             s.subscription_start_date,
             s.subscription_end_date,
             s.status,
-            COALESCE(s.subscription_end_date, NOW()) AS ref_time,
+            LEAST(s.subscription_start_date + INTERVAL '7 days', NOW()) AS ref_time,
             st.billing_frequency_days,
             st.trial_duration_days,
             COALESCE(co.retention_d7, 0)::float AS avg_retention_d7,
             u.unsubscription_datetime,
             u.churn_type,
             u.churn_reason,
-            u.days_since_subscription,
-            CASE
-              WHEN LOWER(COALESCE(s.status, '')) IN ('cancelled', 'expired') THEN 1
-              ELSE 0
-            END AS churned
+            u.days_since_subscription
           FROM subscriptions s
           JOIN services sv ON sv.id = s.service_id
           JOIN service_types st ON st.id = sv.service_type_id
@@ -241,12 +386,13 @@ class ChurnPredictor:
             ON co.service_id = s.service_id
            AND co.cohort_date = date_trunc('month', s.subscription_start_date)::date
           LEFT JOIN unsubscriptions u ON u.subscription_id = s.id
-          WHERE s.status IN ('trial', 'active', 'cancelled', 'expired')
+          WHERE LOWER(COALESCE(s.status, '')) IN ('active', 'pending', 'cancelled', 'billing_failed')  -- RETRAIN REQUIRED
         )
         SELECT
           b.user_id,
           b.service_id,
           b.subscription_id,
+          b.status,
           -- days_since_last_activity
           COALESCE(
             EXTRACT(DAY FROM (b.ref_time - last_activity.last_activity_datetime))::int,
@@ -268,13 +414,12 @@ class ChurnPredictor:
           END AS is_trial_churn,
           COALESCE(b.avg_retention_d7, 0)::float AS avg_retention_d7,
           b.billing_frequency_days::float AS service_billing_frequency,
-          -- days_to_first_unsub: time-to-churn for churned users, else a large sentinel
           CASE
             WHEN b.unsubscription_datetime IS NOT NULL
-            THEN COALESCE(b.days_since_subscription, EXTRACT(DAY FROM (b.unsubscription_datetime - b.subscription_start_date))::int)
-            ELSE 999
-          END AS days_to_first_unsub,
-          COALESCE(b.churned, 0)::int AS churned
+             AND b.unsubscription_datetime > b.ref_time
+             AND b.unsubscription_datetime <= b.ref_time + INTERVAL '30 days'
+            THEN 1 ELSE 0
+          END::int AS churned
         FROM base b
         LEFT JOIN LATERAL (
           SELECT MAX(ua.activity_datetime) AS last_activity_datetime
@@ -303,18 +448,18 @@ class ChurnPredictor:
           SELECT COUNT(*) AS billing_failures_30d
           FROM billing_events be
           WHERE be.subscription_id = b.subscription_id
-            AND be.status = 'FAILED'
+            AND LOWER(COALESCE(be.status, '')) = 'failed'
             AND be.event_datetime >= b.ref_time - INTERVAL '30 days'
             AND be.event_datetime <= b.ref_time
         ) bfail30 ON TRUE
-        LEFT JOIN LATERAL (
-          SELECT MIN(be.event_datetime) AS first_charge_datetime
-          FROM billing_events be
-          WHERE be.subscription_id = b.subscription_id
-            AND be.is_first_charge = TRUE
-            AND be.status = 'SUCCESS'
-            AND be.event_datetime <= b.ref_time
-        ) first_charge ON TRUE
+                -- FIX-1: do not rely on is_first_charge flag (ETL may not set it); use earliest success instead.
+                LEFT JOIN LATERAL (
+                    SELECT MIN(be.event_datetime) AS first_charge_datetime
+                    FROM billing_events be
+                    WHERE be.subscription_id = b.subscription_id
+                        AND LOWER(COALESCE(be.status, '')) = 'success'  -- RETRAIN REQUIRED
+                        AND be.event_datetime <= b.ref_time
+                ) first_charge ON TRUE
         """
 
     def _active_scoring_features_sql(
@@ -328,7 +473,7 @@ class ChurnPredictor:
         Granularity: (subscription_id)
         Includes user phone + service name for UI top lists.
         """
-        where_clauses = ["LOWER(COALESCE(s.status, '')) IN ('active', 'trial')"]
+        where_clauses = ["LOWER(COALESCE(s.status, '')) IN ('active', 'pending')"]
         params = {}
         if service_id:
             where_clauses.append("s.service_id = CAST(:service_id AS uuid)")
@@ -351,7 +496,7 @@ class ChurnPredictor:
             s.subscription_start_date,
             s.subscription_end_date,
             s.status,
-            COALESCE(s.subscription_end_date, NOW()) AS ref_time,
+            LEAST(s.subscription_start_date + INTERVAL '7 days', NOW()) AS ref_time,
             st.billing_frequency_days,
             st.trial_duration_days,
             COALESCE(co.retention_d7, 0)::float AS avg_retention_d7,
@@ -396,12 +541,6 @@ class ChurnPredictor:
           END AS is_trial_churn,
           COALESCE(b.avg_retention_d7, 0)::float AS avg_retention_d7,
           b.billing_frequency_days::float AS service_billing_frequency
-          ,
-          CASE
-            WHEN b.unsubscription_datetime IS NOT NULL
-            THEN COALESCE(b.days_since_subscription, EXTRACT(DAY FROM (b.unsubscription_datetime - b.subscription_start_date))::int)
-            ELSE 999
-          END AS days_to_first_unsub
         FROM base b
         LEFT JOIN LATERAL (
           SELECT MAX(ua.activity_datetime) AS last_activity_datetime
@@ -430,18 +569,18 @@ class ChurnPredictor:
           SELECT COUNT(*) AS billing_failures_30d
           FROM billing_events be
           WHERE be.subscription_id = b.subscription_id
-            AND be.status = 'FAILED'
+            AND LOWER(COALESCE(be.status, '')) = 'failed'
             AND be.event_datetime >= b.ref_time - INTERVAL '30 days'
             AND be.event_datetime <= b.ref_time
         ) bfail30 ON TRUE
-        LEFT JOIN LATERAL (
-          SELECT MIN(be.event_datetime) AS first_charge_datetime
-          FROM billing_events be
-          WHERE be.subscription_id = b.subscription_id
-            AND be.is_first_charge = TRUE
-            AND be.status = 'SUCCESS'
-            AND be.event_datetime <= b.ref_time
-        ) first_charge ON TRUE
+                -- FIX-1: do not rely on is_first_charge flag (ETL may not set it); use earliest success instead.
+                LEFT JOIN LATERAL (
+                    SELECT MIN(be.event_datetime) AS first_charge_datetime
+                    FROM billing_events be
+                    WHERE be.subscription_id = b.subscription_id
+                        AND LOWER(COALESCE(be.status, '')) = 'success'  -- RETRAIN REQUIRED
+                        AND be.event_datetime <= b.ref_time
+                ) first_charge ON TRUE
         """, params
 
     # -----------------------------
@@ -452,18 +591,99 @@ class ChurnPredictor:
         if df.empty:
             raise ValueError("Not enough data to build training dataset.")
 
+        if not self.use_all_rows_for_training:
+            # Optional quality filter when you want a stricter dataset.
+            df = df[
+                ~(
+                    (df["days_since_first_charge"] >= 999)
+                    & (df["days_since_last_activity"] >= 999)
+                    & (df["nb_activities_30d"] <= 0)
+                )
+            ].copy()
+            if df.empty:
+                raise ValueError("No informative rows after feature quality filtering.")
+
+        # Optional rebalance: cap positives (churned=1) to max_positive_ratio * negatives.
+        # Disabled by default so training can run on all subscriptions.
+        if self.max_positive_ratio is not None:
+            positives = df[df["churned"] == 1]
+            negatives = df[df["churned"] == 0]
+            if not positives.empty and not negatives.empty:
+                max_pos = int(len(negatives) * self.max_positive_ratio)
+                if len(positives) > max_pos > 0:
+                    positives = positives.sample(n=max_pos, random_state=42)
+                df = (
+                    pd.concat([negatives, positives], axis=0)
+                    .sample(frac=1.0, random_state=42)
+                    .reset_index(drop=True)
+                )
+
         # Safety: coerce and sanitize features.
-        X = df[self.feature_names].copy()
+        X = df[self.training_feature_names].copy()
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
 
         y = df["churned"].astype(int)
+
+        # If horizon label is degenerate, fallback to status-derived label to keep training usable.
+        if y.nunique() < 2 and "status" in df.columns:
+            status_y = (
+                df["status"]
+                .astype(str)
+                .str.lower()
+                .isin(["cancelled", "billing_failed"])
+                .astype(int)
+            )
+            if status_y.nunique() >= 2:
+                y = status_y
         return X, y
 
-    def train(self, db_session: Session) -> dict[str, Any]:
+    def train(self, db_session: Session, progress_callback: Any | None = None) -> dict[str, Any]:
+        def log_step(message: str, **extra: Any) -> None:
+            if progress_callback:
+                progress_callback(message, **extra)
+
+        log_step("Loading training dataset from SQL...")
         X, y = self.generate_training_dataset(db_session)
+        log_step("Dataset loaded", n_rows=int(len(X)), n_features=int(len(self.training_feature_names)))
         n_positive = int((y == 1).sum())
         n_negative = int((y == 0).sum())
         label_distribution = {"1": n_positive, "0": n_negative}
+        dq = {
+            "n_rows_after_filter": int(len(X)),
+            "pct_days_since_last_activity_999": round(float((X["days_since_last_activity"] >= 999).mean() * 100), 2),
+            "pct_days_since_first_charge_999": round(float((X["days_since_first_charge"] >= 999).mean() * 100), 2),
+            "pct_zero_activities_30d": round(float((X["nb_activities_30d"] <= 0).mean() * 100), 2),
+        }
+        feature_signal = {
+            "pct_billing_failures_zero": round(float((X["billing_failures_30d"] == 0).mean() * 100), 2),
+            "pct_service_billing_freq_zero": None,
+        }
+        feature_signal["pct_days_since_first_charge_999"] = round(
+            float((X["days_since_first_charge"] >= 999).mean() * 100), 2
+        )
+        dq_report = {
+            **dq,
+            "pct_billing_failures_zero": feature_signal["pct_billing_failures_zero"],
+            "n_positive": n_positive,
+            "n_negative": n_negative,
+        }
+        if feature_signal["pct_billing_failures_zero"] > 95.0:
+            log_step(
+                "billing_failures_30d mostly zero, low signal",
+                pct_billing_failures_zero=feature_signal["pct_billing_failures_zero"],
+            )
+        if feature_signal["pct_days_since_first_charge_999"] > 90.0:
+            log_step(
+                "days_since_first_charge mostly 999 sentinel - first_charge SQL may not match any rows",
+                pct=feature_signal["pct_days_since_first_charge_999"],
+            )
+        log_step(
+            "Class distribution computed",
+            n_positive=n_positive,
+            n_negative=n_negative,
+            churn_rate=float(y.mean()) if len(y) else 0.0,
+        )
+        log_step("Data quality report", **dq_report)
 
         if y.nunique() < 2:
             warning = (
@@ -473,6 +693,12 @@ class ChurnPredictor:
             metrics = {
                 "trained_at": pd.Timestamp.utcnow().isoformat(),
                 "roc_auc": None,
+                "pr_auc": None,
+                "optimal_threshold": self.default_threshold,
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "confusion_matrix": {"tn": 0, "fp": 0, "fn": 0, "tp": 0},
                 "churn_rate": float(y.mean()) if len(y) else 0.0,
                 "accuracy": 1.0,
                 "report": {
@@ -482,12 +708,27 @@ class ChurnPredictor:
                         "n_negative": n_negative,
                     },
                     "label_distribution": label_distribution,
+                    "data_quality": dq,
                 },
                 "coefficients": {},
+                "coefficients_sorted": [],
                 "n_samples": int(len(y)),
                 "n_positive": n_positive,
                 "n_negative": n_negative,
                 "warning": warning,
+                "dq_report": dq_report,
+                "feature_signal": feature_signal,
+                "calibration": {
+                    "brier_score": None,
+                    "ece": None,
+                    "bins": [],
+                },
+                "drift": {
+                    "average_z_shift": 0.0,
+                    "high_drift_features": 0,
+                    "medium_drift_features": 0,
+                    "features": [],
+                },
                 "governance": {
                   "protocol": {
                     "version": "churn-governance-v1",
@@ -500,7 +741,18 @@ class ChurnPredictor:
                     "ece": None,
                     "bins": [],
                   },
-                  "feature_profile_train": self._feature_profile_from_df(X),
+                  "risk_policy": {
+                    "selection_metric": "f1",
+                    "recommended_threshold": self.default_threshold,
+                    "fallback_used": True,
+                  },
+                  "drift": {
+                    "average_z_shift": 0.0,
+                    "high_drift_features": 0,
+                    "medium_drift_features": 0,
+                    "features": [],
+                  },
+                  "feature_profile_train": self._feature_profile_from_df(X, self.training_feature_names),
                 },
             }
             self.metrics_path.parent.mkdir(parents=True, exist_ok=True)
@@ -510,56 +762,127 @@ class ChurnPredictor:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y if y.nunique() > 1 else None
         )
+        log_step(
+            "Train/test split done",
+            train_rows=int(len(X_train)),
+            test_rows=int(len(X_test)),
+        )
 
+        log_step("Fitting LogisticRegression...")
         self.model.fit(X_train, y_train)
+        log_step("Model fit completed")
 
-        y_pred = self.model.predict(X_test)
         y_proba = self.model.predict_proba(X_test)[:, 1]
+        threshold_policy = self._select_optimal_threshold(y_test, y_proba, beta=1.0)
+        optimal_threshold = float(threshold_policy.get("optimal_threshold", self.default_threshold))
+        y_pred = (y_proba >= optimal_threshold).astype(int)
 
         roc_auc = None
         if y_test.nunique() > 1:
             roc_auc = float(roc_auc_score(y_test, y_proba))
+        pr_auc = float(average_precision_score(y_test, y_proba))
 
         report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
         churn_rate = float(y.mean()) if len(y) else 0.0
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            y_test, y_pred, average="binary", zero_division=0
+        )
+        cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+        tn, fp, fn, tp = [int(x) for x in cm.ravel()]
+        log_step(
+            "Evaluation completed",
+            roc_auc=roc_auc,
+            accuracy=float(report.get("accuracy", 0.0)),
+            churn_rate=churn_rate,
+            pr_auc=pr_auc,
+            optimal_threshold=optimal_threshold,
+        )
 
         coeffs = {}
         try:
-            # LogisticRegression exposes coef_ directly.
-            coeffs = dict(zip(self.feature_names, self.model.coef_[0].astype(float)))
+            coeffs = dict(
+                zip(
+                    self.training_feature_names,
+                    self.model.named_steps["clf"].coef_[0].astype(float),
+                )
+            )
         except Exception:
             coeffs = {}
+        coeffs_sorted = dict(sorted(coeffs.items(), key=lambda x: abs(x[1]), reverse=True))
+        dominant = max(coeffs_sorted.items(), key=lambda x: abs(x[1]), default=(None, 0))
+        if abs(dominant[1]) > 1.0:
+            log_step(
+                "WARNING: dominant feature detected - may bias model",
+                feature=dominant[0],
+                coefficient=round(dominant[1], 4),
+            )
+        churn_report = report.get("1", {})
 
         metrics = {
             "trained_at": pd.Timestamp.utcnow().isoformat(),
             "roc_auc": roc_auc,
+            "pr_auc": pr_auc,
+            "optimal_threshold": optimal_threshold,
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1_score": float(f1),
+            "churn_precision": round(float(churn_report.get("precision", 0.0)), 4),
+            "churn_recall": round(float(churn_report.get("recall", 0.0)), 4),
+            "churn_f1": round(float(churn_report.get("f1-score", 0.0)), 4),
+            "pr_auc_lift": round((float(pr_auc) / float(churn_rate)) if churn_rate > 0 else 0.0, 2),
+            "confusion_matrix": {"tn": tn, "fp": fp, "fn": fn, "tp": tp},
             "churn_rate": churn_rate,
             "accuracy": float(report.get("accuracy", 0.0)),
           "report": {
             **report,
             "label_distribution": label_distribution,
+            "data_quality": dq,
           },
-            "coefficients": coeffs,
+            "coefficients": coeffs_sorted,
+            "coefficients_sorted": [
+                {"feature": k, "coefficient": round(v, 4)}
+                for k, v in coeffs_sorted.items()
+            ],
             "n_samples": int(len(df := pd.concat([X, y.rename("churned")], axis=1))),
           "n_positive": n_positive,
           "n_negative": n_negative,
             "warning": None,
+            "dq_report": dq_report,
+            "feature_signal": feature_signal,
+            "calibration": self._calibration_summary(y_test, y_proba),
+            "learning_curve": self.compute_learning_curve(X_train, y_train),
+            "drift": {
+                "average_z_shift": 0.0,
+                "high_drift_features": 0,
+                "medium_drift_features": 0,
+                "features": [],
+            },
             "governance": {
               "protocol": {
                 "version": "churn-governance-v1",
                 "evaluation_split": "stratified train_test_split(test_size=0.2, random_state=42)",
-                "default_decision_threshold": 0.4,
+                "default_decision_threshold": self.default_threshold,
+                "optimal_threshold": optimal_threshold,
                 "recalibration_cadence_days": 30,
               },
               "calibration": self._calibration_summary(y_test, y_proba),
-              "feature_profile_train": self._feature_profile_from_df(X_train),
+              "risk_policy": threshold_policy,
+              "drift": {
+                  "average_z_shift": 0.0,
+                  "high_drift_features": 0,
+                  "medium_drift_features": 0,
+                  "features": [],
+              },
+              "feature_profile_train": self._feature_profile_from_df(X_train, self.training_feature_names),
             },
         }
 
         # Persist model + metrics.
         self.model_path.parent.mkdir(parents=True, exist_ok=True)
+        log_step("Persisting model artifacts...")
         joblib.dump(self.model, self.model_path)
         joblib.dump(metrics, self.metrics_path)
+        log_step("Training finished successfully")
 
         return metrics
 
@@ -586,7 +909,7 @@ class ChurnPredictor:
         self,
         db_session: Session,
         *,
-        threshold: float = 0.4,
+        threshold: float | None = None,
         store_predictions: bool = False,
         service_id: str | None = None,
         start_date: str | None = None,
@@ -602,15 +925,16 @@ class ChurnPredictor:
         if df.empty:
             return ChurnPredictionResult(df=pd.DataFrame(), distribution={"Low": 0, "Medium": 0, "High": 0})
 
-        X = df[self.feature_names].copy()
+        X = df[self.scoring_feature_names].copy()
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
 
+        resolved_threshold = self._resolve_threshold(threshold)
         churn_risk_scores = self.model.predict_proba(X)[:, 1]
         churn_risk_scores = np.clip(churn_risk_scores.astype(float), 0.0, 1.0)
 
         df = df.copy()
         df["churn_risk"] = churn_risk_scores
-        df["predicted_churn"] = (df["churn_risk"] >= threshold).astype(int)
+        df["predicted_churn"] = (df["churn_risk"] >= resolved_threshold).astype(int)
         df["risk_category"] = df["churn_risk"].apply(self._risk_category)
 
         distribution = (
@@ -638,7 +962,7 @@ class ChurnPredictor:
                 if col in df_store.columns:
                     df_store[col] = df_store[col].astype(str)
 
-            df_store["threshold"] = float(threshold)
+            df_store["threshold"] = float(resolved_threshold)
             df_store.to_sql("churn_predictions", db_session.bind, if_exists="replace", index=False)
 
         return ChurnPredictionResult(df=df, distribution=distribution)
@@ -656,9 +980,18 @@ class ChurnPredictor:
         if not self.load():
             raise FileNotFoundError("Model not trained yet. Call /ml/churn/train first.")
 
-        current = self.predict_active_subscriptions(db_session, threshold=0.4, store_predictions=False)
+        recommended_threshold = self._resolve_threshold(None)
+        current = self.predict_active_subscriptions(
+            db_session,
+            threshold=recommended_threshold,
+            store_predictions=False,
+        )
         current_df = current.df
-        current_profile = self._feature_profile_from_df(current_df) if not current_df.empty else {}
+        current_profile = (
+            self._feature_profile_from_df(current_df, self.scoring_feature_names)
+            if not current_df.empty
+            else {}
+        )
 
         drift = self._compute_feature_drift(train_profile, current_profile) if train_profile else {
             "average_z_shift": 0.0,
@@ -666,6 +999,20 @@ class ChurnPredictor:
             "medium_drift_features": 0,
             "features": [],
         }
+
+        dq_report = metrics.get("dq_report") or {}
+        pct_billing_failures_zero = dq_report.get("pct_billing_failures_zero")
+        pct_days_since_first_charge_999 = dq_report.get("pct_days_since_first_charge_999")
+        billing_warnings: list[str] = []
+        if pct_billing_failures_zero is not None and float(pct_billing_failures_zero) > 95.0:
+            billing_warnings.append("billing_failures_30d mostly zero")
+        if pct_days_since_first_charge_999 is not None and float(pct_days_since_first_charge_999) > 90.0:
+            billing_warnings.append("days_since_first_charge mostly 999")
+
+        if dq_report:
+            billing_status = "degraded" if billing_warnings else "healthy"
+        else:
+            billing_status = "unknown"
 
         trained_at_raw = metrics.get("trained_at")
         trained_at = pd.to_datetime(trained_at_raw, utc=True) if trained_at_raw else pd.Timestamp.now(tz="UTC")
@@ -693,15 +1040,30 @@ class ChurnPredictor:
             "protocol": {
                 "version": protocol.get("version") or "churn-governance-v1",
                 "evaluation_split": protocol.get("evaluation_split") or "stratified train_test_split(test_size=0.2, random_state=42)",
-                "default_decision_threshold": float(protocol.get("default_decision_threshold") or 0.4),
+                "default_decision_threshold": float(protocol.get("default_decision_threshold") or self.default_threshold),
                 "recalibration_cadence_days": cadence,
             },
+            "risk_policy": {
+                "recommended_threshold": float(recommended_threshold),
+                "selection_metric": ((gov.get("risk_policy") or {}).get("selection_metric") or "f1"),
+            },
+            "recommended_threshold": float(recommended_threshold),
+            "churn_precision": float(metrics.get("precision") or 0.0),
+            "churn_recall": float(metrics.get("recall") or 0.0),
+            "f1_score": float(metrics.get("f1_score") or 0.0),
             "calibration": {
                 "brier_score": calibration.get("brier_score"),
                 "ece": calibration.get("ece"),
                 "bins": calibration.get("bins") or [],
             },
             "drift": drift,
+            "billing_signal_health": {
+                "status": billing_status,
+                "pct_billing_failures_zero": pct_billing_failures_zero,
+                "pct_days_since_first_charge_999": pct_days_since_first_charge_999,
+                "warnings": billing_warnings,
+            },
+            "learning_curve": metrics.get("learning_curve", []),
             "scored_population": int(current_df["user_id"].nunique()) if not current_df.empty and "user_id" in current_df.columns else 0,
             "recommendations": [
                 "Review high-drift features and upstream data contracts before retraining.",

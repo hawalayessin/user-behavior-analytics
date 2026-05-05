@@ -29,6 +29,7 @@ import AppLayout from "../../components/layout/AppLayout";
 import FilterBar from "../../components/dashboard/FilterBar";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 import { useAnomalies } from "../../hooks/useAnomalies";
+import { useAuth } from "../../context/AuthContext";
 
 const THEME = {
   cardBg: "var(--color-bg-card)",
@@ -186,6 +187,8 @@ function TimelineTooltip({ active, payload, label }) {
 }
 
 export default function AnomalyDetectionPage() {
+  const { isAdmin } = useAuth();
+  const canExecuteModel = isAdmin();
   const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS);
   const [showAutoRefresh, setShowAutoRefresh] = useState(true);
   const [expandedInsight, setExpandedInsight] = useState(null);
@@ -211,6 +214,7 @@ export default function AnomalyDetectionPage() {
     insightsLoading,
     runDetectionLoading,
     runDetection,
+    detectionJob,
   } = useAnomalies({
     filters,
     severity: selectedSeverity,
@@ -294,12 +298,58 @@ export default function AnomalyDetectionPage() {
   );
 
   const handleRunDetection = async () => {
+    if (!canExecuteModel) return;
     try {
       await runDetection();
     } catch {
       // section-level error is already handled by hook reloads
     }
   };
+
+  const handleExportReport = () => {
+    const esc = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`
+    const lines = []
+    lines.push("section,key,value")
+    lines.push(`summary,anomalies_detected,${esc(summary?.anomalies_detected ?? 0)}`)
+    lines.push(`summary,critical_alerts,${esc(summary?.critical_alerts ?? 0)}`)
+    lines.push(`summary,unresolved,${esc(summary?.unresolved ?? 0)}`)
+    lines.push(`summary,most_affected_service,${esc(summary?.most_affected_service?.name ?? "N/A")}`)
+    lines.push(`summary,most_affected_count,${esc(summary?.most_affected_service?.anomaly_count ?? 0)}`)
+    lines.push(`summary,last_run_at,${esc(summary?.last_detection?.run_at ?? "")}`)
+    lines.push(`summary,next_run,${esc(summary?.last_detection?.next_run ?? "")}`)
+    lines.push(`summary,trend_vs_previous,${esc(summary?.trend_vs_previous ?? 0)}`)
+    lines.push("")
+    lines.push("details,id,severity,detection_date,service_name,metric,observed_value,expected_value,z_score,direction,status,anomaly_type,churn_rate_overflow")
+    ;(details?.items ?? []).forEach((row) => {
+      lines.push(
+        [
+          "details",
+          esc(row.id),
+          esc(row.severity),
+          esc(row.detection_date),
+          esc(row.service_name),
+          esc(row.metric),
+          esc(row.observed_value),
+          esc(row.expected_value),
+          esc(row.z_score),
+          esc(row.direction),
+          esc(row.status),
+          esc(row.anomaly_type),
+          esc(row.churn_rate_overflow ?? false),
+        ].join(","),
+      )
+    })
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `anomaly_report_${new Date().toISOString().split("T")[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <AppLayout pageTitle="Anomaly Detection — AI">
@@ -323,16 +373,19 @@ export default function AnomalyDetectionPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {canExecuteModel && (
+              <button
+                onClick={handleRunDetection}
+                disabled={runDetectionLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition disabled:opacity-60"
+                style={{ backgroundColor: THEME.primary }}
+              >
+                <Play size={16} />
+                {runDetectionLoading ? "Running..." : "Run Detection"}
+              </button>
+            )}
             <button
-              onClick={handleRunDetection}
-              disabled={runDetectionLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition disabled:opacity-60"
-              style={{ backgroundColor: THEME.primary }}
-            >
-              <Play size={16} />
-              {runDetectionLoading ? "Running..." : "Run Detection"}
-            </button>
-            <button
+              onClick={handleExportReport}
               className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium border transition"
               style={{
                 borderColor: THEME.border,
@@ -369,6 +422,46 @@ export default function AnomalyDetectionPage() {
           defaultPeriod="all"
           appliedFilters={filters}
         />
+
+        {canExecuteModel && detectionJob && (
+          <div
+            className="p-6 rounded-lg border"
+            style={{ backgroundColor: THEME.cardBg, borderColor: THEME.border }}
+          >
+            <h2 className="text-lg font-bold mb-1" style={{ color: THEME.text }}>
+              Training live logs
+            </h2>
+            <p className="text-sm mb-4" style={{ color: "var(--color-text-muted)" }}>
+              Status: {detectionJob.status}
+            </p>
+            <div
+              className="max-h-56 overflow-auto rounded-lg p-3"
+              style={{
+                border: `1px solid ${THEME.border}`,
+                backgroundColor: "#0B0D12",
+              }}
+            >
+              <div className="space-y-2 text-xs font-mono">
+                {(detectionJob.logs ?? []).map((l, idx) => (
+                  <div key={`${l.ts}-${idx}`} style={{ color: "#cbd5e1" }}>
+                    <span style={{ color: "#64748b", marginRight: 8 }}>
+                      [{new Date(l.ts).toLocaleTimeString()}]
+                    </span>
+                    <span>{l.message}</span>
+                    {Object.entries(l)
+                      .filter(([k]) => !["ts", "message"].includes(k))
+                      .map(([k, v]) => (
+                        <span key={k} style={{ color: "#94a3b8" }}>
+                          {" "}
+                          {k}={String(v)}
+                        </span>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div

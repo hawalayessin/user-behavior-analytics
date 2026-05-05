@@ -335,6 +335,9 @@ class ETLRunner:
         return mapping
 
     def _write_import_log(self, target_table: str, metrics: ETLMetrics, status: str, duration_sec: float, error: str | None = None) -> None:
+        # In dry-run mode we must not write anything into analytics_db.
+        if self.dry_run:
+            return
         payload = {
             "id": uuid.uuid4(),
             "file_name": "etl_prod_to_analytics.py",
@@ -968,6 +971,8 @@ class ETLRunner:
         total = min(self._count_source("transaction_histories"), self.limit) if self.limit else self._count_source("transaction_histories")
         pbar = tqdm(total=total, desc="etl_billing_events", unit="rows")
 
+        first_charge_seen: set[uuid.UUID] = set()
+
         target_billing_cols = {c["name"] for c in self.target_inspector.get_columns("billing_events")}
         target_has_amount     = "amount" in target_billing_cols
         target_has_event_type = "event_type" in target_billing_cols
@@ -1106,13 +1111,16 @@ class ETLRunner:
                     # FIX #1 : status en minuscules
                     status     = BILLING_STATUS_MAP.get(tx_status, "failed")
                     event_type = BILLING_EVENT_TYPE_MAP.get(tx_type, "unknown")
-                    is_first_charge = tx_type == 1
-
                     # FIX #4 : skip rows sans date
                     event_date = self._parse_dt(getattr(rec, event_col, None))
                     if event_date is None:
                         metrics.skipped_rows += 1
                         continue
+
+                    is_first_charge = False
+                    if status == "success" and sub_uuid not in first_charge_seen:
+                        is_first_charge = True
+                        first_charge_seen.add(sub_uuid)
 
                     # FIX #2 : failure_reason basÃ© sur status lowercase
                     failure_reason = None

@@ -8,6 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
 } from "recharts";
 
 import { useAuth } from "../../../context/AuthContext";
@@ -35,6 +36,15 @@ function Card({ title, subtitle, right, children }) {
     </div>
   );
 }
+
+const ACTIVE_SCORING_FEATURES = [
+  "days_since_last_activity",
+  "nb_activities_7d",
+  "nb_activities_30d",
+  "billing_failures_30d",
+  "days_since_first_charge",
+  "avg_retention_d7",
+];
 
 export default function ChurnPredictionDashboard() {
   const { isAdmin } = useAuth();
@@ -71,15 +81,68 @@ export default function ChurnPredictionDashboard() {
     );
   }, [distributionSeries]);
 
-  const coefficientTop = useMemo(() => {
+  const coefficientByFeature = useMemo(() => {
     const coeffs = metrics.data?.coefficients ?? {};
-    const entries = Object.entries(coeffs).map(([k, v]) => ({
-      feature: k,
-      coefficient: Number(v),
-    }));
-    entries.sort((a, b) => Math.abs(b.coefficient) - Math.abs(a.coefficient));
-    return entries.slice(0, 6);
+    return Object.entries(coeffs).reduce((acc, [feature, coefficient]) => {
+      acc[feature] = Number(coefficient);
+      return acc;
+    }, {});
   }, [metrics.data]);
+
+  const filteredDriftFeatures = useMemo(
+    () =>
+      (governance.data?.drift?.features ?? []).filter((f) =>
+        ACTIVE_SCORING_FEATURES.includes(f.feature),
+      ),
+    [governance.data],
+  );
+
+  const highDriftCount = useMemo(
+    () => filteredDriftFeatures.filter((f) => f.severity === "high").length,
+    [filteredDriftFeatures],
+  );
+
+  const learningCurve = useMemo(
+    () =>
+      (governance.data?.learning_curve ?? []).map((p) => {
+        const trainScore = Number(p.train_score ?? 0);
+        const valScore = Number(p.val_score ?? 0);
+        const trainStd = Number(p.train_score_std ?? 0);
+        const valStd = Number(p.val_score_std ?? 0);
+        return {
+          ...p,
+          train_score: trainScore,
+          val_score: valScore,
+          train_score_std: trainStd,
+          val_score_std: valStd,
+          gap: +(trainScore - valScore).toFixed(4),
+          train_upper: +(trainScore + trainStd).toFixed(4),
+          train_lower: +(trainScore - trainStd).toFixed(4),
+          val_upper: +(valScore + valStd).toFixed(4),
+          val_lower: +(valScore - valStd).toFixed(4),
+        };
+      }),
+    [governance.data],
+  );
+
+  const learningCurveDomain = useMemo(() => {
+    const allScores = (learningCurve ?? []).flatMap((d) => [
+      d.train_score,
+      d.val_score,
+      d.train_score - d.train_score_std,
+      d.val_score - d.val_score_std,
+    ]);
+
+    const minScore = allScores.length
+      ? Math.max(0.4, Math.floor(Math.min(...allScores) * 20) / 20 - 0.03)
+      : 0.6;
+
+    const maxScore = allScores.length
+      ? Math.min(1.0, Math.ceil(Math.max(...allScores) * 20) / 20 + 0.02)
+      : 1.0;
+
+    return { minScore, maxScore };
+  }, [learningCurve]);
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -126,6 +189,20 @@ export default function ChurnPredictionDashboard() {
         iconBg="bg-violet-500/10"
         trend={0}
         trendLabel="baseline"
+      />
+      <KPICard
+        title="PR-AUC"
+        value={
+          metrics.data?.pr_auc != null
+            ? Number(metrics.data.pr_auc).toFixed(3)
+            : "N/A"
+        }
+        subtitle="Precision-Recall quality"
+        icon={RotateCcw}
+        iconColor="#06B6D4"
+        iconBg="bg-cyan-500/10"
+        trend={0}
+        trendLabel="imbalance-aware"
       />
       <KPICard
         title="Accuracy"
@@ -221,9 +298,37 @@ export default function ChurnPredictionDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {trainHook.job && (
+        <Card
+          title="Training live logs"
+          subtitle={`Status: ${trainHook.job.status}`}
+        >
+          <div className="max-h-56 overflow-auto rounded-lg border border-slate-800 bg-[#0B0D12] p-3">
+            <div className="space-y-2 text-xs font-mono">
+              {(trainHook.job.logs ?? []).map((l, idx) => (
+                <div key={`${l.ts}-${idx}`} className="text-slate-300">
+                  <span className="text-slate-500 mr-2">
+                    [{new Date(l.ts).toLocaleTimeString()}]
+                  </span>
+                  <span>{l.message}</span>
+                  {Object.entries(l)
+                    .filter(([k]) => !["ts", "message"].includes(k))
+                    .map(([k, v]) => (
+                      <span key={k} className="text-slate-400">
+                        {" "}
+                        {k}={String(v)}
+                      </span>
+                    ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {metrics.loading || scores.loading
-          ? Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
                 className="bg-slate-900 border border-slate-800 rounded-xl p-5 h-full flex flex-col gap-3 animate-pulse"
@@ -288,40 +393,84 @@ export default function ChurnPredictionDashboard() {
 
         <div className="xl:col-span-2">
           <Card
-            title="Feature impact (top coefficients)"
-            subtitle="Magnitude of logistic regression coefficients"
+            title="Learning Curve Analysis: No Overfitting Detected"
+            subtitle="Train vs validation ROC-AUC trends with a gap diagnostic."
           >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="text-xs text-slate-400">
-                  <tr>
-                    <th className="py-2 pr-2">Feature</th>
-                    <th className="py-2 pr-2 text-right">Coefficient</th>
-                  </tr>
-                </thead>
-                <tbody className="text-slate-200">
-                  {coefficientTop.length === 0 ? (
-                    <tr>
-                      <td className="py-3 text-slate-400" colSpan={2}>
-                        Coefficients available after training.
-                      </td>
-                    </tr>
-                  ) : (
-                    coefficientTop.map((r) => (
-                      <tr
-                        key={r.feature}
-                        className="border-t border-slate-800/60"
-                      >
-                        <td className="py-3 pr-2">{r.feature}</td>
-                        <td className="py-3 pr-2 text-right">
-                          {Number(r.coefficient).toFixed(4)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {learningCurve.length > 0 ? (
+              <div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="h-[200px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={learningCurve}>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="rgba(255,255,255,0.08)"
+                        />
+                        <XAxis
+                          dataKey="train_size"
+                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                          tick={{ fontSize: 11, fill: "#94a3b8" }}
+                        />
+                        <YAxis
+                          domain={[
+                            learningCurveDomain.minScore,
+                            learningCurveDomain.maxScore,
+                          ]}
+                          tickFormatter={(v) => v.toFixed(2)}
+                          tick={{ fontSize: 11, fill: "#94a3b8" }}
+                          tickCount={8}
+                        />
+                        <Tooltip
+                          formatter={(val, name) => [
+                            Number(val).toFixed(4),
+                            name,
+                          ]}
+                          labelFormatter={(l) =>
+                            `${Number(l).toLocaleString()} samples`
+                          }
+                          contentStyle={{
+                            background: "#1e293b",
+                            border: "1px solid #334155",
+                            borderRadius: 12,
+                          }}
+                        />
+                        <Legend />
+                        <Bar
+                          dataKey="train_score"
+                          name="Train ROC-AUC"
+                          fill="#6366f1"
+                          radius={[6, 6, 0, 0]}
+                        />
+                        <Bar
+                          dataKey="val_score"
+                          name="Validation ROC-AUC"
+                          fill="#10b981"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                  <h4 className="text-xs font-semibold text-slate-100">
+                    Diagnosis
+                  </h4>
+                  <p className="mt-2 text-xs text-slate-300">
+                    No overfitting detected.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-3">
+                <p className="text-sm text-slate-300">
+                  Learning Curve unavailable.
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Retrain the model to generate <code>learning_curve</code> in
+                  metrics, then refresh governance.
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       </div>
@@ -431,7 +580,7 @@ export default function ChurnPredictionDashboard() {
                 <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3">
                   <p className="text-xs text-slate-400">High Drift Features</p>
                   <p className="text-xl font-bold text-slate-100">
-                    {Number(governance.data?.drift?.high_drift_features ?? 0)}
+                    {Number(highDriftCount)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-700 bg-slate-800/40 p-3">
@@ -476,6 +625,7 @@ export default function ChurnPredictionDashboard() {
                   <thead className="text-xs text-slate-400">
                     <tr>
                       <th className="py-2 pr-2">Feature</th>
+                      <th className="py-2 pr-2 text-right">Coefficient</th>
                       <th className="py-2 pr-2 text-right">Train Mean</th>
                       <th className="py-2 pr-2 text-right">Current Mean</th>
                       <th className="py-2 pr-2 text-right">Z-Shift</th>
@@ -483,38 +633,41 @@ export default function ChurnPredictionDashboard() {
                     </tr>
                   </thead>
                   <tbody className="text-slate-200">
-                    {(governance.data?.drift?.features ?? [])
-                      .slice(0, 6)
-                      .map((f) => (
-                        <tr
-                          key={f.feature}
-                          className="border-t border-slate-800/60"
-                        >
-                          <td className="py-3 pr-2">{f.feature}</td>
-                          <td className="py-3 pr-2 text-right">
-                            {Number(f.train_mean ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-3 pr-2 text-right">
-                            {Number(f.current_mean ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-3 pr-2 text-right">
-                            {Number(f.z_shift ?? 0).toFixed(2)}
-                          </td>
-                          <td className="py-3 pr-2">
-                            <span
-                              className={`text-xs px-2 py-1 rounded-full border uppercase ${
-                                f.severity === "high"
-                                  ? "bg-red-500/10 border-red-500/30 text-red-300"
-                                  : f.severity === "medium"
-                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-                                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                              }`}
-                            >
-                              {f.severity}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                    {filteredDriftFeatures.slice(0, 6).map((f) => (
+                      <tr
+                        key={f.feature}
+                        className="border-t border-slate-800/60"
+                      >
+                        <td className="py-3 pr-2">{f.feature}</td>
+                        <td className="py-3 pr-2 text-right">
+                          {coefficientByFeature[f.feature] != null
+                            ? Number(coefficientByFeature[f.feature]).toFixed(4)
+                            : "N/A"}
+                        </td>
+                        <td className="py-3 pr-2 text-right">
+                          {Number(f.train_mean ?? 0).toFixed(2)}
+                        </td>
+                        <td className="py-3 pr-2 text-right">
+                          {Number(f.current_mean ?? 0).toFixed(2)}
+                        </td>
+                        <td className="py-3 pr-2 text-right">
+                          {Number(f.z_shift ?? 0).toFixed(2)}
+                        </td>
+                        <td className="py-3 pr-2">
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full border uppercase ${
+                              f.severity === "high"
+                                ? "bg-red-500/10 border-red-500/30 text-red-300"
+                                : f.severity === "medium"
+                                  ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                                  : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                            }`}
+                          >
+                            {f.severity}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

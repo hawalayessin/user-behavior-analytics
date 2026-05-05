@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Optional
+import threading
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
@@ -21,6 +23,7 @@ from app.schemas.ml_churn import (
 
 
 router = APIRouter(prefix="/ml/churn", tags=["AI Churn Prediction"])
+_train_jobs: dict[str, dict[str, Any]] = {}
 
 
 def _ensure_scores_cache_table(db: Session) -> None:
@@ -166,6 +169,73 @@ def train_churn_model(
     return metrics
 
 
+@router.post("/train/start")
+def start_churn_training_job(
+    _: Any = Depends(require_admin),
+):
+    active = [j for j in _train_jobs.values() if j.get("status") == "running"]
+    if active:
+        raise HTTPException(status_code=409, detail="A churn training job is already running.")
+
+    job_id = str(uuid.uuid4())
+    _train_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "running",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "logs": [{"ts": datetime.now(timezone.utc).isoformat(), "message": "Training job started"}],
+        "metrics": None,
+        "error": None,
+    }
+
+    t = threading.Thread(target=_run_churn_training_job, args=(job_id,), daemon=True)
+    t.start()
+    return {"job_id": job_id, "status": "running"}
+
+
+@router.get("/train/{job_id}/status")
+def get_churn_training_job_status(
+    job_id: str,
+    _: Any = Depends(require_admin),
+):
+    job = _train_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Training job not found.")
+    return job
+
+
+def _run_churn_training_job(job_id: str) -> None:
+    from app.core.database import SessionLocal
+
+    job = _train_jobs[job_id]
+    db = SessionLocal()
+
+    def log_step(message: str, **extra: Any) -> None:
+        payload = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "message": message,
+            **extra,
+        }
+        job["logs"].append(payload)
+        if len(job["logs"]) > 200:
+            job["logs"] = job["logs"][-200:]
+
+    try:
+        predictor = ChurnPredictor()
+        metrics = predictor.train(db, progress_callback=log_step)
+        job["metrics"] = metrics
+        job["status"] = "success"
+        job["completed_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception as e:
+        detail = str(e)
+        log_step("Training failed", error=detail)
+        job["status"] = "failed"
+        job["error"] = detail
+        job["completed_at"] = datetime.now(timezone.utc).isoformat()
+    finally:
+        db.close()
+
+
 @router.get("/metrics")
 def get_churn_model_metrics():
     predictor = ChurnPredictor()
@@ -179,7 +249,7 @@ def get_churn_model_metrics():
 def get_churn_model_governance(
     db: Session = Depends(get_db),
 ):
-    cache_key = build_cache_key("ml:churn:governance", {"v": "governance-v1"})
+    cache_key = build_cache_key("ml:churn:governance", {"v": "governance-v2"})
 
     def _compute() -> dict[str, Any]:
         predictor = ChurnPredictor()
@@ -201,7 +271,7 @@ def get_churn_model_governance(
 def get_churn_scores(
     db: Session = Depends(get_db),
     top: int = Query(default=10, ge=1, le=200),
-    threshold: float = Query(default=0.4, ge=0.0, le=1.0),
+    threshold: float | None = Query(default=None, ge=0.0, le=1.0),
     store: bool = Query(default=False, description="Store predictions into SQL table churn_predictions."),
     use_cached: bool = Query(default=True, description="Read precomputed scores from churn_scores_cache when available."),
     start_date: str | None = Query(default=None),
@@ -257,7 +327,7 @@ def _compute_churn_scores(
     db: Session,
     *,
     top: int,
-    threshold: float,
+    threshold: float | None,
     store: bool,
     use_cached: bool,
     service_id: str | None = None,
@@ -265,16 +335,19 @@ def _compute_churn_scores(
     end_date: str | None = None,
 ) -> ChurnScoresResponse:
     if use_cached:
-        cached_snapshot = _read_scores_snapshot(db, top=top, threshold=threshold)
+        predictor_for_threshold = ChurnPredictor()
+        resolved_threshold = predictor_for_threshold._resolve_threshold(threshold)
+        cached_snapshot = _read_scores_snapshot(db, top=top, threshold=resolved_threshold)
         if cached_snapshot is not None:
             return cached_snapshot
 
     predictor = ChurnPredictor()
+    resolved_threshold = predictor._resolve_threshold(threshold)
 
     try:
         result = predictor.predict_active_subscriptions(
             db,
-            threshold=threshold,
+            threshold=resolved_threshold,
             store_predictions=store,
             service_id=service_id,
             start_date=start_date,
@@ -290,7 +363,7 @@ def _compute_churn_scores(
         now = datetime.now(timezone.utc).isoformat()
         return ChurnScoresResponse(
             generated_at=now,
-            threshold=threshold,
+            threshold=resolved_threshold,
             distribution=[
                 {"risk_category": "Low", "count": 0},
                 {"risk_category": "Medium", "count": 0},
@@ -306,7 +379,7 @@ def _compute_churn_scores(
     df_user["user_id"] = df_user["user_id"].astype(str)
 
     if store:
-        _store_scores_snapshot(db, df_user, threshold=threshold)
+        _store_scores_snapshot(db, df_user, threshold=resolved_threshold)
 
     distribution_dict = df_user["risk_category"].value_counts().to_dict()
     distribution = [
@@ -317,7 +390,7 @@ def _compute_churn_scores(
 
     # "Top risky users" should honor the selected risk threshold.
     top_df = (
-        df_user[df_user["churn_risk"] >= threshold]
+        df_user[df_user["churn_risk"] >= resolved_threshold]
         .sort_values("churn_risk", ascending=False)
         .head(top)
     )
@@ -336,7 +409,7 @@ def _compute_churn_scores(
 
     return ChurnScoresResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
-        threshold=threshold,
+        threshold=resolved_threshold,
         distribution=distribution,
         top_users=top_users,
         active_users_scored=int(df_user["user_id"].nunique()),
@@ -347,12 +420,13 @@ def _compute_churn_scores(
 def recompute_scores_snapshot(
     db: Session = Depends(get_db),
     _: Any = Depends(require_admin),
-    threshold: float = Query(default=0.4, ge=0.0, le=1.0),
+    threshold: float | None = Query(default=None, ge=0.0, le=1.0),
 ):
     predictor = ChurnPredictor()
+    resolved_threshold = predictor._resolve_threshold(threshold)
     result = predictor.predict_active_subscriptions(
         db,
-        threshold=threshold,
+        threshold=resolved_threshold,
         store_predictions=False,
     )
     df = result.df
@@ -362,7 +436,7 @@ def recompute_scores_snapshot(
         db.commit()
         return ChurnScoresResponse(
             generated_at=datetime.now(timezone.utc).isoformat(),
-            threshold=threshold,
+            threshold=resolved_threshold,
             distribution=[
                 {"risk_category": "Low", "count": 0},
                 {"risk_category": "Medium", "count": 0},
@@ -375,9 +449,9 @@ def recompute_scores_snapshot(
     df_sorted = df.sort_values(["user_id", "churn_risk"], ascending=[True, False])
     df_user = df_sorted.groupby("user_id").head(1).copy()
     df_user["user_id"] = df_user["user_id"].astype(str)
-    _store_scores_snapshot(db, df_user, threshold=threshold)
+    _store_scores_snapshot(db, df_user, threshold=resolved_threshold)
 
-    snapshot = _read_scores_snapshot(db, top=10, threshold=threshold)
+    snapshot = _read_scores_snapshot(db, top=10, threshold=resolved_threshold)
     if snapshot is None:
         raise HTTPException(status_code=500, detail="Failed to read churn scores snapshot after recompute")
     return snapshot

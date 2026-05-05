@@ -9,6 +9,7 @@ from typing import Optional
 from app.core.database import get_db
 from app.core.cache import cache_invalidate_prefix, cached_endpoint
 from app.core.config import settings
+from app.core.dependencies import require_admin
 from app.services import segmentation_service
 from app.schemas.segmentation import (
     KPIResponse,
@@ -19,7 +20,7 @@ from app.schemas.segmentation import (
 
 router = APIRouter(prefix="/analytics/segmentation", tags=["Segmentation"])
 
-SEGMENTATION_CACHE_VERSION = "2026-04-16-v3-segmentation-population-fix"
+SEGMENTATION_CACHE_VERSION = "2026-05-05-v5-segmentation-activity-30d"
 
 
 def _segmentation_cache_payload(
@@ -160,6 +161,7 @@ def train_model(
     end_date: Optional[str] = Query(None),
     service_id: Optional[str] = Query(None),
     db: Session = Depends(get_db),
+    _admin = Depends(require_admin),
 ):
     """
     Recalculate the segmentation model using current data.
@@ -171,21 +173,33 @@ def train_model(
     - status: "success" or "error"
     - message: Descriptive message about training
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     start = None
     end = None
     
     if start_date:
         try:
             start = datetime.fromisoformat(start_date)
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to parse start_date '{start_date}': {e}")
             pass
     
     if end_date:
         try:
             end = datetime.fromisoformat(end_date)
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to parse end_date '{end_date}': {e}")
             pass
     
-    result = segmentation_service.train_segmentation_model(db, start, end, service_id)
-    cache_invalidate_prefix("analytics:v2:segmentation_")
-    return result
+    try:
+        result = segmentation_service.train_segmentation_model(db, start, end, service_id)
+        cache_invalidate_prefix("analytics:v2:segmentation_")
+        return result
+    except Exception as e:
+        logger.error(f"Segmentation training failed: {type(e).__name__}: {str(e)}", exc_info=True)
+        return {
+            "status": "error",
+            "message": f"Training failed: {str(e)[:200]}"
+        }

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     CAMPAIGN_CACHE_TTL_SECONDS: int = 86400
     ML_SCORES_CACHE_TTL_SECONDS: int = 86400
     ML_METRICS_CACHE_TTL_SECONDS: int = 86400
+    SEGMENTATION_SQL_TIMEOUT_MS: int = 180000
     CACHE_LOCK_TTL_SECONDS: int = 30
     CACHE_LOCK_WAIT_MS: int = 1200
     CACHE_LOCK_POLL_INTERVAL_MS: int = 80
@@ -60,4 +61,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

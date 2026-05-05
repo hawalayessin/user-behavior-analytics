@@ -322,3 +322,19 @@ html.light .hover\:text-white:hover {
   transform: translate(-50%, -50%);
   box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.5);
 }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}

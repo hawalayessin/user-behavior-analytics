@@ -24,7 +24,7 @@ from app.routers import campaign_upload
 from app.routers import ml_churn
 from app.routers import cross_service
 from app.routers import segmentation
-from app.routers import anomalies
+from ml_models import anomalies
 from app.routers import nrr
 from app.routers import notes
 

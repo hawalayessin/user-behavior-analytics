@@ -11,6 +11,8 @@ export default function SubscribersPage() {
   const kpiAtRisk = loading ? "..." : kpis.atRiskUsers.toLocaleString();
   const kpiLoyalty = loading ? "..." : `${kpis.loyaltyScoreAvg.toFixed(1)}%`;
   const kpiArpu = loading ? "..." : kpis.arpuTnd.toFixed(2);
+  const kpiUssd = loading ? "..." : kpis.channelUssd.toLocaleString();
+  const kpiWeb = loading ? "..." : kpis.channelWeb.toLocaleString();
 
   return (
     <AppLayout pageTitle="Abonnés">
@@ -27,7 +29,7 @@ export default function SubscribersPage() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-6">
           {/* New Subscriptions */}
           <div className="p-6 bg-slate-800 border border-slate-700 rounded-xl relative overflow-hidden group hover:border-slate-600 transition">
             <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
@@ -47,6 +49,50 @@ export default function SubscribersPage() {
             </div>
             <div className="text-xs text-slate-400 font-medium">
               Last 30 days (backend)
+            </div>
+          </div>
+
+          {/* USSD Activations */}
+          <div className="p-6 bg-slate-800 border border-slate-700 rounded-xl relative overflow-hidden group hover:border-slate-600 transition">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
+              <svg
+                className="w-[100px] h-[100px]"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14z" />
+              </svg>
+            </div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+              USSD Activations
+            </div>
+            <div className="text-3xl font-black text-slate-100 mb-2">
+              {kpiUssd}
+            </div>
+            <div className="text-xs text-slate-400 font-medium">
+              All-time user activation channel
+            </div>
+          </div>
+
+          {/* Web Activations */}
+          <div className="p-6 bg-slate-800 border border-slate-700 rounded-xl relative overflow-hidden group hover:border-slate-600 transition">
+            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
+              <svg
+                className="w-[100px] h-[100px]"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 5h16v10H4V5zm0 12h16v2H4v-2z" />
+              </svg>
+            </div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+              Web Activations
+            </div>
+            <div className="text-3xl font-black text-slate-100 mb-2">
+              {kpiWeb}
+            </div>
+            <div className="text-xs text-slate-400 font-medium">
+              All-time user activation channel
             </div>
           </div>
 

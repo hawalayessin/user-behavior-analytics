@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
 from sqlalchemy.orm import Session
 import secrets
 import os
@@ -35,6 +35,13 @@ from app.schemas.auth import (
 from app.utils.email import send_password_reset_email, send_invite_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+_invite_claims: dict[str, str] = {}
+
+
+def _invite_fingerprint(request: Request) -> str:
+    ua = request.headers.get("user-agent", "")
+    lang = request.headers.get("accept-language", "")
+    return f"{ua}|{lang}"
 
 
 # ─── POST /auth/register ──────────────────────────────────
@@ -221,9 +228,13 @@ def invite_user(
 
     invite_link = f"{settings.FRONTEND_BASE_URL.rstrip('/')}/register?token={token}"
     if not send_invite_email(payload.email, invite_link):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send invitation email.",
+        if settings.SMTP_STRICT_DELIVERY:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send invitation email.",
+            )
+        return MessageResponse(
+            message="Invitation created, but email delivery failed. Share the invite link from backend logs (DEV MODE)."
         )
 
     return MessageResponse(message="Invitation sent.")
@@ -235,7 +246,11 @@ def invite_user(
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def register_invite(payload: RegisterInviteRequest, db: Session = Depends(get_db)):
+def register_invite(
+    payload: RegisterInviteRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     invite = (
         db.query(PlatformUserInvite)
         .filter(
@@ -257,6 +272,13 @@ def register_invite(payload: RegisterInviteRequest, db: Session = Depends(get_db
             detail="Invitation expirée.",
         )
 
+    fingerprint = _invite_fingerprint(request)
+    claimed_by = _invite_claims.get(payload.token)
+    if claimed_by and claimed_by != fingerprint:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized browser for this invitation token.",
+        )
     existing = db.query(PlatformUser).filter(PlatformUser.email == invite.email).first()
     if existing:
         raise HTTPException(
@@ -274,6 +296,7 @@ def register_invite(payload: RegisterInviteRequest, db: Session = Depends(get_db
     )
 
     invite.used_at = datetime.now(timezone.utc)
+    _invite_claims.pop(payload.token, None)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -282,6 +305,50 @@ def register_invite(payload: RegisterInviteRequest, db: Session = Depends(get_db
 
 
 # ─── POST /auth/login ─────────────────────────────────────
+
+@router.post(
+    "/register-invite/verify",
+    response_model=TokenValidationResponse,
+    status_code=status.HTTP_200_OK,
+)
+def verify_register_invite_token(
+    payload: VerifyResetTokenRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    invite = (
+        db.query(PlatformUserInvite)
+        .filter(
+            PlatformUserInvite.token == payload.token,
+            PlatformUserInvite.used_at.is_(None),
+        )
+        .first()
+    )
+
+    if not invite:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation invalid or already used.",
+        )
+
+    if datetime.now(timezone.utc) > invite.expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitation expired.",
+        )
+
+    fingerprint = _invite_fingerprint(request)
+    claimed_by = _invite_claims.get(payload.token)
+    if claimed_by and claimed_by != fingerprint:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized browser for this invitation token.",
+        )
+
+    _invite_claims[payload.token] = fingerprint
+    return TokenValidationResponse(valid=True)
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
@@ -442,3 +509,5 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     db.commit()
 
     return MessageResponse(message="Mot de passe modifié avec succès.")
+
+

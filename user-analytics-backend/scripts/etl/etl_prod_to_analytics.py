@@ -49,6 +49,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+PLAIN_LOGGING = os.getenv("ETL_LOG_PLAIN") == "1"
+
 
 USER_NS        = uuid.UUID("11111111-1111-1111-1111-111111111111")
 SUB_NS         = uuid.UUID("22222222-2222-2222-2222-222222222222")
@@ -125,6 +127,8 @@ class ETLRunner:
 
         self.services_by_source_id: dict[int, uuid.UUID] = {}
         self.source_service_by_subscription_type_id: dict[int, int] = {}
+        self._progress_cache: dict[str, int] = {}
+        self._progress_ts: dict[str, float] = {}
 
     # ------------------------------------------------------------------ #
     #  ORCHESTRATION                                                       #
@@ -229,6 +233,19 @@ class ETLRunner:
             **kwargs,
         }
         logging.info(json.dumps(payload, ensure_ascii=True))
+
+    def _log_progress(self, step: str, processed: int, total: int) -> None:
+        if total <= 0:
+            return
+        pct = int((processed / total) * 100)
+        last_pct = self._progress_cache.get(step)
+        now = time.time()
+        last_ts = self._progress_ts.get(step, 0.0)
+        if last_pct == pct and now - last_ts < 0.75:
+            return
+        self._progress_cache[step] = pct
+        self._progress_ts[step] = now
+        self._log("Progress", step=step, processed=processed, total=total, pct=pct)
 
     @staticmethod
     def _uuid5(namespace: uuid.UUID, value: str | int | None) -> uuid.UUID:
@@ -552,7 +569,7 @@ class ETLRunner:
             cols.append("channel")
 
         total = min(self._count_source("subscribed_clients"), self.limit) if self.limit else self._count_source("subscribed_clients")
-        pbar = tqdm(total=total, desc="etl_users", unit="rows")
+        pbar = None if PLAIN_LOGGING else tqdm(total=total, desc="etl_users", unit="rows")
 
         insert_sql = text(
             """
@@ -595,13 +612,18 @@ class ETLRunner:
                     self._with_retry(self._execute_batch, insert_sql, rows)
 
                 metrics.inserted_rows += len(rows)
-                pbar.update(len(chunk))
+                if pbar:
+                    pbar.update(len(chunk))
+                else:
+                    self._log_progress(step, metrics.read_rows, total)
 
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step, read_rows=metrics.read_rows, upserted=metrics.inserted_rows, skipped=metrics.skipped_rows)
         except Exception as exc:
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
@@ -826,7 +848,7 @@ class ETLRunner:
                 cols.append(opt_col)
 
         total = min(self._count_source("subscribed_clients"), self.limit) if self.limit else self._count_source("subscribed_clients")
-        pbar = tqdm(total=total, desc="etl_subscriptions", unit="rows")
+        pbar = None if PLAIN_LOGGING else tqdm(total=total, desc="etl_subscriptions", unit="rows")
 
         upsert_sql = text(
             """
@@ -923,9 +945,13 @@ class ETLRunner:
                     self._with_retry(self._execute_batch, upsert_sql, rows)
 
                 metrics.inserted_rows += len(rows)
-                pbar.update(len(chunk))
+                if pbar:
+                    pbar.update(len(chunk))
+                else:
+                    self._log_progress(step, metrics.read_rows, total)
 
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log(
                 "Step done",
@@ -940,7 +966,8 @@ class ETLRunner:
                 subscription_type_map_size=len(self.source_service_by_subscription_type_id),
             )
         except Exception as exc:
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
@@ -969,7 +996,7 @@ class ETLRunner:
             cols.append(amount_col)
 
         total = min(self._count_source("transaction_histories"), self.limit) if self.limit else self._count_source("transaction_histories")
-        pbar = tqdm(total=total, desc="etl_billing_events", unit="rows")
+        pbar = None if PLAIN_LOGGING else tqdm(total=total, desc="etl_billing_events", unit="rows")
 
         first_charge_seen: set[uuid.UUID] = set()
 
@@ -1153,13 +1180,18 @@ class ETLRunner:
                     self._with_retry(self._execute_batch, upsert_sql, rows)
 
                 metrics.inserted_rows += len(rows)
-                pbar.update(len(chunk))
+                if pbar:
+                    pbar.update(len(chunk))
+                else:
+                    self._log_progress(step, metrics.read_rows, total)
 
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step, read_rows=metrics.read_rows, upserted=metrics.inserted_rows, skipped=metrics.skipped_rows)
         except Exception as exc:
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
@@ -1254,7 +1286,7 @@ class ETLRunner:
             )).scalar() or 0)
         total = min(_cnt_val, self.limit) if self.limit else _cnt_val
 
-        pbar = tqdm(total=total, desc="etl_unsubscriptions", unit="rows")
+        pbar = None if PLAIN_LOGGING else tqdm(total=total, desc="etl_unsubscriptions", unit="rows")
 
         upsert_sql = text(
             """
@@ -1319,6 +1351,7 @@ class ETLRunner:
             sub_map  = self._fetch_subscription_map(sub_ids)
 
             rows = []
+            processed = 0
             for rec in df_unsub.itertuples(index=False):
                 source_subscribed_client_id = int(getattr(rec, "subscribed_client_id"))
                 sub_uuid  = self._uuid5(SUB_NS, f"sub:{source_subscribed_client_id}")
@@ -1398,7 +1431,11 @@ class ETLRunner:
                         "last_billing_event_id": last_be_id,
                     }
                 )
-                pbar.update(1)
+                processed += 1
+                if pbar:
+                    pbar.update(1)
+                else:
+                    self._log_progress(step, processed, total)
 
                 if len(rows) >= self.batch_size and not self.dry_run:
                     self._with_retry(self._execute_batch, upsert_sql, rows)
@@ -1411,7 +1448,8 @@ class ETLRunner:
             elif self.dry_run:
                 metrics.inserted_rows += len(rows)
 
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log(
                 "Step done",
@@ -1421,7 +1459,8 @@ class ETLRunner:
                 skipped=metrics.skipped_rows,
             )
         except Exception as exc:
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
@@ -1448,7 +1487,7 @@ class ETLRunner:
             event_col = "created_at"
 
         total = min(self._count_source("transaction_histories"), self.limit) if self.limit else self._count_source("transaction_histories")
-        pbar = tqdm(total=total, desc="etl_user_activities", unit="rows")
+        pbar = None if PLAIN_LOGGING else tqdm(total=total, desc="etl_user_activities", unit="rows")
 
         upsert_sql = text(
             """
@@ -1517,13 +1556,18 @@ class ETLRunner:
                     self._with_retry(self._execute_batch, upsert_sql, rows)
 
                 metrics.inserted_rows += len(rows)
-                pbar.update(len(chunk))
+                if pbar:
+                    pbar.update(len(chunk))
+                else:
+                    self._log_progress(step, metrics.read_rows, total)
 
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log("Step done", step=step, read_rows=metrics.read_rows, upserted=metrics.inserted_rows, skipped=metrics.skipped_rows)
         except Exception as exc:
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 
@@ -1627,7 +1671,7 @@ class ETLRunner:
 
         order_col = source_id_col or event_dt_col or selected_cols[0]
         total = min(self._count_source(source_table), self.limit) if self.limit else self._count_source(source_table)
-        pbar = tqdm(total=total, desc="etl_sms_events", unit="rows")
+        pbar = None if PLAIN_LOGGING else tqdm(total=total, desc="etl_sms_events", unit="rows")
 
         payload_columns = [
             "id", "user_id", "campaign_id", "service_id", "event_datetime", "event_type", "message_content",
@@ -1639,7 +1683,8 @@ class ETLRunner:
         active_payload_cols = [c for c in payload_columns if c in target_cols]
 
         if "id" not in active_payload_cols:
-            pbar.close()
+            if pbar:
+                pbar.close()
             raise RuntimeError(f"Target table {target_table} has no 'id' column")
 
         placeholders = []
@@ -1874,9 +1919,13 @@ class ETLRunner:
                     self._with_retry(self._execute_batch, upsert_sql, rows)
 
                 metrics.inserted_rows += len(rows)
-                pbar.update(len(chunk))
+                if pbar:
+                    pbar.update(len(chunk))
+                else:
+                    self._log_progress(step, metrics.read_rows, total)
 
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "success", time.time() - started)
             self._log(
                 "Step done",
@@ -1892,7 +1941,8 @@ class ETLRunner:
                 activation_rows=activation_rows,
             )
         except Exception as exc:
-            pbar.close()
+            if pbar:
+                pbar.close()
             self._write_import_log(step, metrics, "failed", time.time() - started, str(exc))
             raise
 

@@ -11,13 +11,11 @@ import {
   Legend,
 } from "recharts";
 
-import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../hooks/useToast";
 
 import KPICard from "../KPICard";
 import { useChurnPredictionMetrics } from "../../../hooks/useChurnPredictionMetrics";
 import { useChurnPredictionScores } from "../../../hooks/useChurnPredictionScores";
-import { useChurnPredictionTrain } from "../../../hooks/useChurnPredictionTrain";
 import { useChurnModelGovernance } from "../../../hooks/useChurnModelGovernance";
 
 function Card({ title, subtitle, right, children }) {
@@ -47,7 +45,6 @@ const ACTIVE_SCORING_FEATURES = [
 ];
 
 export default function ChurnPredictionDashboard() {
-  const { isAdmin } = useAuth();
   const { showToast, Toast } = useToast();
 
   const [topN, setTopN] = useState(10);
@@ -61,7 +58,6 @@ export default function ChurnPredictionDashboard() {
 
   const metrics = useChurnPredictionMetrics();
   const scores = useChurnPredictionScores(scoresOptions);
-  const trainHook = useChurnPredictionTrain();
   const governance = useChurnModelGovernance();
 
   const anyError = metrics.error || scores.error || governance.error;
@@ -151,20 +147,6 @@ export default function ChurnPredictionDashboard() {
       governance.refetch(),
     ]);
     showToast("Churn prediction refreshed", "success");
-  };
-
-  const handleTrain = async () => {
-    try {
-      await trainHook.train();
-      showToast("Model trained successfully", "success");
-      await Promise.all([
-        metrics.refetch(),
-        scores.refetch(),
-        governance.refetch(),
-      ]);
-    } catch (e) {
-      showToast(e?.response?.data?.detail ?? "Training failed", "error");
-    }
   };
 
   const governanceStatusClass =
@@ -267,16 +249,6 @@ export default function ChurnPredictionDashboard() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {isAdmin() && (
-          <button
-            onClick={handleTrain}
-            disabled={trainHook.loading}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition disabled:opacity-60"
-          >
-            {trainHook.loading ? "Training..." : "Train model"}
-          </button>
-        )}
-
         <button
           onClick={handleRefresh}
           className="px-3 py-2 text-sm text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition"
@@ -297,34 +269,6 @@ export default function ChurnPredictionDashboard() {
           />
         </div>
       </div>
-
-      {trainHook.job && (
-        <Card
-          title="Training live logs"
-          subtitle={`Status: ${trainHook.job.status}`}
-        >
-          <div className="max-h-56 overflow-auto rounded-lg border border-slate-800 bg-[#0B0D12] p-3">
-            <div className="space-y-2 text-xs font-mono">
-              {(trainHook.job.logs ?? []).map((l, idx) => (
-                <div key={`${l.ts}-${idx}`} className="text-slate-300">
-                  <span className="text-slate-500 mr-2">
-                    [{new Date(l.ts).toLocaleTimeString()}]
-                  </span>
-                  <span>{l.message}</span>
-                  {Object.entries(l)
-                    .filter(([k]) => !["ts", "message"].includes(k))
-                    .map(([k, v]) => (
-                      <span key={k} className="text-slate-400">
-                        {" "}
-                        {k}={String(v)}
-                      </span>
-                    ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {metrics.loading || scores.loading

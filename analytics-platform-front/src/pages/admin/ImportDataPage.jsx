@@ -1,7 +1,15 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  BarChart3,
+  ClipboardList,
+  CreditCard,
   Database,
+  DoorOpen,
+  Settings,
+  Smartphone,
+  Tag,
+  Target,
   FileText,
   Upload,
   X,
@@ -9,6 +17,7 @@ import {
   Download,
   Eye,
   Info,
+  Users,
 } from "lucide-react";
 import AppLayout from "../../components/layout/AppLayout";
 import useImportData from "../../hooks/useImportData";
@@ -45,7 +54,7 @@ function ResultBox({ result }) {
         )}
         <div className="flex-1">
           <p className="text-sm font-semibold text-slate-100">
-            {ok ? "✅ Import succeeded" : "❌ Import failed"}
+            {ok ? "Import succeeded" : "Import failed"}
           </p>
           {ok && (
             <p className="text-xs text-slate-300 mt-1">
@@ -71,7 +80,7 @@ function ResultBox({ result }) {
           {!!result?.validation?.invalid_rows && (
             <div className="mt-3">
               <p className="text-xs font-semibold text-yellow-300">
-                ⚠️ Detected errors ({result.validation.invalid_rows}):
+                Detected errors ({result.validation.invalid_rows}):
               </p>
               <div className="mt-2 space-y-1 max-h-40 overflow-auto pr-1">
                 {(result.validation.errors ?? []).slice(0, 30).map((e, idx) => (
@@ -161,10 +170,11 @@ function ValidationReportModal({
               mode <span className="text-slate-200 font-semibold">{mode}</span>
             </p>
             <p className="text-sm text-slate-300 mt-3">
-              ✅ <span className="font-semibold">{valid}</span> valid rows ready
-              to import
-              {"  "}—{"  "}❌ <span className="font-semibold">{invalid}</span>{" "}
-              invalid rows detected
+              <span className="font-semibold">{valid}</span> valid rows ready to
+              import
+              {"  "}—{"  "}
+              <span className="font-semibold">{invalid}</span> invalid rows
+              detected
               {"  "}—{"  "}
               Total: <span className="font-semibold">{total}</span>
             </p>
@@ -239,8 +249,11 @@ function ETLConfigPanel({
   dryRun,
   setDryRun,
   onLaunch,
+  onStop,
   isLaunching,
   isRunning,
+  isStopping,
+  canStop,
   error,
 }) {
   return (
@@ -356,15 +369,42 @@ function ETLConfigPanel({
               value: "demo",
               label: "Demo Mode",
               desc: "Stratified sample",
-              icon: "⚡",
               color: "var(--color-info)",
+              icon: (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              ),
             },
             {
               value: "prod",
               label: "Production Mode",
               desc: "Full dataset",
-              icon: "🗄️",
               color: "var(--color-warning)",
+              icon: (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <ellipse cx="12" cy="5" rx="9" ry="3" />
+                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                </svg>
+              ),
             },
           ].map((opt) => (
             <div
@@ -375,7 +415,9 @@ function ETLConfigPanel({
                 padding: "14px 16px",
                 borderRadius: "10px",
                 cursor: "pointer",
-                border: `2px solid ${mode === opt.value ? opt.color : "var(--color-border)"}`,
+                border: `2px solid ${
+                  mode === opt.value ? opt.color : "var(--color-border)"
+                }`,
                 backgroundColor:
                   mode === opt.value
                     ? `color-mix(in srgb, ${opt.color} 10%, transparent)`
@@ -383,9 +425,18 @@ function ETLConfigPanel({
                 transition: "all 0.15s ease",
               }}
             >
-              <div style={{ fontSize: "20px", marginBottom: "4px" }}>
+              <div
+                style={{
+                  marginBottom: "8px",
+                  color:
+                    mode === opt.value ? opt.color : "var(--color-text-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
                 {opt.icon}
               </div>
+
               <div
                 style={{
                   color:
@@ -398,8 +449,12 @@ function ETLConfigPanel({
               >
                 {opt.label}
               </div>
+
               <div
-                style={{ color: "var(--color-text-muted)", fontSize: "12px" }}
+                style={{
+                  color: "var(--color-text-muted)",
+                  fontSize: "12px",
+                }}
               >
                 {opt.desc}
               </div>
@@ -549,7 +604,7 @@ function ETLConfigPanel({
             fontSize: "13px",
           }}
         >
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -593,11 +648,34 @@ function ETLConfigPanel({
             Starting...
           </>
         ) : isRunning ? (
-          <>⏳ Pipeline is running...</>
+          <>{isStopping ? "Stopping..." : "Pipeline is running..."}</>
         ) : (
-          <>▶ Run ETL pipeline</>
+          <>Run ETL pipeline</>
         )}
       </button>
+
+      {canStop && (
+        <button
+          onClick={onStop}
+          disabled={isStopping}
+          style={{
+            marginTop: "12px",
+            width: "100%",
+            padding: "12px",
+            borderRadius: "10px",
+            border: "1px solid var(--color-danger)",
+            cursor: isStopping ? "not-allowed" : "pointer",
+            backgroundColor: isStopping
+              ? "var(--color-danger-bg)"
+              : "transparent",
+            color: "var(--color-danger)",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}
+        >
+          {isStopping ? "Stopping..." : "Stop ETL pipeline"}
+        </button>
+      )}
     </div>
   );
 }
@@ -607,6 +685,9 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
   const isRunning = run.status === "running";
   const isSuccess = run.status === "success";
   const isFailed = run.status === "failed";
+  const isStopping = run.status === "stopping";
+  const isStopped = run.status === "stopped";
+  const isActive = isRunning || isStopping;
 
   const formatDuration = (sec) => {
     if (!sec) return "0s";
@@ -618,7 +699,26 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
     ? "var(--color-success)"
     : isFailed
       ? "var(--color-danger)"
-      : "var(--color-primary)";
+      : isStopped
+        ? "var(--color-danger)"
+        : isStopping
+          ? "var(--color-warning)"
+          : "var(--color-primary)";
+
+  const iconByStep = {
+    settings: Settings,
+    tag: Tag,
+    users: Users,
+    "clipboard-list": ClipboardList,
+    "credit-card": CreditCard,
+    "door-open": DoorOpen,
+    "bar-chart-3": BarChart3,
+    smartphone: Smartphone,
+    target: Target,
+  };
+  const stepLabelMap = Object.fromEntries(
+    ETL_STEPS.map((step) => [step.key, step.label]),
+  );
 
   return (
     <div
@@ -646,9 +746,11 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
               margin: 0,
             }}
           >
-            {isRunning && "⏳ Pipeline in progress..."}
-            {isSuccess && "✅ Pipeline completed successfully"}
-            {isFailed && "❌ Pipeline failed"}
+            {isRunning && "Pipeline in progress..."}
+            {isStopping && "Stopping pipeline..."}
+            {isSuccess && "Pipeline completed successfully"}
+            {isFailed && "Pipeline failed"}
+            {isStopped && "Pipeline stopped"}
           </h3>
           <p
             style={{
@@ -707,10 +809,14 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
             style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}
           >
             {isRunning
-              ? `Step ${run.current_step_num} / ${run.total_steps} — ${run.current_step_label || ""}`
-              : isSuccess
-                ? "All steps completed"
-                : `Failed at step ${run.current_step_num}`}
+              ? `Step ${run.current_step_num} / ${run.total_steps} — ${stepLabelMap[run.current_step] || run.current_step_label || ""}`
+              : isStopping
+                ? `Stopping at step ${run.current_step_num}`
+                : isSuccess
+                  ? "All steps completed"
+                  : isStopped
+                    ? "Pipeline stopped"
+                    : `Failed at step ${run.current_step_num}`}
           </span>
           <span
             style={{ color: statusColor, fontSize: "13px", fontWeight: 600 }}
@@ -741,7 +847,7 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
         {ETL_STEPS.map((step, idx) => {
           const isDone = (run.steps_done || []).includes(step.key);
-          const isCurr = isRunning && run.current_step === step.key;
+          const isCurr = isActive && run.current_step === step.key;
           let dotColor = "var(--color-text-disabled)";
           let textColor = "var(--color-text-disabled)";
           if (isDone) {
@@ -749,7 +855,9 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
             textColor = "var(--color-text-secondary)";
           }
           if (isCurr) {
-            dotColor = "var(--color-primary)";
+            dotColor = isStopping
+              ? "var(--color-warning)"
+              : "var(--color-primary)";
             textColor = "var(--color-text-primary)";
           }
           if (isFailed && isCurr) dotColor = "var(--color-danger)";
@@ -787,7 +895,13 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
                   color: dotColor,
                 }}
               >
-                {isDone ? "✓" : isCurr ? "⟳" : idx + 1}
+                {isDone
+                  ? "✓"
+                  : (() => {
+                      const Icon = iconByStep[step.icon];
+                      if (!Icon) return isCurr ? "..." : idx + 1;
+                      return <Icon size={14} />;
+                    })()}
               </div>
               <span
                 style={{
@@ -796,7 +910,7 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
                   fontWeight: isCurr ? 500 : 400,
                 }}
               >
-                {step.icon} {step.label}
+                {step.label}
               </span>
               {isDone && (
                 <span
@@ -806,7 +920,7 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
                     fontSize: "11px",
                   }}
                 >
-                  ✅ Done
+                  Done
                 </span>
               )}
               {isCurr && isRunning && (
@@ -819,6 +933,17 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
                   }}
                 >
                   Running...
+                </span>
+              )}
+              {isCurr && isStopping && (
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    color: "var(--color-warning)",
+                    fontSize: "11px",
+                  }}
+                >
+                  Stopping...
                 </span>
               )}
             </div>
@@ -842,6 +967,52 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
           {run.error}
         </div>
       )}
+    </div>
+  );
+}
+
+function ETLLiveLogPanel({ log, isRunning }) {
+  return (
+    <div
+      style={{
+        backgroundColor: "var(--color-bg-card)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "12px",
+        padding: "20px",
+      }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h4
+          className="text-sm font-semibold"
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          Terminal Live Logs
+        </h4>
+        <span
+          className="text-xs px-2 py-1 rounded-full"
+          style={{
+            color: isRunning
+              ? "var(--color-primary)"
+              : "var(--color-text-muted)",
+            backgroundColor: isRunning
+              ? "var(--color-primary-bg)"
+              : "var(--color-bg-elevated)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          {isRunning ? "Streaming..." : "Idle"}
+        </span>
+      </div>
+      <pre
+        className="text-xs rounded-xl p-4 max-h-[320px] overflow-auto whitespace-pre-wrap"
+        style={{
+          backgroundColor: "#020617",
+          border: "1px solid var(--color-border)",
+          color: "#cbd5e1",
+        }}
+      >
+        {log || "No runtime logs yet. Start an ETL run to stream logs here."}
+      </pre>
     </div>
   );
 }
@@ -882,22 +1053,32 @@ function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
       success: {
         bg: "var(--color-success-bg)",
         color: "var(--color-success)",
-        label: "✅ Success",
+        label: "Success",
       },
       running: {
         bg: "var(--color-primary-bg)",
         color: "var(--color-primary)",
-        label: "⏳ Running",
+        label: "Running",
+      },
+      stopping: {
+        bg: "var(--color-warning-bg)",
+        color: "var(--color-warning)",
+        label: "Stopping",
       },
       failed: {
         bg: "var(--color-danger-bg)",
         color: "var(--color-danger)",
-        label: "❌ Failed",
+        label: "Failed",
+      },
+      stopped: {
+        bg: "var(--color-danger-bg)",
+        color: "var(--color-danger)",
+        label: "Stopped",
       },
       pending: {
         bg: "var(--color-amber-bg)",
         color: "var(--color-amber)",
-        label: "⏸ Pending",
+        label: "Pending",
       },
     };
     const s = styles[status] || styles.pending;
@@ -973,7 +1154,7 @@ function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
             gap: "6px",
           }}
         >
-          {loading ? "⟳" : "↻"} Refresh
+          {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
@@ -995,7 +1176,7 @@ function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
             color: "var(--color-text-muted)",
           }}
         >
-          <div style={{ fontSize: "32px", marginBottom: "8px" }}>🗄️</div>
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>�</div>
           <div>No pipeline has been executed yet.</div>
           <div style={{ fontSize: "12px", marginTop: "4px" }}>
             Run your first ETL pipeline above.
@@ -1218,6 +1399,11 @@ export default function ImportDataPage() {
   const [etlLogError, setEtlLogError] = useState("");
   const [etlLogLoading, setEtlLogLoading] = useState(false);
   const [etlLogTitle, setEtlLogTitle] = useState("");
+  const [importLogOpen, setImportLogOpen] = useState(false);
+  const [importLogContent, setImportLogContent] = useState("");
+  const [importLogError, setImportLogError] = useState("");
+  const [importLogLoading, setImportLogLoading] = useState(false);
+  const [importLogTitle, setImportLogTitle] = useState("");
   const inputRef = useRef(null);
 
   const {
@@ -1230,6 +1416,7 @@ export default function ImportDataPage() {
     importDatabaseSql,
     downloadTemplate,
     getTableSchema,
+    getImportHistoryDetails,
   } = useImportData();
   const {
     mode: etlMode,
@@ -1243,13 +1430,18 @@ export default function ImportDataPage() {
     activeRun,
     isLaunching,
     launchETL,
+    stopETL,
     history: etlHistory,
     historyLoading: etlHistoryLoading,
     fetchHistory: fetchEtlHistory,
     error: etlError,
     ETL_STEPS,
+    runLog,
+    isStopping,
   } = useETLPipeline();
   const isRunning = activeRun?.status === "running";
+  const isRunStopping = activeRun?.status === "stopping";
+  const isStreaming = isRunning || isRunStopping;
 
   useEffect(() => {
     let mounted = true;
@@ -1285,6 +1477,27 @@ export default function ImportDataPage() {
     setPreview([]);
     setColumns([]);
     setStaged(null);
+  };
+
+  const openImportLogDetails = async (historyItem) => {
+    if (!historyItem?.id) return;
+    setImportLogOpen(true);
+    setImportLogLoading(true);
+    setImportLogError("");
+    setImportLogContent("");
+    setImportLogTitle(
+      `Import log — ${historyItem.file_name || historyItem.target_table || "run"}`,
+    );
+    try {
+      const details = await getImportHistoryDetails(historyItem.id);
+      setImportLogContent(JSON.stringify(details, null, 2));
+    } catch (err) {
+      setImportLogError(
+        getApiErrorMessage(err, "Failed to load import log details"),
+      );
+    } finally {
+      setImportLogLoading(false);
+    }
   };
 
   const handleFileSelected = async (f) => {
@@ -1355,6 +1568,26 @@ export default function ImportDataPage() {
     setResult(null);
     try {
       const report = await stageCsv({ file, table: targetTable, mode });
+      if (mode === "demo" || report?.demo_mode) {
+        setResult({
+          success: true,
+          mode: "demo",
+          detail:
+            "Test mode completed. Validation only, no data written to database.",
+          rows_inserted: report?.valid_rows ?? 0,
+          rows_skipped: report?.invalid_rows ?? 0,
+          validation: {
+            total_rows: report?.total_rows ?? 0,
+            valid_rows: report?.valid_rows ?? 0,
+            invalid_rows: report?.invalid_rows ?? 0,
+            errors: report?.errors ?? [],
+          },
+          cohorts_recalculated: false,
+          duration_ms: report?.duration_ms,
+        });
+        setStaged(null);
+        return;
+      }
       setStaged(report);
       setValidationModalOpen(true);
     } catch (err) {
@@ -1411,14 +1644,23 @@ export default function ImportDataPage() {
               dryRun={dryRun}
               setDryRun={setDryRun}
               onLaunch={launchETL}
+              onStop={stopETL}
               isLaunching={isLaunching}
-              isRunning={isRunning}
+              isRunning={isStreaming}
+              isStopping={isStopping || isRunStopping}
+              canStop={!!activeRun && isStreaming}
               error={etlError}
             />
             {activeRun && (
               <ETLProgressPanel run={activeRun} ETL_STEPS={ETL_STEPS} />
             )}
           </div>
+
+          {activeRun && (
+            <div style={{ marginBottom: "24px" }}>
+              <ETLLiveLogPanel log={runLog} isRunning={isStreaming} />
+            </div>
+          )}
 
           <ETLHistoryTable
             history={etlHistory}
@@ -1705,7 +1947,21 @@ export default function ImportDataPage() {
                     />
                     Replace
                   </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mode"
+                      checked={mode === "demo"}
+                      onChange={() => setMode("demo")}
+                    />
+                    Test (No DB write)
+                  </label>
                 </div>
+                {mode === "demo" && (
+                  <p className="text-xs text-amber-300">
+                    Demo mode: validation only.
+                  </p>
+                )}
               </div>
             </>
           ) : (
@@ -1884,6 +2140,7 @@ export default function ImportDataPage() {
                     "Mode",
                     "Rows",
                     "Status",
+                    "Details",
                   ].map((h) => (
                     <th
                       key={h}
@@ -1938,12 +2195,21 @@ export default function ImportDataPage() {
                         {h.status}
                       </span>
                     </td>
+                    <td className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => openImportLogDetails(h)}
+                        className="px-2 py-1 rounded border border-slate-600 text-slate-200 hover:bg-slate-800 text-[11px]"
+                      >
+                        View
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {(!history || history.length === 0) && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={10}
                       className="px-4 py-8 text-center text-slate-500"
                     >
                       No import history yet
@@ -2002,14 +2268,33 @@ export default function ImportDataPage() {
           content={etlLogContent}
           error={etlLogError}
           loading={etlLogLoading}
+          subtitle="Showing latest lines from the ETL runner log."
           onClose={() => setEtlLogOpen(false)}
+        />
+
+        <ETLLogModal
+          open={importLogOpen}
+          title={importLogTitle}
+          content={importLogContent}
+          error={importLogError}
+          loading={importLogLoading}
+          subtitle="Showing full import diagnostic payload (validation, errors, and runtime context)."
+          onClose={() => setImportLogOpen(false)}
         />
       </div>
     </AppLayout>
   );
 }
 
-function ETLLogModal({ open, title, content, error, loading, onClose }) {
+function ETLLogModal({
+  open,
+  title,
+  content,
+  error,
+  loading,
+  subtitle,
+  onClose,
+}) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -2018,7 +2303,7 @@ function ETLLogModal({ open, title, content, error, loading, onClose }) {
           <div>
             <h3 className="text-lg font-bold text-slate-100">{title}</h3>
             <p className="text-xs text-slate-400 mt-1">
-              Showing latest lines from the ETL runner log.
+              {subtitle || "Showing latest lines from the ETL runner log."}
             </p>
           </div>
           <button

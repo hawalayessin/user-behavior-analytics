@@ -18,6 +18,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.core.cache import build_cache_key, cache_get_json, cache_set_json, cache_or_compute, get_redis_client
+from app.core.config import settings
 from app.core.database import SessionLocal, get_db
 from app.core.dependencies import require_admin
 from app.core.date_ranges import resolve_date_range
@@ -35,9 +36,9 @@ ALL_METRICS = ("dau", "churn_rate", "revenue", "renewals")
 ALL_SEVERITIES = ("critical", "high", "medium")
 MAX_ANOMALY_RANGE_DAYS = 120
 ENABLE_CACHE = True
-DAILY_METRICS_CACHE_TTL_SECONDS = 180
-ANOMALIES_CACHE_TTL_SECONDS = 120
-MOST_AFFECTED_CACHE_TTL_SECONDS = 120
+DAILY_METRICS_CACHE_TTL_SECONDS = settings.ANOMALY_DAILY_METRICS_CACHE_TTL_SECONDS
+ANOMALIES_CACHE_TTL_SECONDS = settings.ANOMALY_RESULTS_CACHE_TTL_SECONDS
+MOST_AFFECTED_CACHE_TTL_SECONDS = settings.ANOMALY_MOST_AFFECTED_CACHE_TTL_SECONDS
 # "intersection" = higher precision, fewer false positives (recommended for production)
 # "union" = higher recall, catches more edge cases but more noise
 DETECTION_COMBINATION_MODE = "intersection"

@@ -294,15 +294,11 @@ export default function CampaignImpactPage() {
         label: "critical",
         cls: "bg-red-500/20 text-red-400 border-red-500/30",
       };
-      if (conv >= 15)
+      // Business rule: a conversion rate >= 1% is considered healthy (not critical).
+      if (conv >= 1)
         health = {
           label: "good",
           cls: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-        };
-      else if (conv >= 8)
-        health = {
-          label: "warning",
-          cls: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
         };
       return { ...r, health: health.label, _healthCls: health.cls };
     });

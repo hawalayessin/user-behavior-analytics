@@ -26,18 +26,20 @@ export function useCampaignImpactDashboard(filters = {}) {
       normalizedFilters.service_id,
     ],
     queryFn: async () => {
-      const params = new URLSearchParams()
-      if (normalizedFilters.start_date) params.set("start_date", normalizedFilters.start_date)
-      if (normalizedFilters.end_date) params.set("end_date", normalizedFilters.end_date)
-      if (normalizedFilters.service_id) params.set("service_id", normalizedFilters.service_id)
-      params.set("_cb", String(Date.now()))
-
-      const qs = params.toString()
-      const url = `/analytics/campaigns/dashboard${qs ? `?${qs}` : ""}`
-      return await getWithCache(url, { ttlMs: 0, force: true })
+      return await getWithCache("/analytics/campaigns/dashboard", {
+        params: {
+          start_date: normalizedFilters.start_date,
+          end_date: normalizedFilters.end_date,
+          service_id: normalizedFilters.service_id,
+        },
+        ttlMs: 5 * 60 * 1000,
+      })
     },
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   return {

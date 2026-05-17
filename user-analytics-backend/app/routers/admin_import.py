@@ -8,6 +8,7 @@ import time
 import uuid
 import traceback
 import subprocess
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/admin/import", tags=["Admin Import"])
 CSV_MAX_FILE_BYTES = 20 * 1024 * 1024
 SQL_MAX_FILE_BYTES = 50 * 1024 * 1024
 
-ImportMode = Literal["append", "replace"]
+ImportMode = Literal["append", "replace", "demo"]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -282,6 +283,31 @@ class ValidationResult:
     errors: list[dict]
 
 
+def _build_validation_summary(errors: list[dict], *, sample_size: int = 20) -> dict[str, Any]:
+    """
+    Build compact, UI-friendly validation stats while keeping full raw errors in JSON.
+    """
+    if not errors:
+        return {
+            "error_count": 0,
+            "top_fields": [],
+            "top_error_types": [],
+            "sample": [],
+        }
+
+    field_counter = Counter(str(e.get("field") or "__unknown__") for e in errors)
+    error_counter = Counter(str(e.get("error") or "unknown_error") for e in errors)
+    top_fields = [{"field": k, "count": v} for k, v in field_counter.most_common(10)]
+    top_error_types = [{"error": k, "count": v} for k, v in error_counter.most_common(10)]
+
+    return {
+        "error_count": len(errors),
+        "top_fields": top_fields,
+        "top_error_types": top_error_types,
+        "sample": errors[:sample_size],
+    }
+
+
 def _validate_and_stage_csv(
     db: Session,
     *,
@@ -289,6 +315,8 @@ def _validate_and_stage_csv(
     file_name: str | None,
     mode: ImportMode,
     raw: bytes,
+    skip_fk_checks: bool = False,
+    stage_rows: bool = True,
 ) -> ValidationResult:
     if table not in TABLE_REGISTRY or table in EXCLUDED_TABLES:
         raise HTTPException(status_code=400, detail=f"Invalid table '{table}'.")
@@ -305,6 +333,9 @@ def _validate_and_stage_csv(
     if df.empty:
         raise HTTPException(status_code=400, detail="Empty file")
 
+    # Normalize column names early (strip + BOM-safe)
+    df.columns = [str(c).lstrip("\ufeff").strip() for c in df.columns]
+
     reg = TABLE_REGISTRY[table]
     required_cols: list[str] = list(reg["required"])
 
@@ -314,9 +345,6 @@ def _validate_and_stage_csv(
 
     errors: list[dict] = []
     invalid_rows: set[int] = set()
-
-    # Normalize column names (strip)
-    df.columns = [str(c).strip() for c in df.columns]
 
     # Coercions by heuristic
     datetime_cols = [c for c in df.columns if c.endswith("_datetime") or c.endswith("_date") or c.endswith("_at")]
@@ -371,33 +399,34 @@ def _validate_and_stage_csv(
                     else:
                         df.at[idx, field] = sval
 
-    # Validate UUID format for FK columns (if present)
+    # Validate UUID format + FK existence (skipped in demo mode)
     fk_map: dict[str, str] = dict(reg.get("fk", {}))
-    for fk_col in fk_map.keys():
-        if fk_col not in df.columns:
-            continue
-        for idx, v in df[fk_col].items():
-            if v is None or (isinstance(v, float) and pd.isna(v)) or v == "":
+    if not skip_fk_checks:
+        for fk_col in fk_map.keys():
+            if fk_col not in df.columns:
                 continue
-            if not _is_valid_uuid(v):
-                invalid_rows.add(int(idx))
-                errors.append({"row": int(idx) + 1, "field": fk_col, "error": "invalid uuid"})
+            for idx, v in df[fk_col].items():
+                if v is None or (isinstance(v, float) and pd.isna(v)) or v == "":
+                    continue
+                if not _is_valid_uuid(v):
+                    invalid_rows.add(int(idx))
+                    errors.append({"row": int(idx) + 1, "field": fk_col, "error": "invalid uuid"})
 
-    # FK existence check
-    for fk_col, target in fk_map.items():
-        if fk_col not in df.columns:
-            continue
-        ids = [str(v) for v in df[fk_col].dropna().tolist() if str(v).strip()]
-        if not ids:
-            continue
-        target_table, target_col = target.split(".", 1)
-        existing = _fk_exists_map(db, target_table, target_col, ids)
-        for idx, v in df[fk_col].items():
-            if v is None or (isinstance(v, float) and pd.isna(v)) or v == "":
+        # FK existence check
+        for fk_col, target in fk_map.items():
+            if fk_col not in df.columns:
                 continue
-            if str(v) not in existing:
-                invalid_rows.add(int(idx))
-                errors.append({"row": int(idx) + 1, "field": fk_col, "error": f"FK not found in {target_table}"})
+            ids = [str(v) for v in df[fk_col].dropna().tolist() if str(v).strip()]
+            if not ids:
+                continue
+            target_table, target_col = target.split(".", 1)
+            existing = _fk_exists_map(db, target_table, target_col, ids)
+            for idx, v in df[fk_col].items():
+                if v is None or (isinstance(v, float) and pd.isna(v)) or v == "":
+                    continue
+                if str(v) not in existing:
+                    invalid_rows.add(int(idx))
+                    errors.append({"row": int(idx) + 1, "field": fk_col, "error": f"FK not found in {target_table}"})
 
     # Internal duplicates (simple full-row duplicates)
     dup_mask = df.duplicated(keep="first")
@@ -406,43 +435,44 @@ def _validate_and_stage_csv(
             invalid_rows.add(int(idx))
             errors.append({"row": int(idx) + 1, "field": "__row__", "error": "duplicate row in file"})
 
-    # STAGE (valid + invalid)
-    _ensure_staging_tables(db)
     import_id = uuid.uuid4()
-    records = []
-    for idx, row in df.iterrows():
-        row_num = int(idx) + 1
-        raw_data = {k: (None if (isinstance(v, float) and pd.isna(v)) else v) for k, v in row.to_dict().items()}
-        is_valid = int(idx) not in invalid_rows
-        err_msgs = [e["error"] for e in errors if e["row"] == row_num]
-        records.append(
-            {
-                "id": str(uuid.uuid4()),
-                "import_id": str(import_id),
-                "row_number": row_num,
-                "raw_data": json.dumps(raw_data, default=str),
-                "status": "valid" if is_valid else "invalid",
-                "error_message": "; ".join(err_msgs)[:2000] if err_msgs else None,
-            }
-        )
-
-    db.execute(
-        text(
-            """
-            INSERT INTO staging_imports (id, import_id, row_number, raw_data, status, error_message)
-            VALUES (
-              CAST(:id AS uuid),
-              CAST(:import_id AS uuid),
-              :row_number,
-              CAST(:raw_data AS jsonb),
-              :status,
-              :error_message
+    if stage_rows:
+        # STAGE (valid + invalid)
+        _ensure_staging_tables(db)
+        records = []
+        for idx, row in df.iterrows():
+            row_num = int(idx) + 1
+            raw_data = {k: (None if (isinstance(v, float) and pd.isna(v)) else v) for k, v in row.to_dict().items()}
+            is_valid = int(idx) not in invalid_rows
+            err_msgs = [e["error"] for e in errors if e["row"] == row_num]
+            records.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "import_id": str(import_id),
+                    "row_number": row_num,
+                    "raw_data": json.dumps(raw_data, default=str),
+                    "status": "valid" if is_valid else "invalid",
+                    "error_message": "; ".join(err_msgs)[:2000] if err_msgs else None,
+                }
             )
-            """
-        ),
-        records,
-    )
-    db.commit()
+
+        db.execute(
+            text(
+                """
+                INSERT INTO staging_imports (id, import_id, row_number, raw_data, status, error_message)
+                VALUES (
+                  CAST(:id AS uuid),
+                  CAST(:import_id AS uuid),
+                  :row_number,
+                  CAST(:raw_data AS jsonb),
+                  :status,
+                  :error_message
+                )
+                """
+            ),
+            records,
+        )
+        db.commit()
 
     total_rows = int(len(df))
     invalid_count = len(invalid_rows)
@@ -570,45 +600,114 @@ def stage_single_table_csv(
     current_user: PlatformUser = Depends(require_admin),
 ):
     t0 = time.perf_counter()
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only .csv files are allowed.")
+    file_name = file.filename if file else None
+    try:
+        if not file.filename or not file.filename.lower().endswith(".csv"):
+            raise HTTPException(status_code=400, detail="Only .csv files are allowed.")
 
-    raw = _read_upload_bytes(file, max_bytes=CSV_MAX_FILE_BYTES)
-    result = _validate_and_stage_csv(db, table=table, file_name=file.filename, mode=mode, raw=raw)
+        raw = _read_upload_bytes(file, max_bytes=CSV_MAX_FILE_BYTES)
+        demo_mode = mode == "demo"
+        result = _validate_and_stage_csv(
+            db,
+            table=table,
+            file_name=file.filename,
+            mode=mode,
+            raw=raw,
+            skip_fk_checks=demo_mode,
+            stage_rows=not demo_mode,
+        )
+        validation_summary = _build_validation_summary(result.errors)
 
-    duration_ms = int((time.perf_counter() - t0) * 1000)
-    _log_import(
-        db,
-        admin=current_user,
-        file_name=file.filename,
-        file_type="csv",
-        target_table=table,
-        scope="single_table",
-        mode=mode,
-        status_value="partial" if result.invalid_rows else "success",
-        rows_inserted=0,
-        rows_skipped=0,
-        error_details={
-            "import_id": str(result.import_id),
-            "validation": {
-                "total_rows": result.total_rows,
-                "valid_rows": result.valid_rows,
-                "invalid_rows": result.invalid_rows,
-                "errors": result.errors,
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        _log_import(
+            db,
+            admin=current_user,
+            file_name=file.filename,
+            file_type="csv",
+            target_table=table,
+            scope="single_table",
+            mode=mode,
+            status_value="partial" if result.invalid_rows else "success",
+            rows_inserted=result.valid_rows,
+            rows_skipped=result.invalid_rows,
+            error_details={
+                "import_id": str(result.import_id),
+                "demo_mode": demo_mode,
+                "fk_checks_skipped": demo_mode,
+                "db_write_skipped": demo_mode,
+                "validation": {
+                    "total_rows": result.total_rows,
+                    "valid_rows": result.valid_rows,
+                    "invalid_rows": result.invalid_rows,
+                    "errors": result.errors,
+                    "summary": validation_summary,
+                },
+                "duration_ms": duration_ms,
             },
-            "duration_ms": duration_ms,
-        },
-    )
+        )
 
-    return {
-        "import_id": str(result.import_id),
-        "table": table,
-        "total_rows": result.total_rows,
-        "valid_rows": result.valid_rows,
-        "invalid_rows": result.invalid_rows,
-        "errors": result.errors,
-        "ready_to_load": result.valid_rows > 0,
-    }
+        return {
+            "import_id": str(result.import_id),
+            "table": table,
+            "demo_mode": demo_mode,
+            "total_rows": result.total_rows,
+            "valid_rows": result.valid_rows,
+            "invalid_rows": result.invalid_rows,
+            "errors": result.errors,
+            "ready_to_load": (result.valid_rows > 0) and not demo_mode,
+        }
+    except HTTPException as he:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        try:
+            _log_import(
+                db,
+                admin=current_user,
+                file_name=file_name,
+                file_type="csv",
+                target_table=table,
+                scope="single_table",
+                mode=mode,
+                status_value="failed",
+                rows_inserted=0,
+                rows_skipped=0,
+                error_details={
+                    "demo_mode": mode == "demo",
+                    "error_type": "http_exception",
+                    "http_status": he.status_code,
+                    "error": he.detail,
+                    "duration_ms": duration_ms,
+                },
+            )
+        except Exception:
+            db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        try:
+            _log_import(
+                db,
+                admin=current_user,
+                file_name=file_name,
+                file_type="csv",
+                target_table=table,
+                scope="single_table",
+                mode=mode,
+                status_value="failed",
+                rows_inserted=0,
+                rows_skipped=0,
+                error_details={
+                    "demo_mode": mode == "demo",
+                    "error_type": "exception",
+                    "error": str(e),
+                    "exception_type": type(e).__name__,
+                    "traceback": traceback.format_exc(limit=20),
+                    "duration_ms": duration_ms,
+                },
+            )
+        except Exception:
+            db.rollback()
+        raise
 
 
 @router.post("/csv/confirm")
@@ -623,6 +722,12 @@ def confirm_single_table_csv(
     t0 = time.perf_counter()
     if table not in TABLE_REGISTRY:
         raise HTTPException(status_code=400, detail="Invalid table.")
+
+    if mode == "demo":
+        raise HTTPException(
+            status_code=400,
+            detail="Demo mode does not allow confirm/load. Validation only, no database write.",
+        )
 
     try:
         import_uuid = uuid.UUID(import_id)
@@ -669,6 +774,7 @@ def confirm_single_table_csv(
         raise
     except Exception as e:
         db.rollback()
+        duration_ms = int((time.perf_counter() - t0) * 1000)
         _log_import(
             db,
             admin=current_user,
@@ -680,7 +786,13 @@ def confirm_single_table_csv(
             status_value="failed",
             rows_inserted=0,
             rows_skipped=0,
-            error_details={"import_id": import_id, "error": str(e)},
+            error_details={
+                "import_id": import_id,
+                "error": str(e),
+                "exception_type": type(e).__name__,
+                "duration_ms": duration_ms,
+                "traceback": traceback.format_exc(limit=20),
+            },
         )
         raise HTTPException(status_code=500, detail=f"Load failed: {e}")
 
@@ -758,6 +870,8 @@ def import_full_database_sql(
     if bad:
         raise HTTPException(status_code=400, detail={"error": "Invalid statements detected", "details": bad[:50]})
 
+    demo_mode = mode == "demo"
+
     # Group by target table
     by_table: dict[str, list[str]] = {t: [] for t in TABLE_REGISTRY.keys()}
     unknown_tables: set[str] = set()
@@ -777,6 +891,43 @@ def import_full_database_sql(
     inserted_subs_or_billing = False
 
     try:
+        if demo_mode:
+            duration_ms = int((time.perf_counter() - t0) * 1000)
+            _log_import(
+                db,
+                admin=current_user,
+                file_name=file.filename,
+                file_type="sql",
+                target_table=None,
+                scope="full_database",
+                mode=mode,
+                status_value="success",
+                rows_inserted=0,
+                rows_skipped=0,
+                error_details={
+                    "demo_mode": True,
+                    "db_write_skipped": True,
+                    "fk_checks_skipped": True,
+                    "statements_total": len(statements),
+                    "tables_detected": sorted([t for t, items in by_table.items() if items]),
+                    "unknown_tables": sorted(unknown_tables),
+                    "duration_ms": duration_ms,
+                },
+            )
+            return {
+                "success": True,
+                "mode": mode,
+                "demo_mode": True,
+                "message": "SQL validated in demo mode. No changes applied to the database.",
+                "statements_total": len(statements),
+                "tables_detected": sorted([t for t, items in by_table.items() if items]),
+                "unknown_tables": sorted(unknown_tables),
+                "rows_inserted": 0,
+                "rows_skipped": 0,
+                "cohorts_recalculated": False,
+                "duration_ms": duration_ms,
+            }
+
         db.execute(text("BEGIN"))
 
         if mode == "replace":
@@ -860,6 +1011,8 @@ def import_history(
     for l in logs:
         admin = admin_map.get(l.admin_id) if l.admin_id else None
         details = l.error_details or {}
+        validation = details.get("validation") if isinstance(details, dict) else None
+        summary = validation.get("summary") if isinstance(validation, dict) else None
         history.append(
             {
                 "id": str(l.id),
@@ -875,10 +1028,54 @@ def import_history(
                 "status": l.status,
                 "cohorts_recalculated": details.get("cohorts_recalculated"),
                 "duration_ms": details.get("duration_ms"),
+                "error": details.get("error"),
+                "exception_type": details.get("exception_type"),
+                "validation": {
+                    "total_rows": (validation or {}).get("total_rows"),
+                    "valid_rows": (validation or {}).get("valid_rows"),
+                    "invalid_rows": (validation or {}).get("invalid_rows"),
+                    "summary": summary,
+                    "errors_sample": ((validation or {}).get("errors") or [])[:10],
+                }
+                if validation
+                else None,
             }
         )
 
     return {"history": history}
+
+
+@router.get("/history/{log_id}")
+def import_history_details(
+    log_id: str,
+    db: Session = Depends(get_db),
+    current_user: PlatformUser = Depends(require_admin),
+):
+    _ = current_user
+    try:
+        log_uuid = uuid.UUID(log_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid log id")
+
+    log = db.query(ImportLog).filter(ImportLog.id == log_uuid).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+
+    admin = db.query(PlatformUser).filter(PlatformUser.id == log.admin_id).first() if log.admin_id else None
+    details = log.error_details or {}
+    return {
+        "id": str(log.id),
+        "imported_at": log.imported_at.isoformat() if log.imported_at else None,
+        "admin_name": getattr(admin, "full_name", None) or getattr(admin, "email", None) or "—",
+        "file_name": log.file_name,
+        "file_type": log.file_type,
+        "target_table": log.target_table,
+        "mode": log.mode,
+        "rows_inserted": log.rows_inserted,
+        "rows_skipped": log.rows_skipped,
+        "status": log.status,
+        "error_details": details,
+    }
 
 
 @router.get("/schema/{table}")
@@ -963,6 +1160,7 @@ ETL_STEPS = [
 ]
 
 _active_runs: dict[str, dict[str, Any]] = {}
+_active_processes: dict[str, subprocess.Popen] = {}
 
 
 @router.post(
@@ -1082,6 +1280,7 @@ async def _execute_etl_background(
 ):
     start_time = datetime.now(timezone.utc)
     run = _active_runs[log_id]
+    run["stop_requested"] = False
 
     python_exe = sys.executable
     etl_script = str(
@@ -1107,15 +1306,16 @@ async def _execute_etl_background(
     try:
         prod_conn = settings.PROD_CONN or settings.prod_conn
         analytics_conn = settings.ANALYTICS_CONN or settings.analytics_conn or settings.DATABASE_URL
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+        env = {**os.environ, "PYTHONUNBUFFERED": "1", "ETL_LOG_PLAIN": "1"}
         if prod_conn:
             env["PROD_CONN"] = prod_conn
         if analytics_conn:
             env["ANALYTICS_CONN"] = analytics_conn
-        with log_path.open("w", encoding="utf-8") as log_file:
+        with log_path.open("w", encoding="utf-8", buffering=1) as log_file:
             log_file.write(f"Command: {' '.join(cmd)}\n")
             log_file.write(f"Mode: {mode} | Dry run: {dry_run} | Truncate: {truncate}\n")
             log_file.write("--- ETL output ---\n")
+            log_file.flush()
 
             def _run_process():
                 process = subprocess.Popen(
@@ -1126,6 +1326,8 @@ async def _execute_etl_background(
                     text=True,
                     bufsize=1,
                 )
+                _active_processes[log_id] = process
+                run["pid"] = process.pid
 
                 rows_inserted = 0
                 rows_skipped = 0
@@ -1140,6 +1342,7 @@ async def _execute_etl_background(
                     if not line:
                         continue
                     log_file.write(line + "\n")
+                    log_file.flush()
                     output_tail.append(line)
                     if len(output_tail) > 20:
                         output_tail = output_tail[-20:]
@@ -1151,13 +1354,42 @@ async def _execute_etl_background(
 
                     msg = str(log_data.get("message", ""))
 
-                    for step in ETL_STEPS:
-                        if (
-                            "Step done" in msg
-                            and step["key"].replace("etl_", "") in msg
-                            and step["key"] not in completed_steps
-                        ):
-                            completed_steps.append(step["key"])
+                    if "Step start" in msg:
+                        step_name = str(log_data.get("step", ""))
+                        step_key = f"etl_{step_name}" if step_name else None
+                        step_match = next((s for s in ETL_STEPS if s["key"] == step_key), None)
+                        if step_match:
+                            run.update(
+                                {
+                                    "current_step": step_match["key"],
+                                    "current_step_num": step_match["num"],
+                                    "current_step_label": step_match["label"],
+                                }
+                            )
+
+                    if msg == "Progress":
+                        step_name = str(log_data.get("step", ""))
+                        step_key = f"etl_{step_name}" if step_name else None
+                        step_match = next((s for s in ETL_STEPS if s["key"] == step_key), None)
+                        step_pct = int(log_data.get("pct", 0) or 0)
+                        base = len(completed_steps)
+                        if step_match and step_match["key"] not in completed_steps:
+                            base = step_match["num"] - 1
+                        overall = int(((base + (step_pct / 100)) / len(ETL_STEPS)) * 100)
+                        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+                        run.update(
+                            {
+                                "progress_pct": max(run.get("progress_pct", 0), overall),
+                                "duration_sec": round(elapsed, 1),
+                            }
+                        )
+
+                    if msg == "Step done":
+                        step_name = str(log_data.get("step", ""))
+                        step_key = f"etl_{step_name}" if step_name else None
+                        step_match = next((s for s in ETL_STEPS if s["key"] == step_key), None)
+                        if step_match and step_match["key"] not in completed_steps:
+                            completed_steps.append(step_match["key"])
                             next_num = len(completed_steps) + 1
                             next_step = ETL_STEPS[next_num - 1] if next_num <= len(ETL_STEPS) else ETL_STEPS[-1]
                             pct = int(len(completed_steps) / len(ETL_STEPS) * 100)
@@ -1179,7 +1411,6 @@ async def _execute_etl_background(
                                     "steps_done": completed_steps.copy(),
                                 }
                             )
-                            break
 
                 process.wait()
                 return process.returncode, output_tail, rows_inserted, rows_skipped
@@ -1187,7 +1418,8 @@ async def _execute_etl_background(
             returncode, output_tail, rows_inserted, rows_skipped = await asyncio.to_thread(_run_process)
             elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
 
-            final_status = "success" if returncode == 0 else "failed"
+            stop_requested = run.get("stop_requested")
+            final_status = "stopped" if stop_requested else ("success" if returncode == 0 else "failed")
             error_msg = None
             if final_status == "failed":
                 error_msg = "\n".join(output_tail[-8:]) if output_tail else ""
@@ -1205,6 +1437,7 @@ async def _execute_etl_background(
                     "error": error_msg,
                 }
             )
+            _active_processes.pop(log_id, None)
 
     except Exception as exc:
         elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
@@ -1232,6 +1465,8 @@ async def _execute_etl_background(
             )
         except Exception:
             pass
+        finally:
+            _active_processes.pop(log_id, None)
 
     try:
         db2 = SessionLocal()
@@ -1308,6 +1543,38 @@ def get_etl_log(
         "line_count": len(lines),
         "log": "\n".join(lines),
     }
+
+
+@router.post(
+    "/run-etl/{log_id}/stop",
+    summary="Arreter le pipeline ETL",
+    dependencies=[Depends(require_admin)],
+)
+async def stop_etl_run(
+    log_id: str,
+    current_user: PlatformUser = Depends(get_current_user),
+):
+    _ = current_user
+    run = _active_runs.get(log_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Aucun pipeline trouve pour cet identifiant.")
+    if run.get("status") not in {"running", "stopping"}:
+        return {"status": run.get("status"), "detail": "Pipeline non actif."}
+
+    process = _active_processes.get(log_id)
+    if not process:
+        run["stop_requested"] = True
+        run["status"] = "stopping"
+        return {"status": "stopping"}
+
+    run["stop_requested"] = True
+    run["status"] = "stopping"
+    try:
+        process.terminate()
+    except Exception:
+        pass
+
+    return {"status": "stopping"}
 
 
 @router.get(

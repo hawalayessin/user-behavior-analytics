@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { AlertCircle, RotateCcw, Download, RefreshCw } from "lucide-react";
+import { AlertCircle, RotateCcw, Download } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -26,9 +26,7 @@ import BIInsightsPanel from "../../components/dashboard/BIInsightsPanel";
 import { useSegmentationKPIs } from "../../hooks/useSegmentationKPIs";
 import { useSegmentationClusters } from "../../hooks/useSegmentationClusters";
 import { useSegmentationProfiles } from "../../hooks/useSegmentationProfiles";
-import { useSegmentationTrain } from "../../hooks/useSegmentationTrain";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
-import { useAuth } from "../../context/AuthContext";
 
 const SEGMENT_COLORS = {
   "Power Users": "#3b82f6",
@@ -106,10 +104,7 @@ const ChartContainerCard = ({
 );
 
 export default function UserSegmentationPage() {
-  const { isAdmin } = useAuth();
-  const canExecuteModel = isAdmin();
   const [filters, setFilters] = useState(DEFAULT_ANALYTICS_FILTERS);
-  const trainHook = useSegmentationTrain();
 
   const {
     data: kpiData,
@@ -169,20 +164,6 @@ export default function UserSegmentationPage() {
   const profiles = useMemo(() => {
     return profileData?.profiles ?? [];
   }, [profileData]);
-
-  const handleRecalculate = async () => {
-    if (!canExecuteModel) return;
-    try {
-      await trainHook.train({
-        start_date: filters.start_date,
-        end_date: filters.end_date,
-        service_id: filters.service_id,
-      });
-      await Promise.all([refetchKPIs(), refetchClusters(), refetchProfiles()]);
-    } catch (err) {
-      console.error("Recalculation failed:", err);
-    }
-  };
 
   const handleExport = () => {
     const data = {
@@ -344,20 +325,6 @@ export default function UserSegmentationPage() {
             >
               <Download size={16} /> Export
             </button>
-            {canExecuteModel && (
-              <button
-                onClick={handleRecalculate}
-                disabled={trainHook.loading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {trainHook.loading ? (
-                  <RotateCcw size={16} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={16} />
-                )}
-                Recalculate Model
-              </button>
-            )}
           </div>
         </div>
 
@@ -367,14 +334,14 @@ export default function UserSegmentationPage() {
           appliedFilters={filters}
         />
 
-        {(kpiError || clusterError || profileError || trainHook.error) && (
+        {(kpiError || clusterError || profileError) && (
           <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
             <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
             <p
               className="flex-1 text-sm"
               style={{ color: "var(--color-danger-text)" }}
             >
-              {kpiError || clusterError || profileError || trainHook.error}
+              {kpiError || clusterError || profileError}
             </p>
             <button
               onClick={() => {
@@ -387,40 +354,6 @@ export default function UserSegmentationPage() {
               <RotateCcw size={14} /> Retry
             </button>
           </div>
-        )}
-
-        {canExecuteModel && trainHook.job && (
-          <ChartContainerCard title="Training live logs">
-            <p className="text-xs mb-3" style={{ color: "var(--color-text-muted)" }}>
-              Status: {trainHook.job.status}
-            </p>
-            <div
-              className="max-h-56 overflow-auto rounded-lg p-3"
-              style={{
-                border: "1px solid var(--color-border)",
-                backgroundColor: "var(--color-bg-elevated)",
-              }}
-            >
-              <div className="space-y-2 text-xs font-mono">
-                {(trainHook.job.logs ?? []).map((l, idx) => (
-                  <div key={`${l.ts}-${idx}`} style={{ color: "var(--color-text-secondary)" }}>
-                    <span style={{ color: "var(--color-text-muted)" }}>
-                      [{new Date(l.ts).toLocaleTimeString()}]{" "}
-                    </span>
-                    <span>{l.message}</span>
-                    {Object.entries(l)
-                      .filter(([k]) => !["ts", "message"].includes(k))
-                      .map(([k, v]) => (
-                        <span key={k} style={{ color: "var(--color-text-muted)" }}>
-                          {" "}
-                          {k}={String(v)}
-                        </span>
-                      ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </ChartContainerCard>
         )}
 
         {/* KPI Cards Row */}

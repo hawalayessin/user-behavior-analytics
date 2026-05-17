@@ -1,0 +1,874 @@
+﻿<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DigMaco Precision Observatory - Rapport Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --bg: #0d0f14;
+      --surface: #131620;
+      --accent: #6366f1;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #e8eaf2;
+      --text-muted: #7c84a0;
+      --border: rgba(255,255,255,.07);
+    }
+
+    html[data-theme="light"] {
+      --bg: #f4f5f9;
+      --surface: #ffffff;
+      --accent: #4f46e5;
+      --text: #141824;
+      --text-muted: #596076;
+      --border: rgba(0,0,0,.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      padding: 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .logo-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-weight: 800;
+      font-family: var(--font-mono);
+      background: transparent;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .side-actions {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    button,
+    .btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    button:hover,
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .nav {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .nav a {
+      text-decoration: none;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      font-size: 13px;
+      display: block;
+    }
+
+    .nav a.active,
+    .nav a:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .main {
+      padding: 20px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 28px);
+    }
+
+    .topbar p {
+      margin: 4px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .select {
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-width: 150px;
+    }
+
+    .error-banner {
+      display: none;
+      margin-bottom: 12px;
+      border: 1px solid rgba(239,68,68,.55);
+      background: rgba(239,68,68,.13);
+      color: #fecaca;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      position: relative;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      right: -70px;
+      top: -80px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, rgba(99,102,241,.15), rgba(99,102,241,0));
+      pointer-events: none;
+    }
+
+    .kpi-label {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-family: var(--font-mono);
+      font-size: clamp(17px, 2vw, 24px);
+      font-weight: 500;
+    }
+
+    .kpi-sub {
+      margin-top: 7px;
+      font-size: 12px;
+    }
+
+    .good { color: var(--success); }
+    .warn { color: var(--warning); }
+    .bad { color: var(--danger); }
+
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .skeleton::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+      animation: shimmer 1.2s infinite;
+    }
+
+    @keyframes shimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .section {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .section h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .muted { color: var(--text-muted); font-size: 12px; }
+
+    .chart-wrap {
+      height: 280px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 9px;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th { color: var(--text-muted); font-weight: 600; }
+
+    .mono { font-family: var(--font-mono); }
+
+    .badge {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .insight-list {
+      margin: 0;
+      padding-left: 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1080px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .kpi-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-mark">DM</div>
+        <div>
+          <h1>DigMaco</h1>
+          <p>Precision Observatory</p>
+        </div>
+      </div>
+
+      <div class="side-actions">
+        <button id="themeToggle" type="button">Dark / Light</button>
+        <button id="printBtn" type="button">Export PDF</button>
+      </div>
+
+      <nav class="nav">
+        <a href="#sec1" class="active">01 — Executive Summary</a>
+        <a href="#sec2">02 — Churn & Retention</a>
+        <a href="#sec3">03 — Segmentation IA</a>
+        <a href="#sec4">04 — Campaign Performance</a>
+        <a href="#sec5">05 — User Behavior</a>
+        <a href="#sec6">06 — Anomalies & Risk</a>
+        <a href="#sec7">07 — Prédiction Churn</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div id="errorBanner" class="error-banner"></div>
+
+      <header class="topbar">
+        <div>
+          <h2>Confidential Analytics Report</h2>
+          <p id="reportScope">Service: ElJournal By TT · Période: 90 jours</p>
+        </div>
+        <div class="top-controls">
+          <select id="serviceSelect" class="select">
+            <option value="ElJournal By TT">ElJournal By TT</option>
+            <option value="Esports.tn">Esports.tn</option>
+            <option value="TToons">TToons</option>
+            <option value="Tawer">Tawer</option>
+            <option value="Mou7a9e9">Mou7a9e9</option>
+          </select>
+          <select id="periodSelect" class="select">
+            <option value="30">30j</option>
+            <option value="60">60j</option>
+            <option value="90" selected>90j</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="kpi-grid" id="kpis">
+        <article class="kpi-card"><div class="kpi-label">Churn Rate</div><div class="kpi-value mono" id="kpiChurn">--</div><div class="kpi-sub bad" id="kpiChurnTrend">--</div></article>
+        <article class="kpi-card"><div class="kpi-label">Rétention D30</div><div class="kpi-value mono" id="kpiRetD30">--</div><div class="kpi-sub good" id="kpiRetD30Trend">--</div></article>
+        <article class="kpi-card"><div class="kpi-label">ARPU (TND)</div><div class="kpi-value mono" id="kpiArpu">--</div><div class="kpi-sub good" id="kpiArpuTrend">--</div></article>
+        <article class="kpi-card"><div class="kpi-label">Trial → Paid</div><div class="kpi-value mono" id="kpiConv">--</div><div class="kpi-sub warn" id="kpiConvTrend">--</div></article>
+        <article class="kpi-card"><div class="kpi-label">DAU</div><div class="kpi-value mono" id="kpiDau">--</div><div class="kpi-sub good" id="kpiDauTrend">--</div></article>
+      </section>
+
+      <div class="content-grid">
+        <section id="sec1" class="section">
+          <div class="section-header">
+            <h3>01 — Executive Summary</h3>
+            <span class="badge" id="aiConfidence">AI confidence --</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartKpis"></canvas></div>
+          <ul class="insight-list" id="summaryInsights"></ul>
+        </section>
+
+        <section id="sec2" class="section">
+          <div class="section-header">
+            <h3>02 — Churn & Retention Intelligence</h3>
+            <span class="muted">D7 / D30 / D90</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartChurn"></canvas></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Service</th><th>D7</th><th>D30</th><th>D90</th></tr>
+              </thead>
+              <tbody id="retentionTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="sec3" class="section">
+          <div class="section-header">
+            <h3>03 — AI User Segmentation</h3>
+            <span class="muted">K-Means (k=4)</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartSegments"></canvas></div>
+        </section>
+
+        <section id="sec4" class="section">
+          <div class="section-header">
+            <h3>04 — Campaign Performance Analytics</h3>
+            <span class="badge" id="campaignRoi">ROI --</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartCampaigns"></canvas></div>
+        </section>
+
+        <section id="sec5" class="section">
+          <div class="section-header">
+            <h3>05 — User Behavior Analytics</h3>
+            <span class="muted">7 derniers jours</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartBehavior"></canvas></div>
+        </section>
+
+        <section id="sec6" class="section">
+          <div class="section-header">
+            <h3>06 — Anomaly Detection & Risk Analysis</h3>
+            <span class="badge" id="anomalyBadge">Z-Score + Isolation Forest</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartAnomalies"></canvas></div>
+        </section>
+
+        <!-- MODIFIED: Added section 07 -->
+        <section id="sec7" class="section">
+          <div class="section-header">
+            <h3>07 — Prédiction Churn (30 jours)</h3>
+            <span class="badge">ROC-AUC 0.84</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartChurnForecast"></canvas></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>User ID</th><th>Service</th><th>Risque churn</th><th>Z-Score</th></tr>
+              </thead>
+              <tbody id="riskUsersBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // MODIFIED: All static data moved into REPORT_DATA for backend-driven updates
+    const REPORT_DATA = {
+      meta: {
+        service: 'ElJournal By TT',
+        periodDays: 90,
+        aiConfidence: 0.86
+      },
+      kpis: {
+        churnRate: 3.7,
+        churnTrend: -0.4,
+        retentionD30: 62.1,
+        retentionD30Trend: 1.8,
+        arpu: 12.4,
+        arpuTrend: 0.3,
+        trialToPaid: 6.8,
+        trialToPaidTrend: 0.7,
+        dau: 43214,
+        dauTrend: 4.2
+      },
+      summaryInsights: [
+        'Croissance résiliente malgré pression concurrentielle sur les offres trial.',
+        'La cohorte Esports.tn montre la meilleure fidélité D90 (58.2%).',
+        'La fenêtre d’activation J+1/J+3 reste le levier principal de réduction du churn.'
+      ],
+      retentionByService: [
+        { service: 'ElJournal By TT', d7: 84.2, d30: 62.1, d90: 45.8 },
+        { service: 'Esports.tn', d7: 91.5, d30: 78.3, d90: 58.2 },
+        { service: 'TToons', d7: 76.8, d30: 44.5, d90: 32.1 },
+        { service: 'Tawer', d7: 68.4, d30: 38.2, d90: 24.5 },
+        { service: 'Mou7a9e9', d7: 72.0, d30: 42.7, d90: 29.9 }
+      ],
+      churnSeries: {
+        labels: ['S1','S2','S3','S4','S5','S6','S7','S8','S9','S10','S11','S12'],
+        churn: [4.2,4.0,3.9,3.8,3.7,3.8,3.6,3.7,3.6,3.7,3.8,3.7],
+        retentionD30: [57,58,58,59,60,60,61,61,62,62,62,62]
+      },
+      segments: [
+        { name: 'Power Users', value: 2.2 },
+        { name: 'Loyaux Réguliers', value: 2.4 },
+        { name: 'Occasionnels', value: 3.4 },
+        { name: 'Trial Only', value: 92.1 }
+      ],
+      campaign: {
+        roi: 3.5,
+        labels: ['SMS-01','SMS-02','SMS-03','SMS-04','SMS-05'],
+        conversion: [4.2,6.1,7.3,5.8,6.8]
+      },
+      behavior: {
+        labels: ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'],
+        sessions: [5820,6010,6200,6490,7010,7820,7300],
+        dau: [40300,41200,41900,42600,43800,44600,43214]
+      },
+      anomalies: {
+        points: [
+          { x: 1, y: 1.2 }, { x: 2, y: 1.8 }, { x: 3, y: 2.7 }, { x: 4, y: 0.8 },
+          { x: 5, y: 3.2 }, { x: 6, y: 2.2 }, { x: 7, y: 3.9 }, { x: 8, y: 1.3 },
+          { x: 9, y: 2.6 }, { x: 10, y: 1.1 }, { x: 11, y: 2.9 }, { x: 12, y: 3.4 },
+          { x: 13, y: 1.7 }, { x: 14, y: 2.1 }
+        ]
+      },
+      churnForecast: {
+        labels: Array.from({ length: 30 }, (_, i) => `J+${i + 1}`),
+        values: [3.7,3.68,3.66,3.65,3.64,3.63,3.62,3.61,3.60,3.60,3.59,3.58,3.58,3.57,3.57,3.56,3.56,3.55,3.55,3.54,3.54,3.53,3.53,3.52,3.52,3.51,3.51,3.50,3.50,3.49]
+      },
+      topRiskUsers: [
+        { id: 'U-1092', service: 'Tawer', risk: 0.97, z: 3.8 },
+        { id: 'U-2077', service: 'TToons', risk: 0.95, z: 3.6 },
+        { id: 'U-3321', service: 'Mou7a9e9', risk: 0.94, z: 3.5 },
+        { id: 'U-4950', service: 'ElJournal By TT', risk: 0.93, z: 3.4 },
+        { id: 'U-5987', service: 'Tawer', risk: 0.92, z: 3.3 },
+        { id: 'U-6114', service: 'Esports.tn', risk: 0.91, z: 3.3 },
+        { id: 'U-7031', service: 'TToons', risk: 0.90, z: 3.2 },
+        { id: 'U-7550', service: 'Mou7a9e9', risk: 0.89, z: 3.1 },
+        { id: 'U-8122', service: 'ElJournal By TT', risk: 0.88, z: 3.0 },
+        { id: 'U-9004', service: 'Esports.tn', risk: 0.87, z: 2.9 }
+      ]
+    };
+
+    const state = {
+      data: structuredClone(REPORT_DATA),
+      charts: {}
+    };
+
+    const kpiContainer = document.getElementById('kpis');
+    const errorBanner = document.getElementById('errorBanner');
+    const serviceSelect = document.getElementById('serviceSelect');
+    const periodSelect = document.getElementById('periodSelect');
+    const reportScope = document.getElementById('reportScope');
+
+    const chartTextColor = () => getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+    const chartMutedColor = () => getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
+    const chartBorderColor = () => getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const chartAccent = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+
+    const fmtPct = (v) => `${Number(v).toFixed(1)}%`;
+    const fmtSignedPct = (v) => `${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}%`;
+    const fmtSigned = (v) => `${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}`;
+
+    function setSkeletonLoading(on) {
+      [...kpiContainer.children].forEach((card) => {
+        card.classList.toggle('skeleton', on);
+      });
+    }
+
+    function showError(message) {
+      errorBanner.style.display = 'block';
+      errorBanner.textContent = message;
+    }
+
+    function clearError() {
+      errorBanner.style.display = 'none';
+      errorBanner.textContent = '';
+    }
+
+    function setScope() {
+      reportScope.textContent = `Service: ${state.data.meta.service} · Période: ${state.data.meta.periodDays} jours`;
+    }
+
+    function renderKpis() {
+      const k = state.data.kpis;
+      document.getElementById('kpiChurn').textContent = fmtPct(k.churnRate);
+      document.getElementById('kpiChurnTrend').textContent = fmtSignedPct(k.churnTrend);
+      document.getElementById('kpiRetD30').textContent = fmtPct(k.retentionD30);
+      document.getElementById('kpiRetD30Trend').textContent = fmtSignedPct(k.retentionD30Trend);
+      document.getElementById('kpiArpu').textContent = `${k.arpu.toFixed(1)} TND`;
+      document.getElementById('kpiArpuTrend').textContent = fmtSigned(k.arpuTrend);
+      document.getElementById('kpiConv').textContent = fmtPct(k.trialToPaid);
+      document.getElementById('kpiConvTrend').textContent = fmtSignedPct(k.trialToPaidTrend);
+      document.getElementById('kpiDau').textContent = k.dau.toLocaleString('fr-FR');
+      document.getElementById('kpiDauTrend').textContent = fmtSignedPct(k.dauTrend);
+      document.getElementById('aiConfidence').textContent = `AI confidence ${(state.data.meta.aiConfidence * 100).toFixed(0)}%`;
+      document.getElementById('campaignRoi').textContent = `ROI ${state.data.campaign.roi.toFixed(1)}x`;
+    }
+
+    function renderSummary() {
+      const ul = document.getElementById('summaryInsights');
+      ul.innerHTML = state.data.summaryInsights.map((x) => `<li>${x}</li>`).join('');
+    }
+
+    function renderRetentionTable() {
+      const body = document.getElementById('retentionTableBody');
+      body.innerHTML = state.data.retentionByService.map((r) => `
+        <tr>
+          <td>${r.service}</td>
+          <td class="mono">${r.d7.toFixed(1)}%</td>
+          <td class="mono">${r.d30.toFixed(1)}%</td>
+          <td class="mono">${r.d90.toFixed(1)}%</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderRiskUsers() {
+      const body = document.getElementById('riskUsersBody');
+      body.innerHTML = state.data.topRiskUsers.map((u) => `
+        <tr>
+          <td class="mono">${u.id}</td>
+          <td>${u.service}</td>
+          <td class="mono">${(u.risk * 100).toFixed(0)}%</td>
+          <td class="mono">${u.z.toFixed(1)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function destroyCharts() {
+      Object.values(state.charts).forEach((c) => c && c.destroy());
+      state.charts = {};
+    }
+
+    function chartBaseOpts() {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: chartTextColor() } }
+        },
+        scales: {
+          x: { ticks: { color: chartMutedColor() }, grid: { color: chartBorderColor() } },
+          y: { ticks: { color: chartMutedColor() }, grid: { color: chartBorderColor() } }
+        }
+      };
+    }
+
+    function renderCharts() {
+      destroyCharts();
+
+      state.charts.kpis = new Chart(document.getElementById('chartKpis'), {
+        type: 'bar',
+        data: {
+          labels: ['Churn', 'Rétention D30', 'ARPU', 'Trial→Paid', 'DAU/1000'],
+          datasets: [{
+            label: 'Snapshot',
+            data: [
+              state.data.kpis.churnRate,
+              state.data.kpis.retentionD30,
+              state.data.kpis.arpu,
+              state.data.kpis.trialToPaid,
+              state.data.kpis.dau / 1000
+            ],
+            backgroundColor: chartAccent(),
+            borderRadius: 8
+          }]
+        },
+        options: chartBaseOpts()
+      });
+
+      state.charts.churn = new Chart(document.getElementById('chartChurn'), {
+        type: 'line',
+        data: {
+          labels: state.data.churnSeries.labels,
+          datasets: [
+            {
+              label: 'Churn %',
+              data: state.data.churnSeries.churn,
+              borderColor: getComputedStyle(document.documentElement).getPropertyValue('--danger').trim(),
+              backgroundColor: 'transparent',
+              tension: .35
+            },
+            {
+              label: 'Retention D30 %',
+              data: state.data.churnSeries.retentionD30,
+              borderColor: getComputedStyle(document.documentElement).getPropertyValue('--success').trim(),
+              backgroundColor: 'transparent',
+              tension: .35
+            }
+          ]
+        },
+        options: chartBaseOpts()
+      });
+
+      state.charts.segments = new Chart(document.getElementById('chartSegments'), {
+        type: 'doughnut',
+        data: {
+          labels: state.data.segments.map((s) => s.name),
+          datasets: [{
+            data: state.data.segments.map((s) => s.value),
+            backgroundColor: [
+              chartAccent(),
+              'rgba(34,197,94,.85)',
+              'rgba(245,158,11,.85)',
+              'rgba(124,132,160,.85)'
+            ],
+            borderColor: chartBorderColor(),
+            borderWidth: 1
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: chartTextColor() } } } }
+      });
+
+      state.charts.campaigns = new Chart(document.getElementById('chartCampaigns'), {
+        type: 'bar',
+        data: {
+          labels: state.data.campaign.labels,
+          datasets: [{
+            label: 'Conversion %',
+            data: state.data.campaign.conversion,
+            backgroundColor: chartAccent(),
+            borderRadius: 7
+          }]
+        },
+        options: chartBaseOpts()
+      });
+
+      state.charts.behavior = new Chart(document.getElementById('chartBehavior'), {
+        type: 'line',
+        data: {
+          labels: state.data.behavior.labels,
+          datasets: [
+            {
+              label: 'Sessions',
+              data: state.data.behavior.sessions,
+              borderColor: chartAccent(),
+              backgroundColor: 'transparent',
+              tension: .35
+            },
+            {
+              label: 'DAU',
+              data: state.data.behavior.dau,
+              borderColor: getComputedStyle(document.documentElement).getPropertyValue('--success').trim(),
+              backgroundColor: 'transparent',
+              tension: .35
+            }
+          ]
+        },
+        options: chartBaseOpts()
+      });
+
+      state.charts.anomalies = new Chart(document.getElementById('chartAnomalies'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'Z-Score',
+            data: state.data.anomalies.points,
+            backgroundColor: state.data.anomalies.points.map((p) => p.y >= 3 ? 'rgba(239,68,68,.9)' : p.y >= 2 ? 'rgba(245,158,11,.9)' : 'rgba(99,102,241,.9)'),
+            pointRadius: 5
+          }]
+        },
+        options: chartBaseOpts()
+      });
+
+      // MODIFIED: Added section 07 forecast line chart
+      state.charts.forecast = new Chart(document.getElementById('chartChurnForecast'), {
+        type: 'line',
+        data: {
+          labels: state.data.churnForecast.labels,
+          datasets: [{
+            label: 'Churn prédit %',
+            data: state.data.churnForecast.values,
+            borderColor: chartAccent(),
+            backgroundColor: 'transparent',
+            tension: .28
+          }]
+        },
+        options: chartBaseOpts()
+      });
+    }
+
+    function renderAll() {
+      setScope();
+      renderKpis();
+      renderSummary();
+      renderRetentionTable();
+      renderRiskUsers();
+      renderCharts();
+    }
+
+    function mergeApiPayload(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      state.data = {
+        ...state.data,
+        ...payload,
+        meta: { ...state.data.meta, ...(payload.meta || {}) },
+        kpis: { ...state.data.kpis, ...(payload.kpis || {}) }
+      };
+    }
+
+    // MODIFIED: Added API integration with loading skeleton and error banner
+    async function loadReport(service) {
+      setSkeletonLoading(true);
+      clearError();
+      try {
+        const response = await fetch(`/api/v1/report?service=${encodeURIComponent(service)}`);
+        if (!response.ok) {
+          if (response.status >= 500) {
+            throw new Error('Erreur serveur (500): impossible de charger les données du rapport.');
+          }
+          throw new Error(`Erreur API: ${response.status}`);
+        }
+        const json = await response.json();
+        mergeApiPayload(json);
+      } catch (error) {
+        showError(error.message || 'Erreur inconnue de chargement API.');
+      } finally {
+        setSkeletonLoading(false);
+        renderAll();
+      }
+    }
+
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      const html = document.documentElement;
+      html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      renderCharts();
+    });
+
+    serviceSelect.addEventListener('change', () => {
+      state.data.meta.service = serviceSelect.value;
+      loadReport(serviceSelect.value);
+    });
+
+    periodSelect.addEventListener('change', () => {
+      state.data.meta.periodDays = Number(periodSelect.value);
+      setScope();
+      renderCharts();
+    });
+
+    document.querySelectorAll('.nav a').forEach((link) => {
+      link.addEventListener('click', () => {
+        document.querySelectorAll('.nav a').forEach((l) => l.classList.remove('active'));
+        link.classList.add('active');
+      });
+    });
+
+    renderAll();
+    loadReport(state.data.meta.service);
+  </script>
+</body>
+</html>

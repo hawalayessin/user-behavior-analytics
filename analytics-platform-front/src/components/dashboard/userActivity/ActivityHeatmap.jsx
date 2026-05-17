@@ -1,18 +1,16 @@
 import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 
-const DAYS_FR = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const DAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function getColorForCount(count, maxCount) {
-  // Palette aligned with the rest of charts (indigo/violet accent)
-  if (count === 0) return "#0B1220"; // near bg
+  // Intuitive heat scale: low -> cool, high -> warm
+  if (count === 0) return "#1F2937"; // gray-800
   const r = Math.max(0, Math.min(1, count / (maxCount || 1)));
-  if (r < 0.25) return "#312E81"; // indigo-900
-  if (r < 0.5) return "#4F46E5"; // indigo-600
-  if (r < 0.75) return "#7C3AED"; // violet-600
-  if (r < 0.95) return "#A855F7"; // purple-500
-  return "#C084FC"; // purple-300
+  if (r < 0.25) return "#2563EB"; // blue-600
+  if (r < 0.5) return "#10B981"; // emerald-500
+  if (r < 0.75) return "#F59E0B"; // amber-500
+  return "#EF4444"; // red-500
 }
 
 function detectPeakInsight(data) {
@@ -110,7 +108,7 @@ export default function ActivityHeatmap({ data }) {
               <div key={`row-${dayIndex}`} className="flex">
                 {/* Day Label */}
                 <div className="w-12 flex items-center justify-center text-xs font-medium text-slate-400">
-                  {DAYS_FR[dayIndex]}
+                  {DAYS_EN[dayIndex]}
                 </div>
 
                 {/* Cells */}
@@ -129,13 +127,13 @@ export default function ActivityHeatmap({ data }) {
                         style={{ backgroundColor: color }}
                         onMouseEnter={() => setHoveredCell(key)}
                         onMouseLeave={() => setHoveredCell(null)}
-                        title={`${DAYS_FR[dayIndex]} ${hour}h — ${count} users`}
+                        title={`${DAYS_EN[dayIndex]} ${hour}h - ${count} users`}
                       />
 
                       {/* Hover Tooltip */}
                       {isHovered && (
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 whitespace-nowrap">
-                          {DAYS_FR[dayIndex]} {hour}h — {count} utilisateurs
+                          {DAYS_EN[dayIndex]} {hour}h - {count} users
                         </div>
                       )}
                     </div>
@@ -149,28 +147,28 @@ export default function ActivityHeatmap({ data }) {
         {/* Legend */}
         <div className="mt-8 space-y-2">
           <p className="text-xs font-semibold text-slate-400 uppercase">
-            Légende
+            Legend
           </p>
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: "#1A1D27" }} />
+              <div className="w-6 h-6" style={{ backgroundColor: "#1F2937" }} />
               <span className="text-xs text-slate-400">0</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: "#4C1D95" }} />
-              <span className="text-xs text-slate-400">&lt;100</span>
+              <div className="w-6 h-6" style={{ backgroundColor: "#2563EB" }} />
+              <span className="text-xs text-slate-400">Low</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: "#7C3AED" }} />
-              <span className="text-xs text-slate-400">100-300</span>
+              <div className="w-6 h-6" style={{ backgroundColor: "#10B981" }} />
+              <span className="text-xs text-slate-400">Medium</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: "#A855F7" }} />
-              <span className="text-xs text-slate-400">&gt;300</span>
+              <div className="w-6 h-6" style={{ backgroundColor: "#F59E0B" }} />
+              <span className="text-xs text-slate-400">High</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6" style={{ backgroundColor: "#E879F9" }} />
-              <span className="text-xs text-slate-400">Max</span>
+              <div className="w-6 h-6" style={{ backgroundColor: "#EF4444" }} />
+              <span className="text-xs text-slate-400">Very High</span>
             </div>
           </div>
         </div>

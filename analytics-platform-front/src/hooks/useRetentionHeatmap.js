@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import api from "../services/api"
+import { getWithCache } from "../services/api"
 
 export function useRetentionHeatmap({ service_id, last_n_months = 6 } = {}) {
   const [data, setData] = useState(null)
@@ -10,12 +10,14 @@ export function useRetentionHeatmap({ service_id, last_n_months = 6 } = {}) {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      if (service_id) params.set("service_id", service_id)
-      if (last_n_months) params.set("last_n_months", String(last_n_months))
-
-      const res = await api.get(`/analytics/retention/heatmap?${params.toString()}`)
-      setData(res.data)
+      const payload = await getWithCache("/analytics/retention/heatmap", {
+        params: {
+          service_id,
+          last_n_months: last_n_months ? String(last_n_months) : null,
+        },
+        ttlMs: 5 * 60 * 1000,
+      })
+      setData(payload)
     } catch (err) {
       setError(err.response?.data?.detail ?? err.message ?? "Erreur lors du chargement")
     } finally {

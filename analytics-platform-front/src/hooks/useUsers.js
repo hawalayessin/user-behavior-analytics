@@ -26,9 +26,11 @@ export function useUsers({ status, search, service_id, cursor = null, limit = 10
       page_size: limit,
       cursor,
     }),
-    staleTime: 30 * 1000,
+    staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    refetchOnMount: "always",
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   return {

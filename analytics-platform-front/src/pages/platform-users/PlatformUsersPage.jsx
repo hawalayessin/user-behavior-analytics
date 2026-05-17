@@ -9,7 +9,6 @@ import UserFilters from "../../components/platform-users/UserFilters";
 import UserKPICards from "../../components/platform-users/UserKPICards";
 import InviteUserModal from "../../components/platform-users/InviteUserModal";
 import EditUserModal from "../../components/platform-users/EditUserModal";
-import ConfirmDeleteModal from "../../components/platform-users/ConfirmDeleteModal";
 
 const DEBOUNCE_DELAY = 400;
 const PAGE_LIMIT = 20;
@@ -30,7 +29,6 @@ export default function PlatformUsersPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [statsData, setStatsData] = useState({
     total: 0,
@@ -139,10 +137,6 @@ export default function PlatformUsersPage() {
     setSelectedUser(user);
     setShowEditModal(true);
   };
-  const handleDeleteClick = (user) => {
-    setSelectedUser(user);
-    setShowDeleteModal(true);
-  };
 
   const handleToggleStatus = async (user) => {
     try {
@@ -172,13 +166,6 @@ export default function PlatformUsersPage() {
     showToast("User updated successfully", "success");
   };
 
-  const handleDeleteSuccess = () => {
-    setShowDeleteModal(false);
-    setSelectedUser(null);
-    setPage(1);
-    refreshAll(1);
-    showToast("User deleted successfully", "success");
-  };
 
   return (
     <AppLayout
@@ -230,7 +217,6 @@ export default function PlatformUsersPage() {
             loading={loading}
             onEdit={handleEditClick}
             onToggleStatus={handleToggleStatus}
-            onDelete={handleDeleteClick}
             page={page}
             total={total}
             limit={PAGE_LIMIT}
@@ -256,16 +242,6 @@ export default function PlatformUsersPage() {
           />
         )}
 
-        {showDeleteModal && selectedUser && (
-          <ConfirmDeleteModal
-            user={selectedUser}
-            onClose={() => {
-              setShowDeleteModal(false);
-              setSelectedUser(null);
-            }}
-            onSuccess={handleDeleteSuccess}
-          />
-        )}
       </div>
 
       {Toast}

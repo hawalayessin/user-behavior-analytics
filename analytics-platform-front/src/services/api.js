@@ -6,7 +6,38 @@ const api = axios.create({
 
 const inFlightGetRequests = new Map()
 const getResponseCache = new Map()
-const DEFAULT_GET_CACHE_TTL_MS = 15000
+const DEFAULT_GET_CACHE_TTL_MS = 5 * 60 * 1000
+const GET_CACHE_STORAGE_KEY = "digmaco:get-cache:v1"
+
+function loadPersistedGetCache() {
+  try {
+    const raw = sessionStorage.getItem(GET_CACHE_STORAGE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return
+    parsed.forEach(([key, value]) => {
+      if (!key || !value || typeof value.timestamp !== "number") return
+      getResponseCache.set(key, value)
+    })
+  } catch {
+    // Ignore invalid session cache payloads
+  }
+}
+
+function persistGetCache() {
+  try {
+    const now = Date.now()
+    // Keep persisted cache bounded and reasonably fresh.
+    const entries = Array.from(getResponseCache.entries())
+      .filter(([, value]) => now - value.timestamp < 24 * 60 * 60 * 1000)
+      .slice(-300)
+    sessionStorage.setItem(GET_CACHE_STORAGE_KEY, JSON.stringify(entries))
+  } catch {
+    // Ignore storage quota / privacy mode failures
+  }
+}
+
+loadPersistedGetCache()
 
 function toCanonicalParams(params = {}) {
   return Object.keys(params)
@@ -53,6 +84,7 @@ export async function getWithCache(url, { params = null, force = false, ttlMs = 
     .get(url, { params })
     .then((response) => {
       getResponseCache.set(cacheKey, { data: response.data, timestamp: Date.now() })
+      persistGetCache()
       return response.data
     })
     .finally(() => {

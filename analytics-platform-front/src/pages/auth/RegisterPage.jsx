@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../services/api";
 import digmacoLogo from "../../assets/digmaco.png";
@@ -15,8 +15,45 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+  const [verified, setVerified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const verifyInvite = async () => {
+      if (!token) {
+        setVerifying(false);
+        return;
+      }
+      try {
+        await api.post("/auth/register-invite/verify", { token });
+        if (!cancelled) {
+          setVerified(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const status = err?.response?.status;
+          if (status === 403) {
+            navigate("/login");
+          } else {
+            setError(err?.response?.data?.detail || "Invitation token is invalid.");
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setVerifying(false);
+        }
+      }
+    };
+
+    verifyInvite();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, navigate]);
 
   if (!token) {
     return (
@@ -45,6 +82,27 @@ export default function RegisterPage() {
             Back to Sign In
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (verifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--color-bg-primary)" }}>
+        <p style={{ color: "var(--color-text-secondary)" }}>Verifying invitation...</p>
+      </div>
+    );
+  }
+
+  if (!verified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--color-bg-primary)" }}>
+        <button
+          onClick={() => navigate("/login")}
+          className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold"
+        >
+          Back to Sign In
+        </button>
       </div>
     );
   }

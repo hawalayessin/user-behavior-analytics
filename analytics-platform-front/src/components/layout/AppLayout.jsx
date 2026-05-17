@@ -18,6 +18,7 @@ export default function AppLayout({
   hasNotifications = false,
   showExportButton = false,
 }) {
+
   return (
     <div
       className="flex h-screen overflow-hidden"

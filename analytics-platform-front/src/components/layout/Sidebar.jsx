@@ -1,19 +1,57 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, LogOut, Zap } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { ChevronLeft, ChevronRight, LogOut, Zap, ChevronDown } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { navigationConfig } from "./navConfig";
-import SidebarSection from "./SidebarSection";
-import SidebarNavItem from "./SidebarNavItem";
 import { ThemeToggleWithLabel } from "./ThemeToggle";
 
-/**
- * Sidebar
- * Main navigation sidebar with collapsible state, admin-only sections,
- * and sticky header/footer with user info
- */
 export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({});
+  const navRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const { full_name, logout, isAdmin } = useAuth();
+  const sidebarScrollKey = "sidebar-nav-scroll";
+
+  useEffect(() => {
+    const mainContent = document.querySelector('main');
+    if (!mainContent) return;
+
+    const handleScroll = () => {
+      sessionStorage.setItem(`scroll-${location.pathname}`, mainContent.scrollTop);
+    };
+
+    mainContent.addEventListener('scroll', handleScroll);
+
+    const savedScroll = sessionStorage.getItem(`scroll-${location.pathname}`);
+    if (savedScroll) {
+      mainContent.scrollTop = parseInt(savedScroll, 10);
+    }
+
+    return () => {
+      mainContent.removeEventListener('scroll', handleScroll);
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const navEl = navRef.current;
+    if (!navEl) return;
+
+    const saved = sessionStorage.getItem(sidebarScrollKey);
+    if (saved) {
+      navEl.scrollTop = parseInt(saved, 10);
+    }
+
+    const handleNavScroll = () => {
+      sessionStorage.setItem(sidebarScrollKey, String(navEl.scrollTop));
+    };
+
+    navEl.addEventListener("scroll", handleNavScroll, { passive: true });
+    return () => {
+      navEl.removeEventListener("scroll", handleNavScroll);
+    };
+  }, [location.pathname]);
 
   const getInitials = () => {
     if (!full_name) return "?";
@@ -30,6 +68,31 @@ export default function Sidebar() {
   };
 
   const sidebarWidth = isCollapsed ? "w-16" : "w-[220px]";
+
+  const handleNavClick = useCallback((route) => (e) => {
+    e.preventDefault();
+    if (navRef.current) {
+      sessionStorage.setItem(sidebarScrollKey, String(navRef.current.scrollTop));
+    }
+
+    const mainContent = document.querySelector('main');
+    if (mainContent) {
+      const scrollPos = mainContent.scrollTop;
+      const currentPath = location.pathname;
+
+      sessionStorage.setItem(`scroll-${currentPath}`, scrollPos);
+      navigate(route);
+
+      requestAnimationFrame(() => {
+        const savedScroll = sessionStorage.getItem(`scroll-${route}`);
+        if (mainContent && savedScroll) {
+          mainContent.scrollTop = parseInt(savedScroll, 10);
+        }
+      });
+    } else {
+      navigate(route);
+    }
+  }, [navigate, location.pathname]);
 
   return (
     <aside
@@ -86,32 +149,85 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto sidebar-nav">
+      <nav
+        ref={navRef}
+        className="flex-1 overflow-y-auto sidebar-nav"
+      >
         {navigationConfig.map((section) => {
           if (section.adminOnly && !isAdmin()) return null;
 
-          return (
-            <SidebarSection
-              key={section.section}
-              title={section.section}
-              isCollapsed={isCollapsed}
-            >
-              {section.items.map((item) => (
-                <SidebarNavItem
-                  key={item.route}
-                  icon={item.icon}
-                  label={item.label}
-                  route={item.route}
-                  isCollapsed={isCollapsed}
-                />
-              ))}
+          const isCollapsible = section.collapsible;
+          const isExpanded = expandedSections[section.section] ?? true;
 
-              {!isCollapsed && section.section === "ADMIN" && (
-                <div className="px-3 pt-2">
-                  <ThemeToggleWithLabel />
+          return (
+            <div key={section.section} className="py-4">
+              {isCollapsible && !isCollapsed ? (
+                <button
+                  onClick={() =>
+                    setExpandedSections((prev) => ({
+                      ...prev,
+                      [section.section]: !prev[section.section],
+                    }))
+                  }
+                  className="w-full flex items-center justify-between px-4 mb-2 text-xs font-semibold uppercase tracking-widest hover:text-[var(--color-text-secondary)] transition-colors"
+                  style={{ color: "var(--color-text-disabled)" }}
+                >
+                  <span>{section.section}</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-200 ${isExpanded ? "rotate-0" : "-rotate-90"}`}
+                  />
+                </button>
+              ) : (
+                !isCollapsed && (
+                  <h3
+                    className="px-4 mb-2 text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--color-text-disabled)" }}
+                  >
+                    {section.section}
+                  </h3>
+                )
+              )}
+
+              {(!isCollapsible || isExpanded || isCollapsed) && (
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const isActive = location.pathname === item.route;
+                    return (
+                      <a
+                        key={item.route}
+                        href={item.route}
+                        onClick={handleNavClick(item.route)}
+                        className="group relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 border-l-2 cursor-pointer"
+                        style={{
+                          backgroundColor: isActive ? "var(--color-primary-bg)" : "transparent",
+                          color: isActive ? "var(--color-primary)" : "var(--color-text-muted)",
+                          borderLeftColor: isActive ? "var(--color-primary)" : "transparent",
+                        }}
+                      >
+                        <item.icon
+                          className="w-5 h-5 flex-shrink-0 transition-colors duration-200"
+                          style={{
+                            color: isActive
+                              ? "var(--color-primary)"
+                              : "var(--color-text-muted)",
+                          }}
+                        />
+                        {!isCollapsed && (
+                          <span className="text-sm font-medium truncate">{item.label}</span>
+                        )}
+                      </a>
+                    );
+                  })}
+
+                  {!isCollapsed && section.section === "ADMIN" && (
+                    <div className="px-3 pt-2">
+                      <ThemeToggleWithLabel />
+                    </div>
+                  )}
                 </div>
               )}
-            </SidebarSection>
+            </div>
           );
         })}
       </nav>

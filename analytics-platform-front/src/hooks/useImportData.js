@@ -122,6 +122,12 @@ export default function useImportData() {
     }
   }, [])
 
+  const getImportHistoryDetails = useCallback(async (logId) => {
+    if (!logId) return null
+    const res = await api.get(`/admin/import/history/${logId}`)
+    return res.data ?? null
+  }, [])
+
   return {
     loading,
     historyLoading,
@@ -134,5 +140,6 @@ export default function useImportData() {
     importDatabaseSql,
     downloadTemplate,
     getTableSchema,
+    getImportHistoryDetails,
   }
 }

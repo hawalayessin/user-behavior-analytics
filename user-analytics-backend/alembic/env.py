@@ -6,6 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 from app.core.database import Base
 from app.models import __all__
+from app.models.report_history import ReportHistory
 from app.core.config import settings
 
 DATABASE_URL = settings.DATABASE_URL

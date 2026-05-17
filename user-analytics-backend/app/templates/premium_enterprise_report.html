@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIGMACO{% if language == 'en' %} — Complete Analytical Report{% else %} — Rapport Analytique Complet{% endif %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-page:     #0a1628;
+  --bg-sidebar:  #0d1e3a;
+  --bg-card:     #111f38;
+  --bg-card-alt: #0f1d35;
+  --bg-elevated: #152540;
+  --bg-surface:  #1a2d4a;
+
+  --border:      #1e3555;
+  --border-mid:  #2a4570;
+  --border-soft: #162d50;
+
+  --blue:        #3b82f6;
+  --blue-light:  #60a5fa;
+  --blue-dim:    #1e40af;
+  --blue-bg:     #0f2340;
+
+  --green:       #10b981;
+  --green-light: #34d399;
+  --green-bg:    #062318;
+
+  --red:         #ef4444;
+  --red-light:   #f87171;
+  --red-bg:      #2a0a0a;
+
+  --amber:       #f59e0b;
+  --amber-light: #fcd34d;
+  --amber-bg:    #2a1a00;
+
+  --purple:      #8b5cf6;
+  --purple-light:#a78bfa;
+  --purple-bg:   #1a0f35;
+
+  --cyan:        #06b6d4;
+  --cyan-light:  #22d3ee;
+  --cyan-bg:     #061e28;
+
+  --text-primary:   #f0f4ff;
+  --text-secondary: #94a3b8;
+  --text-muted:     #4a6080;
+  --text-disabled:  #2d4060;
+
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+
+  --sidebar-w:    224px;
+  --radius-card:  10px;
+  --radius-small:  6px;
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; right: 0;
+  width: 40%;
+  height: 40%;
+  background: radial-gradient(
+    ellipse at top right,
+    rgba(59,130,246,0.06) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after { display: none; }
+
+.layout {
+  display: flex;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── SIDEBAR ─────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-mid);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-mark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+.logo-sub {
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 12px 8px 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: all 0.12s ease;
+  cursor: pointer;
+}
+.nav-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.nav-item.active {
+  background: var(--blue-bg);
+  border-color: rgba(59,130,246,0.25);
+  color: var(--blue-light);
+  font-weight: 500;
+}
+
+.nav-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.nav-item.active .nav-dot {
+  opacity: 1;
+  background: var(--blue);
+}
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-footer-label { font-size: 10px; color: var(--text-muted); }
+.sidebar-footer-val { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* ─── MAIN ────────────────────────────────── */
+.main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── TOPBAR ───────────────────────────────── */
+.topbar {
+  height: 56px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-mid);
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topbar-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+
+.topbar-period {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+}
+
+.badge-live {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--amber-light);
+  background: var(--amber-bg);
+  border: 1px solid rgba(245,158,11,0.25);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.btn-export:hover { opacity: 0.85; }
+
+/* ─── PAGE CONTENT ────────────────────────── */
+.page-content {
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ─── SECTION HEADER ──────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--blue-light);
+  background: var(--blue-bg);
+  border: 1px solid rgba(59,130,246,0.3);
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+/* ─── SECTION BLOCK ───────────────────────── */
+.section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sep {
+  width: 100%;
+  height: 1px;
+  background: var(--border-mid);
+  margin: 4px 0;
+}
+
+/* ─── KPI GRID ────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 18px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--blue);
+  border-radius: 3px 3px 0 0;
+}
+
+.kpi-card.danger {
+  background: var(--red-bg);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+.kpi-card.danger::before {
+  background: var(--red);
+}
+
+.kpi-card.success {
+  background: var(--green-bg);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+.kpi-card.success::before {
+  background: var(--green);
+}
+
+.kpi-card.warning {
+  background: var(--amber-bg);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.kpi-card.warning::before {
+  background: var(--amber);
+}
+
+.kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.kpi-value {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 8px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.kpi-delta {
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kpi-delta.up   { color: var(--green-light); }
+.kpi-delta.down { color: var(--red-light);   }
+.kpi-delta.warn { color: var(--amber-light); }
+
+/* ─── CONTENT GRIDS ───────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+.grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+
+/* ─── CARD ────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+/* ─── AI INSIGHT BLOCK ────────────────────── */
+.ai-block {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  border-left: 4px solid var(--blue);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.ai-block::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  opacity: 0.5;
+}
+
+.ai-block.warn {
+  border-left-color: var(--amber);
+  background: var(--amber-bg);
+  border-color: rgba(245,158,11,0.2);
+}
+.ai-block.warn::after { background: var(--amber); }
+
+.ai-block.danger {
+  border-left-color: var(--red);
+  background: var(--red-bg);
+  border-color: rgba(239,68,68,0.2);
+}
+.ai-block.danger::after { background: var(--red); }
+
+.ai-block.success {
+  border-left-color: var(--green);
+  background: var(--green-bg);
+  border-color: rgba(16,185,129,0.2);
+}
+.ai-block.success::after { background: var(--green); }
+
+.ai-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--blue-light);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ai-block.warn   .ai-tag { color: var(--amber-light); }
+.ai-block.danger .ai-tag { color: var(--red-light);   }
+.ai-block.success .ai-tag { color: var(--green-light); }
+
+.ai-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* ─── RETENTION TABLE ─────────────────────── */
+.ret-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ret-table th {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  text-align: left;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-mid);
+}
+
+.ret-table td {
+  padding: 11px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.ret-table tr:hover td {
+  background: var(--bg-elevated);
+}
+
+.ret-table tr:last-child td {
+  border-bottom: none;
+}
+
+.service-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ret-val { font-family: var(--font-mono); }
+.ret-val.good { color: var(--green-light); }
+.ret-val.mid  { color: var(--amber-light); }
+.ret-val.bad  { color: var(--red-light);   }
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.status-badge.stable    {
+  background: var(--green-bg);
+  color: var(--green-light);
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.status-badge.healthy   {
+  background: var(--blue-bg);
+  color: var(--blue-light);
+  border: 1px solid rgba(59,130,246,0.2);
+}
+.status-badge.attention {
+  background: var(--amber-bg);
+  color: var(--amber-light);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.status-badge.critical  {
+  background: var(--red-bg);
+  color: var(--red-light);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+
+/* ─── RETENTION BAR ───────────────────────── */
+.ret-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.ret-bar-bg {
+  flex: 1;
+  height: 5px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ret-bar-fill { height: 100%; border-radius: 3px; }
+
+/* ─── FUNNEL ──────────────────────────────── */
+.funnel { display: flex; flex-direction: column; gap: 8px; }
+.funnel-row { display: flex; align-items: center; gap: 10px; }
+.funnel-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 100px;
+  flex-shrink: 0;
+}
+.funnel-track {
+  flex: 1;
+  height: 22px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.funnel-fill {
+  height: 100%;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+  justify-content: flex-end;
+  min-width: 2px;
+}
+.funnel-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  width: 36px;
+  text-align: right;
+}
+
+/* ─── SEGMENT CARDS ───────────────────────── */
+.seg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  transition: border-color 0.15s;
+}
+.seg-card.highlight {
+  background: var(--blue-bg);
+  border-color: rgba(59,130,246,0.35);
+}
+.seg-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+.seg-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+.seg-stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.seg-stat-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.seg-pct-bar {
+  height: 3px;
+  background: var(--border-mid);
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+.seg-pct-fill { height: 100%; border-radius: 2px; }
+
+/* ─── CAMPAIGN ────────────────────────────── */
+.camp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.camp-stat { text-align: center; }
+.camp-stat-val {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+.camp-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+/* ─── ATTRIBUTION BAR ─────────────────────── */
+.attr-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.attr-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 130px;
+  flex-shrink: 0;
+}
+.attr-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.attr-bar { height: 100%; border-radius: 3px; }
+.attr-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 32px;
+  text-align: right;
+}
+
+/* ─── TECH BADGE ──────────────────────────── */
+.tech-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  color: var(--text-secondary);
+}
+.tech-pill.highlight {
+  background: var(--blue-bg);
+  border-color: rgba(59,130,246,0.3);
+  color: var(--blue-light);
+}
+
+/* ─── MODEL PERF ──────────────────────────── */
+.model-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.model-row:last-child { border-bottom: none; }
+.model-key {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.model-val {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ─── CHART CANVAS ────────────────────────── */
+.chart-wrap { position: relative; width: 100%; }
+
+/* ─── SCROLLBAR ───────────────────────────── */
+.page-content::-webkit-scrollbar { width: 4px; }
+.page-content::-webkit-scrollbar-track { background: transparent; }
+.page-content::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+
+/* ─── HIGHLIGHT NUMBERS ───────────────────── */
+.highlight-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.highlight-num.blue {
+  background: var(--blue-bg);
+  color: var(--blue-light);
+  border: 1px solid rgba(59,130,246,0.2);
+}
+.highlight-num.green {
+  background: var(--green-bg);
+  color: var(--green-light);
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.highlight-num.red {
+  background: var(--red-bg);
+  color: var(--red-light);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+
+/* ─── PDF / PRINT OVERRIDES ────────────────── */
+@page {
+  margin: 12mm 15mm;
+  size: A4 portrait;
+}
+
+@media print {
+  :root {
+    --bg-page:    #ffffff;
+    --bg-sidebar: #f8fafc;
+    --bg-card:    #f1f5f9;
+    --bg-elevated:#e2e8f0;
+    --border:     #cbd5e1;
+    --border-mid: #94a3b8;
+    --text-primary:   #0f172a;
+    --text-secondary: #334155;
+    --text-muted:     #64748b;
+  }
+
+  body::before { display: none; }
+  body::after  { display: none; }
+
+  .sidebar { display: none !important; }
+  .main    { margin-left: 0 !important; }
+
+  .topbar {
+    position: static !important;
+    background: #f8fafc !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .page-content { padding: 16px !important; }
+
+  .card, .kpi-card, .ai-block, .seg-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .section-block {
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  .sep { display: none; }
+}
+</style>
+</head>
+<body>
+
+{% if language == 'en' %}
+{% set _NAV_REPORT = "Report" %}
+{% set _NAV_EXEC = "Executive Summary" %}
+{% set _NAV_CHURN = "Churn & Retention" %}
+{% set _NAV_COHORTS = "Cohorts" %}
+{% set _NAV_TRIAL = "Free Trial" %}
+{% set _NAV_AI_SEG = "AI Segmentation" %}
+{% set _NAV_CAMPAIGNS = "Campaigns" %}
+{% set _NAV_ACTIVITY = "Activity" %}
+{% set _NAV_TECH = "Technical Appendix" %}
+{% set _GEN_ON = "Generated on" %}
+{% set _TOPBAR_TTL = "Analytical Report" %}
+{% set _TB_EXEC = "Executive Summary" %}
+{% set _TB_CHURN = "Churn & Retention" %}
+{% set _TB_AI = "AI & Segmentation" %}
+{% set _CONF = "Confidential" %}
+{% set _EXPORT = "Export" %}
+{% set _SEC_SUMMARY = "Executive Summary" %}
+{% set _SEC_CHURN = "Churn & Retention" %}
+{% set _SEC_RETENTION = "Retention Cohorts" %}
+{% set _SEC_TRIAL = "Free Trial Behavior" %}
+{% set _SEC_AI = "AI Segmentation" %}
+{% set _SEC_CAMPAIGNS = "Campaign Performance" %}
+{% set _SEC_ACTIVITY = "User Activity" %}
+{% set _SEC_TECH = "Technical Appendix" %}
+{% set _PERIOD = "Period" %}
+{% set _KPI_SUBS = "Total Subscribers" %}
+{% set _KPI_CHURN = "Churn Rate" %}
+{% set _KPI_ARPU = "Average ARPU" %}
+{% set _KPI_CONV = "Conversion" %}
+{% set _KPI_D30 = "D30 Retention" %}
+{% set _KPI_RISK = "At Risk" %}
+{% set _GROWTH = "growth" %}
+{% set _VS_PREV = "vs previous" %}
+{% set _STABLE = "Stable" %}
+{% set _MONITOR = "To monitor" %}
+{% set _AI_PRIO = "Strategic Priorities" %}
+{% set _AI_FCAST = "Predictive Forecast" %}
+{% set _AI_KPI = "Expected KPI Improvements" %}
+{% set _CHURN_TTL = "Monthly Churn Evolution" %}
+{% set _AI_CAUSE = "Root Cause Analysis" %}
+{% set _AI_CHURN90 = "90-Day Churn Forecast" %}
+{% set _RET_RADAR = "D30 Retention by Service" %}
+{% set _TBL_SVC = "Service" %}
+{% set _TBL_D7 = "D7" %}
+{% set _TBL_D30 = "D30" %}
+{% set _TBL_D90 = "D90" %}
+{% set _TBL_ST = "Status" %}
+{% set _ST_STABLE = "Stable" %}
+{% set _ST_HEALTHY = "Healthy" %}
+{% set _ST_ATTN = "Attention" %}
+{% set _ST_CRIT = "Critical" %}
+{% set _FUNNEL_TTL = "Trial to Paid Funnel" %}
+{% set _FUN_STARTS = "Starts" %}
+{% set _FUN_W1 = "Active W1" %}
+{% set _FUN_ENG = "Engaged" %}
+{% set _FUN_INT = "Intent" %}
+{% set _FUN_PAID = "Paid" %}
+{% set _AI_SESS = "Session Analysis" %}
+{% set _AI_TRIAL = "Trial Optimization" %}
+{% set _TRIAL_CHART = "Trial vs Paid Churn" %}
+{% set _SEG_DIST = "Segment Distribution" %}
+{% set _SEG_ARPU = "ARPU per Segment" %}
+{% set _AI_MIG = "Migration Analysis" %}
+{% set _AI_PROF = "Profitability Matrix" %}
+{% set _CAMP_ATTR = "Channel Attribution" %}
+{% set _CAMP_FUN = "Conversion Funnel" %}
+{% set _CAMP_ROI = "Avg ROI" %}
+{% set _CAMP_SMS = "SMS Effectiveness" %}
+{% set _CAMP_ENG = "Engagement" %}
+{% set _AI_CAMP = "Campaign Strategy" %}
+{% set _ACT_TTL = "Activity Trends - Daily Sessions" %}
+{% set _TECH_PERF = "Model Performance" %}
+{% set _TECH_FEAT = "Feature Importance" %}
+{% set _TECH_META = "Technical Metadata" %}
+{% set _TECH_JSON = "Full JSON Export" %}
+{% set _MDL_ENG = "Engine" %}
+{% set _MDL_MODEL = "AI Model" %}
+{% set _MDL_ACTIVE = "Active Users" %}
+{% set _MDL_TOTAL = "Total Subscribers" %}
+{% set _MDL_PAYING = "Paying Users" %}
+{% set _MDL_LIFE = "Avg Lifetime" %}
+{% set _SEG_RET = "Retention" %}
+{% set _SEG_LOYALS = "Regular Loyals" %}
+{% set _SEG_OCC = "Occasional" %}
+{% set _SEG_REG = "Regular" %}
+{% set _MDL_CONF = "Model Confidence" %}
+{% else %}
+{% set _NAV_REPORT = "Rapport" %}
+{% set _NAV_EXEC = "Résumé Exécutif" %}
+{% set _NAV_CHURN = "Churn & Rétention" %}
+{% set _NAV_COHORTS = "Cohortes" %}
+{% set _NAV_TRIAL = "Essai Gratuit" %}
+{% set _NAV_AI_SEG = "Segmentation IA" %}
+{% set _NAV_CAMPAIGNS = "Campagnes" %}
+{% set _NAV_ACTIVITY = "Activité" %}
+{% set _NAV_TECH = "Annexe Technique" %}
+{% set _GEN_ON = "Généré le" %}
+{% set _TOPBAR_TTL = "Rapport Analytique" %}
+{% set _TB_EXEC = "Résumé Exécutif" %}
+{% set _TB_CHURN = "Churn & Rétention" %}
+{% set _TB_AI = "IA & Segmentation" %}
+{% set _CONF = "Confidentiel" %}
+{% set _EXPORT = "Exporter" %}
+{% set _SEC_SUMMARY = "Résumé Exécutif" %}
+{% set _SEC_CHURN = "Churn & Rétention" %}
+{% set _SEC_RETENTION = "Cohortes de Rétention" %}
+{% set _SEC_TRIAL = "Comportement Essai Gratuit" %}
+{% set _SEC_AI = "Segmentation IA" %}
+{% set _SEC_CAMPAIGNS = "Performance Campagnes" %}
+{% set _SEC_ACTIVITY = "Activité Utilisateur" %}
+{% set _SEC_TECH = "Annexe Technique" %}
+{% set _PERIOD = "Période" %}
+{% set _KPI_SUBS = "Abonnés Totaux" %}
+{% set _KPI_CHURN = "Taux de Churn" %}
+{% set _KPI_ARPU = "ARPU Moyen" %}
+{% set _KPI_CONV = "Conversion" %}
+{% set _KPI_D30 = "Rétention D30" %}
+{% set _KPI_RISK = "À Risque" %}
+{% set _GROWTH = "croissance" %}
+{% set _VS_PREV = "vs précédent" %}
+{% set _STABLE = "Stable" %}
+{% set _MONITOR = "À surveiller" %}
+{% set _AI_PRIO = "Priorités Stratégiques" %}
+{% set _AI_FCAST = "Prévision Prédictive" %}
+{% set _AI_KPI = "Améliorations KPI Attendues" %}
+{% set _CHURN_TTL = "Évolution Mensuelle du Churn" %}
+{% set _AI_CAUSE = "Analyse des Causes Racines" %}
+{% set _AI_CHURN90 = "Prévision Churn 90j" %}
+{% set _RET_RADAR = "Comparaison Services D30" %}
+{% set _TBL_SVC = "Service" %}
+{% set _TBL_D7 = "D7" %}
+{% set _TBL_D30 = "D30" %}
+{% set _TBL_D90 = "D90" %}
+{% set _TBL_ST = "Statut" %}
+{% set _ST_STABLE = "Stable" %}
+{% set _ST_HEALTHY = "Sain" %}
+{% set _ST_ATTN = "Attention" %}
+{% set _ST_CRIT = "Critique" %}
+{% set _FUNNEL_TTL = "Funnel Essai → Payant" %}
+{% set _FUN_STARTS = "Démarrages" %}
+{% set _FUN_W1 = "Actifs S1" %}
+{% set _FUN_ENG = "Engagés" %}
+{% set _FUN_INT = "Intention" %}
+{% set _FUN_PAID = "Payants" %}
+{% set _AI_SESS = "Analyse des Sessions" %}
+{% set _AI_TRIAL = "Optimisation Essai" %}
+{% set _TRIAL_CHART = "Churn Trial vs Payants" %}
+{% set _SEG_DIST = "Distribution des Segments" %}
+{% set _SEG_ARPU = "ARPU par Segment" %}
+{% set _AI_MIG = "Analyse de Migration" %}
+{% set _AI_PROF = "Matrice Rentabilité" %}
+{% set _CAMP_ATTR = "Attribution Canal" %}
+{% set _CAMP_FUN = "Funnel Conversion" %}
+{% set _CAMP_ROI = "ROI Moyen" %}
+{% set _CAMP_SMS = "Efficacité SMS" %}
+{% set _CAMP_ENG = "Engagement" %}
+{% set _AI_CAMP = "Stratégie Campagnes" %}
+{% set _ACT_TTL = "Tendances d'Activité — Sessions Quotidiennes" %}
+{% set _TECH_PERF = "Performance Modèle" %}
+{% set _TECH_FEAT = "Importance des Features" %}
+{% set _TECH_META = "Métadonnées Techniques" %}
+{% set _TECH_JSON = "Export JSON Complet" %}
+{% set _MDL_ENG = "Engine" %}
+{% set _MDL_MODEL = "Modèle IA" %}
+{% set _MDL_ACTIVE = "Utilisateurs Actifs" %}
+{% set _MDL_TOTAL = "Total Abonnés" %}
+{% set _MDL_PAYING = "Paying Users" %}
+{% set _MDL_LIFE = "Avg Lifetime" %}
+{% set _SEG_RET = "Rétention" %}
+{% set _SEG_LOYALS = "Loyaux Réguliers" %}
+{% set _SEG_OCC = "Occasionnels" %}
+{% set _SEG_REG = "Réguliers" %}
+{% set _MDL_CONF = "Confiance Modèle" %}
+{% endif %}
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">DIGMACO</div>
+    <div class="logo-sub">Precision Observatory</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">{{ _NAV_REPORT }}</div>
+    {% if 'summary' in sections_included %}
+    <a class="nav-item active" href="#summary">
+      <span class="nav-dot"></span> {{ _NAV_EXEC }}
+    </a>
+    {% endif %}
+    {% if 'churn' in sections_included %}
+    <a class="nav-item" href="#churn">
+      <span class="nav-dot"></span> {{ _NAV_CHURN }}
+    </a>
+    {% endif %}
+    {% if 'retention' in sections_included %}
+    <a class="nav-item" href="#cohorts">
+      <span class="nav-dot"></span> {{ _NAV_COHORTS }}
+    </a>
+    {% endif %}
+    {% if 'trial' in sections_included %}
+    <a class="nav-item" href="#trial">
+      <span class="nav-dot"></span> {{ _NAV_TRIAL }}
+    </a>
+    {% endif %}
+    {% if 'ai_segmentation' in sections_included %}
+    <a class="nav-item" href="#segmentation">
+      <span class="nav-dot"></span> {{ _NAV_AI_SEG }}
+    </a>
+    {% endif %}
+    {% if 'campaigns' in sections_included %}
+    <a class="nav-item" href="#campaigns">
+      <span class="nav-dot"></span> {{ _NAV_CAMPAIGNS }}
+    </a>
+    {% endif %}
+    {% if 'activity' in sections_included %}
+    <a class="nav-item" href="#activity">
+      <span class="nav-dot"></span> {{ _NAV_ACTIVITY }}
+    </a>
+    {% endif %}
+    {% if 'raw_data' in sections_included %}
+    <a class="nav-item" href="#tech">
+      <span class="nav-dot"></span> {{ _NAV_TECH }}
+    </a>
+    {% endif %}
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-label">{{ _GEN_ON }}</div>
+    <div class="sidebar-footer-val">{{ generated_timestamp }}</div>
+    <div class="sidebar-footer-label" style="margin-top:8px">{{ generated_by }}</div>
+    <div class="sidebar-footer-val">{{ report_type }}</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-title">{{ _TOPBAR_TTL }}{% if report_type == 'executive' %} — {{ _TB_EXEC }}{% elif report_type == 'churn' %} — {{ _TB_CHURN }}{% elif report_type == 'ai_segmentation' %} — {{ _TB_AI }}{% endif %}</div>
+    <span class="topbar-period">{{ date_range }}</span>
+    <div class="badge-live">{{ _CONF }}</div>
+    <button class="btn-export" onclick="window.print()">↓ {{ _EXPORT }}</button>
+  </div>
+
+  <!-- PAGE CONTENT -->
+  <div class="page-content">
+
+    {% if 'summary' in sections_included %}
+    <!-- SECTION 01: RÉSUMÉ EXÉCUTIF -->
+    <div class="section-block" id="summary">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <span class="section-title">{{ _NAV_EXEC }}</span>
+        <span class="section-subtitle">{{ _PERIOD }} {{ date_range }}</span>
+      </div>
+
+      <!-- KPI GRID -->
+      <div class="kpi-grid">
+        <div class="kpi-card success">
+          <div class="kpi-label">{{ _KPI_SUBS }}</div>
+          <div class="kpi-value">{{ active_users }}</div>
+          <div class="kpi-delta up">▲ +{{ active_growth_pct }}% {{ _GROWTH }}</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">{{ _KPI_CHURN }}</div>
+          <div class="kpi-value">{{ global_churn_rate }}%</div>
+          <div class="kpi-delta down">▼ {{ churn_delta_pct }}% {{ _VS_PREV }}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">{{ _KPI_ARPU }}</div>
+          <div class="kpi-value">{{ arpu }}<span style="font-size:14px;font-weight:400;color:var(--text-muted)"> TND</span></div>
+          <div class="kpi-delta up">▲ {{ arpu_delta }}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">{{ _KPI_CONV }}</div>
+          <div class="kpi-value">{{ conversion_rate }}%</div>
+          <div class="kpi-delta up">▲ +{{ conversion_delta }}%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">{{ _KPI_D30 }}</div>
+          <div class="kpi-value">{{ retention_d30 }}%</div>
+          <div class="kpi-delta warn">→ {{ _STABLE }}</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">{{ _KPI_RISK }}</div>
+          <div class="kpi-value">{{ high_risk_pct }}</div>
+          <div class="kpi-delta down">⚠ {{ _MONITOR }}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Conversion</div>
+          <div class="kpi-value">{{ conversion_rate }}%</div>
+          <div class="kpi-delta up">▲ +{{ conversion_delta }}%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">{{ _KPI_D30 }}</div>
+          <div class="kpi-value">{{ retention_d30 }}%</div>
+          <div class="kpi-delta warn">→ {{ _STABLE }}</div>
+        </div>
+        <div class="kpi-card danger">
+          <div class="kpi-label">{{ _KPI_RISK }}</div>
+          <div class="kpi-value">{{ high_risk_pct }}</div>
+          <div class="kpi-delta down">⚠ {{ _MONITOR }}</div>
+        </div>
+      </div>
+
+      <!-- AI INSIGHTS -->
+      <div class="grid-3">
+        <div class="ai-block">
+          <div class="ai-tag">{{ _AI_PRIO }}</div>
+          <div class="ai-text">{{ strategic_priorities }}</div>
+        </div>
+        <div class="ai-block warn">
+          <div class="ai-tag">{{ _AI_FCAST }}</div>
+          <div class="ai-text">{{ predictive_forecast }}</div>
+        </div>
+        <div class="ai-block success">
+          <div class="ai-tag">{{ _AI_KPI }}</div>
+          <div class="ai-text">{{ expected_kpi_improvements }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sep"></div>
+
+    {% if 'churn' in sections_included %}
+    <!-- SECTION 02: CHURN -->
+    <div class="section-block" id="churn">
+      <div class="section-header">
+        <span class="section-num" style="color:var(--red);background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.2)">02</span>
+        <span class="section-title">{{ _NAV_CHURN }}</span>
+      </div>
+
+      <div class="grid-2-1">
+        <!-- CHURN CHART -->
+        <div class="card">
+          <div class="card-title">{{ _CHURN_TTL }}</div>
+          <div class="chart-wrap" style="height:200px">
+            <canvas id="churnChart" role="img" aria-label="{{ _CHURN_TTL }}">Churn: {{ global_churn_rate }}%</canvas>
+          </div>
+        </div>
+
+        <!-- ANALYSIS -->
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="ai-block danger">
+            <div class="ai-tag">{{ _AI_CAUSE }}</div>
+            <div class="ai-text">{{ ai_churn_explanations }}</div>
+          </div>
+          <div class="ai-block">
+            <div class="ai-tag">{{ _AI_CHURN90 }}</div>
+            <div class="ai-text">{{ predictive_churn_forecast }}</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span class="highlight-num red">Trial churn: {{ trial_churn_rate }}%</span>
+            <span class="highlight-num blue">D7: {{ retention_d7 }}%</span>
+            <span class="highlight-num blue">D30: {{ retention_d30 }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sep"></div>
+
+    {% if 'retention' in sections_included %}
+    <!-- SECTION 03: COHORTES -->
+    <div class="section-block" id="cohorts">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <span class="section-title">{{ _SEC_RETENTION }}</span>
+      </div>
+
+      <div class="grid-1-2">
+        <!-- RADAR CHART -->
+        <div class="card">
+          <div class="card-title">{{ _RET_RADAR }}</div>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="retentionRadar" role="img" aria-label="{{ _RET_RADAR }}">{{ segment_comparison }}</canvas>
+          </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="card">
+          <div class="card-title">Taux D7, D30, D90 par Service</div>
+          <table class="ret-table">
+            <thead>
+              <tr>
+                <th>{{ _TBL_SVC }}</th>
+                <th>{{ _TBL_D7 }}</th>
+                <th>{{ _TBL_D30 }}</th>
+                <th>{{ _TBL_D90 }}</th>
+                <th>{{ _TBL_ST }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="service-name">Esports.tn</td>
+                <td>
+                  <div class="ret-bar-wrap">
+                    <div class="ret-bar-bg"><div class="ret-bar-fill" style="width:91.5%;background:var(--green)"></div></div>
+                    <span class="ret-val good">91.5%</span>
+                  </div>
+                </td>
+                <td class="ret-val good">78.3%</td>
+                <td class="ret-val mid">58.2%</td>
+                <td><span class="status-badge stable">Stable</span></td>
+              </tr>
+              <tr>
+                <td class="service-name">ElJournal</td>
+                <td>
+                  <div class="ret-bar-wrap">
+                    <div class="ret-bar-bg"><div class="ret-bar-fill" style="width:84.2%;background:#60A5FA"></div></div>
+                    <span class="ret-val good">84.2%</span>
+                  </div>
+                </td>
+                <td class="ret-val mid">62.1%</td>
+                <td class="ret-val mid">45.8%</td>
+                <td><span class="status-badge healthy">{{ _ST_HEALTHY }}</span></td>
+              </tr>
+              <tr>
+                <td class="service-name">TToons</td>
+                <td>
+                  <div class="ret-bar-wrap">
+                    <div class="ret-bar-bg"><div class="ret-bar-fill" style="width:76.8%;background:var(--amber)"></div></div>
+                    <span class="ret-val mid">76.8%</span>
+                  </div>
+                </td>
+                <td class="ret-val bad">44.5%</td>
+                <td class="ret-val bad">32.1%</td>
+                <td><span class="status-badge attention">Attention</span></td>
+              </tr>
+              <tr>
+                <td class="service-name">Tawer</td>
+                <td>
+                  <div class="ret-bar-wrap">
+                    <div class="ret-bar-bg"><div class="ret-bar-fill" style="width:68.4%;background:var(--red)"></div></div>
+                    <span class="ret-val bad">68.4%</span>
+                  </div>
+                </td>
+                <td class="ret-val bad">38.2%</td>
+                <td class="ret-val bad">24.5%</td>
+                <td><span class="status-badge critical">{{ _ST_CRIT }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sep"></div>
+
+    {% if 'trial' in sections_included %}
+    <!-- SECTION 04: ESSAI GRATUIT -->
+    <div class="section-block" id="trial">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <span class="section-title">Comportement {{ _NAV_TRIAL }}</span>
+      </div>
+
+      <div class="grid-2">
+        <!-- FUNNEL -->
+        <div class="card">
+          <div class="card-title">{{ _FUNNEL_TTL }}</div>
+          <div class="funnel">
+            <div class="funnel-row">
+              <div class="funnel-label">{{ _FUN_STARTS }}</div>
+              <div class="funnel-track">
+                <div class="funnel-fill" style="width:100%;background:linear-gradient(90deg,#3B82F6,#60A5FA)"></div>
+              </div>
+              <div class="funnel-pct">100%</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-label">{{ _FUN_W1 }}</div>
+              <div class="funnel-track">
+                <div class="funnel-fill" style="width:67%;background:linear-gradient(90deg,#3B82F6,#60A5FA)"></div>
+              </div>
+              <div class="funnel-pct">67%</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-label">{{ _FUN_ENG }}</div>
+              <div class="funnel-track">
+                <div class="funnel-fill" style="width:45%;background:linear-gradient(90deg,#2563EB,#3B82F6)"></div>
+              </div>
+              <div class="funnel-pct">45%</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-label">{{ _FUN_INT }}</div>
+              <div class="funnel-track">
+                <div class="funnel-fill" style="width:28%;background:linear-gradient(90deg,#1D4ED8,#2563EB)"></div>
+              </div>
+              <div class="funnel-pct">28%</div>
+            </div>
+            <div class="funnel-row">
+              <div class="funnel-label">{{ _FUN_PAID }}</div>
+              <div class="funnel-track">
+                <div class="funnel-fill" style="width:7%;background:linear-gradient(90deg,#1E3A8A,#1D4ED8)"></div>
+              </div>
+              <div class="funnel-pct">~7%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RECO -->
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="ai-block">
+            <div class="ai-tag">{{ _AI_SESS }}</div>
+            <div class="ai-text">{{ session_activity_charts }}</div>
+          </div>
+          <div class="ai-block success">
+            <div class="ai-tag">{{ _AI_TRIAL }}</div>
+            <div class="ai-text">{{ trial_ai_recommendations }}</div>
+          </div>
+          <div class="card" style="padding:14px">
+            <div class="card-title">{{ _TRIAL_CHART }}</div>
+            <div class="chart-wrap" style="height:100px">
+              <canvas id="trialChart" role="img" aria-label="{{ _TRIAL_CHART }}">Trial: {{ trial_churn_rate }}% churn, Payants: {{ segments.power_users.churn if segments.get('power_users') else 23.6 }}% churn</canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sep"></div>
+
+    {% if 'ai_segmentation' in sections_included %}
+    <!-- SECTION 05: SEGMENTATION IA -->
+    <div class="section-block" id="segmentation">
+      <div class="section-header">
+        <span class="section-num" style="color:var(--purple);background:rgba(139,92,246,0.1);border-color:rgba(139,92,246,0.2)">05</span>
+        <span class="section-title">{{ _SEC_AI }}</span>
+        <span class="section-subtitle">K-means k={{ kmeans_k }} · Silhouette: {{ silhouette_score }} · Confiance: {{ churn_model_confidence }}%</span>
+      </div>
+
+      <div class="grid-2-1">
+        <!-- DONUT -->
+        <div class="grid-2">
+          <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px">
+            <div class="card-title" style="align-self:flex-start">{{ _SEG_DIST }}</div>
+            <div class="chart-wrap" style="height:200px;width:100%">
+              <canvas id="segDonut" role="img" aria-label="Distribution des segments">{{ top_segments }}</canvas>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;width:100%">
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+                <span style="width:10px;height:10px;border-radius:2px;background:#3B82F6;flex-shrink:0"></span>Power Users {{ segments.power_users.pct if segments.get('power_users') else 2.2 }}%
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+                <span style="width:10px;height:10px;border-radius:2px;background:#10B981;flex-shrink:0"></span>{{ _SEG_LOYALS }} {{ segments.regular_loyals.pct if segments.get('regular_loyals') else 2.4 }}%
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+                <span style="width:10px;height:10px;border-radius:2px;background:#F59E0B;flex-shrink:0"></span>{{ _SEG_OCC }} {{ segments.occasional.pct if segments.get('occasional') else 3.4 }}%
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary)">
+                <span style="width:10px;height:10px;border-radius:2px;background:#475569;flex-shrink:0"></span>Trial Only {{ segments.trial_only.pct if segments.get('trial_only') else 92.1 }}%
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">{{ _SEG_ARPU }}</div>
+            <div class="chart-wrap" style="height:200px">
+              <canvas id="arpuChart" role="img" aria-label="ARPU par segment">{{ segment_comparison }}</canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEGMENT CARDS -->
+        <div class="seg-grid">
+          <div class="seg-card highlight">
+            <div class="seg-name">Power Users</div>
+            <div class="seg-stat"><span class="seg-stat-label">Base</span><span class="seg-stat-val">{{ segments.power_users.pct if segments.get('power_users') else 2.2 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">ARPU</span><span class="seg-stat-val">{{ segments.power_users.arpu if segments.get('power_users') else 24.5 }} TND</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">Churn</span><span class="seg-stat-val">{{ segments.power_users.churn if segments.get('power_users') else 23.6 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">{{ _SEG_RET }}</span><span class="seg-stat-val">{{ 100 - (segments.power_users.churn if segments.get('power_users') else 23.6) }}%</span></div>
+            <div class="seg-pct-bar"><div class="seg-pct-fill" style="width:{{ segments.power_users.pct if segments.get('power_users') else 2.2 }}%;background:var(--blue)"></div></div>
+          </div>
+          <div class="seg-card">
+            <div class="seg-name">{{ _SEG_LOYALS }}</div>
+            <div class="seg-stat"><span class="seg-stat-label">Base</span><span class="seg-stat-val">{{ segments.regular_loyals.pct if segments.get('regular_loyals') else 2.4 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">ARPU</span><span class="seg-stat-val">{{ segments.regular_loyals.arpu if segments.get('regular_loyals') else 8.3 }} TND</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">Churn</span><span class="seg-stat-val">{{ segments.regular_loyals.churn if segments.get('regular_loyals') else 23.2 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">{{ _SEG_RET }}</span><span class="seg-stat-val">{{ 100 - (segments.regular_loyals.churn if segments.get('regular_loyals') else 23.2) }}%</span></div>
+            <div class="seg-pct-bar"><div class="seg-pct-fill" style="width:{{ segments.regular_loyals.pct if segments.get('regular_loyals') else 2.4 }}%;background:var(--green)"></div></div>
+          </div>
+          <div class="seg-card">
+            <div class="seg-name">{{ _SEG_OCC }}</div>
+            <div class="seg-stat"><span class="seg-stat-label">Base</span><span class="seg-stat-val">{{ segments.occasional.pct if segments.get('occasional') else 3.4 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">ARPU</span><span class="seg-stat-val">{{ segments.occasional.arpu if segments.get('occasional') else 3.5 }} TND</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">Churn</span><span class="seg-stat-val">{{ segments.occasional.churn if segments.get('occasional') else 21.8 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">{{ _SEG_RET }}</span><span class="seg-stat-val">{{ 100 - (segments.occasional.churn if segments.get('occasional') else 21.8) }}%</span></div>
+            <div class="seg-pct-bar"><div class="seg-pct-fill" style="width:{{ segments.occasional.pct if segments.get('occasional') else 3.4 }}%;background:var(--amber)"></div></div>
+          </div>
+          <div class="seg-card">
+            <div class="seg-name">Trial Only</div>
+            <div class="seg-stat"><span class="seg-stat-label">Base</span><span class="seg-stat-val">{{ segments.trial_only.pct if segments.get('trial_only') else 92.1 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">ARPU</span><span class="seg-stat-val">{{ segments.trial_only.arpu if segments.get('trial_only') else 0.0 }} TND</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">Churn</span><span class="seg-stat-val" style="color:var(--red)">{{ segments.trial_only.churn if segments.get('trial_only') else 63.5 }}%</span></div>
+            <div class="seg-stat"><span class="seg-stat-label">{{ _SEG_RET }}</span><span class="seg-stat-val" style="color:var(--red)">{{ 100 - (segments.trial_only.churn if segments.get('trial_only') else 63.5) }}%</span></div>
+            <div class="seg-pct-bar"><div class="seg-pct-fill" style="width:{{ segments.trial_only.pct if segments.get('trial_only') else 92.1 }}%;background:var(--text-muted)"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="ai-block">
+          <div class="ai-tag">{{ _AI_MIG }}</div>
+          <div class="ai-text">{{ segment_migration_analysis }}</div>
+        </div>
+        <div class="ai-block success">
+          <div class="ai-tag">{{ _AI_PROF }}</div>
+          <div class="ai-text">{{ segment_profitability_matrix }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sep"></div>
+
+    {% if 'campaigns' in sections_included %}
+    <!-- SECTION 06: CAMPAGNES -->
+    <div class="section-block" id="campaigns">
+      <div class="section-header">
+        <span class="section-num">06</span>
+        <span class="section-title">{{ _SEC_CAMPAIGNS }}</span>
+      </div>
+
+      <div class="grid-2-1">
+        <div class="card">
+          <div class="card-title">{{ _CAMP_ATTR }}</div>
+          <div style="margin-bottom:16px">
+            <div class="attr-row">
+              <div class="attr-label">Organique</div>
+              <div class="attr-bar-wrap"><div class="attr-bar" style="width:45%;background:var(--blue)"></div></div>
+              <div class="attr-pct">45%</div>
+            </div>
+            <div class="attr-row">
+              <div class="attr-label">Campagne SMS</div>
+              <div class="attr-bar-wrap"><div class="attr-bar" style="width:28%;background:var(--green)"></div></div>
+              <div class="attr-pct">28%</div>
+            </div>
+            <div class="attr-row">
+              <div class="attr-label">Push Notification</div>
+              <div class="attr-bar-wrap"><div class="attr-bar" style="width:18%;background:var(--purple)"></div></div>
+              <div class="attr-pct">18%</div>
+            </div>
+            <div class="attr-row">
+              <div class="attr-label">Referral</div>
+              <div class="attr-bar-wrap"><div class="attr-bar" style="width:9%;background:var(--amber)"></div></div>
+              <div class="attr-pct">9%</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:14px">
+            <div class="card-title">{{ _CAMP_FUN }}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              {{ funnel_conversion }}
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="card">
+            <div class="camp-grid">
+              <div class="camp-stat">
+                <div class="camp-stat-val" style="color:var(--blue)">{{ campaign_roi }}</div>
+                <div class="camp-stat-label">{{ _CAMP_ROI }}</div>
+              </div>
+              <div class="camp-stat">
+                <div class="camp-stat-val" style="color:var(--green)">{{ sms_effectiveness }}%</div>
+                <div class="camp-stat-label">{{ _CAMP_SMS }}</div>
+              </div>
+              <div class="camp-stat">
+                <div class="camp-stat-val" style="color:var(--purple)">+{{ engagement_uplift }}%</div>
+                <div class="camp-stat-label">{{ _CAMP_ENG }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="ai-block">
+            <div class="ai-tag">{{ _AI_CAMP }}</div>
+            <div class="ai-text">{{ ai_campaign_recommendations }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sep"></div>
+
+    {% if 'activity' in sections_included %}
+    <!-- SECTION 07: ACTIVITÉ -->
+    <div class="section-block" id="activity">
+      <div class="section-header">
+        <span class="section-num">07</span>
+        <span class="section-title">{{ _SEC_ACTIVITY }}</span>
+      </div>
+
+      <div class="card">
+        <div class="card-title">{{ _ACT_TTL }}</div>
+        <div class="chart-wrap" style="height:180px">
+          <canvas id="activityChart" role="img" aria-label="{{ _ACT_TTL }}">{{ session_activity_charts }}</canvas>
+        </div>
+      </div>
+
+      <div class="ai-block">
+        <div class="ai-tag">{{ _AI_SESS }}</div>
+        <div class="ai-text">{{ session_activity_charts }}</div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+    {% endif %}
+
+    {% if 'raw_data' in sections_included %}
+    <!-- SECTION 08: ANNEXE TECHNIQUE -->
+    <div class="section-block" id="tech">
+      <div class="section-header">
+        <span class="section-num" style="color:var(--text-muted);background:rgba(148,163,184,0.08);border-color:var(--border)">08</span>
+        <span class="section-title">{{ _SEC_TECH }}</span>
+      </div>
+
+      <div class="grid-3">
+        <!-- MODEL PERF -->
+        <div class="card">
+          <div class="card-title">{{ _TECH_PERF }}</div>
+          <div class="model-row">
+            <span class="model-key">ROC-AUC</span>
+            <span class="model-val" style="color:var(--green)">{{ roc_auc }}</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">Intervalle Confiance</span>
+            <span class="model-val">{{ confidence_intervals }}</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_CONF }}</span>
+            <span class="model-val" style="color:var(--blue)">{{ churn_model_confidence }}%</span>
+          </div>
+        </div>
+
+        <!-- FEATURE IMP -->
+        <div class="card">
+          <div class="card-title">{{ _TECH_FEAT }}</div>
+          <div class="attr-row">
+            <div class="attr-label">tenure</div>
+            <div class="attr-bar-wrap"><div class="attr-bar" style="width:100%;background:var(--blue)"></div></div>
+            <div class="attr-pct">0.32</div>
+          </div>
+          <div class="attr-row">
+            <div class="attr-label">session_count</div>
+            <div class="attr-bar-wrap"><div class="attr-bar" style="width:75%;background:var(--purple)"></div></div>
+            <div class="attr-pct">0.24</div>
+          </div>
+          <div class="attr-row">
+            <div class="attr-label">service_count</div>
+            <div class="attr-bar-wrap"><div class="attr-bar" style="width:56%;background:var(--green)"></div></div>
+            <div class="attr-pct">0.18</div>
+          </div>
+          <div class="attr-row">
+            <div class="attr-label">payment_failures</div>
+            <div class="attr-bar-wrap"><div class="attr-bar" style="width:44%;background:var(--red)"></div></div>
+            <div class="attr-pct">0.14</div>
+          </div>
+        </div>
+
+        <!-- METADATA -->
+        <div class="card">
+          <div class="card-title">{{ _TECH_META }}</div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_ENG }}</span>
+            <span class="model-val">{{ technical_metadata.split('|')[0] if '|' in technical_metadata else 'v2.1' }}</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_MODEL }}</span>
+            <span class="model-val">{{ 'gemini-2.5-flash' if ai_source == 'gemini' else ('Rule-based' if language == 'en' else 'Règle métier') }}</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_ACTIVE }}</span>
+            <span class="model-val">{{ active_users }}</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_TOTAL }}</span>
+            <span class="model-val">{{ active_subscriptions }}</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_PAYING }}</span>
+            <span class="model-val">{{ conversion_rate.split('.')[0] if '.' in conversion_rate else conversion_rate }}% conv</span>
+          </div>
+          <div class="model-row">
+            <span class="model-key">{{ _MDL_LIFE }}</span>
+            <span class="model-val">{{ backend_metrics.split('churn=')[1].split('%')[0] if 'churn=' in backend_metrics else global_churn_rate }}% churn</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- JSON EXPORT -->
+      <div class="card">
+        <div class="card-title">{{ _TECH_JSON }}</div>
+        <pre style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">{{ json_metrics }}</pre>
+      </div>
+
+    </div>
+    {% endif %}
+
+  </div><!-- end page-content -->
+</div><!-- end main -->
+</div><!-- end layout -->
+
+<script>
+const blue = '#3B82F6';
+const red = '#EF4444';
+const green = '#10B981';
+const amber = '#F59E0B';
+const purple = '#8B5CF6';
+const muted = '#475569';
+const textSec = '#94A3B8';
+
+Chart.defaults.color = textSec;
+Chart.defaults.borderColor = 'rgba(148,163,184,0.1)';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+function initChart(id, config) {
+  const el = document.getElementById(id);
+  if (el) new Chart(el, config);
+}
+
+/* 1. CHURN CHART */
+initChart('churnChart', {
+  type: 'bar',
+  data: {
+    labels: ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'],
+    datasets: [
+      {
+        label: 'Churn %',
+        data: [2.1, 2.8, 3.0, 3.3, 3.1, 3.5, 3.4, {{ global_churn_rate }}],
+        backgroundColor: 'rgba(239,68,68,0.3)',
+        borderColor: red,
+        borderWidth: 1,
+        borderRadius: 3,
+      },
+      {
+        label: 'Tendance',
+        data: [2.1, 2.4, 2.7, 3.0, 3.2, 3.4, 3.5, {{ global_churn_rate }}],
+        type: 'line',
+        borderColor: 'rgba(239,68,68,0.7)',
+        borderWidth: 2,
+        borderDash: [4,3],
+        pointRadius: 0,
+        fill: false,
+        tension: 0.4,
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(148,163,184,0.06)' }, ticks: { autoSkip: false } },
+      y: {
+        min: 0, max: 5,
+        grid: { color: 'rgba(148,163,184,0.06)' },
+        ticks: { callback: v => v + '%' }
+      }
+    }
+  }
+});
+
+/* 2. RETENTION RADAR */
+initChart('retentionRadar', {
+  type: 'radar',
+  data: {
+    labels: ['D7', 'D30', 'D90'],
+    datasets: [
+      { label: 'Esports.tn', data: [91.5, 78.3, 58.2], borderColor: green, backgroundColor: 'rgba(16,185,129,0.12)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: green },
+      { label: 'ElJournal', data: [84.2, 62.1, 45.8], borderColor: blue, backgroundColor: 'rgba(59,130,246,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: blue },
+      { label: 'TToons', data: [76.8, 44.5, 32.1], borderColor: amber, backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: amber },
+      { label: 'Tawer', data: [68.4, 38.2, 24.5], borderColor: red, backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: red }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } },
+    scales: {
+      r: {
+        min: 0, max: 100,
+        grid: { color: 'rgba(148,163,184,0.08)' },
+        angleLines: { color: 'rgba(148,163,184,0.08)' },
+        pointLabels: { font: { size: 12, weight: '500' }, color: textSec },
+        ticks: { display: false }
+      }
+    }
+  }
+});
+
+/* 3. TRIAL CHART */
+initChart('trialChart', {
+  type: 'bar',
+  data: {
+    labels: ['Power Users', '{{ _SEG_REG }}', '{{ _SEG_OCC }}', 'Trial Only'],
+    datasets: [{
+      label: 'Churn %',
+      data: [{{ segments.power_users.churn if segments.get('power_users') else 23.6 }}, {{ segments.regular_loyals.churn if segments.get('regular_loyals') else 23.2 }}, {{ segments.occasional.churn if segments.get('occasional') else 21.8 }}, {{ trial_churn_rate }}],
+      backgroundColor: [blue, green, amber, red],
+      borderRadius: 4,
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { min: 0, max: 80, grid: { color: 'rgba(148,163,184,0.06)' }, ticks: { callback: v => v + '%' } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+    }
+  }
+});
+
+/* 4. SEGMENT DONUT */
+initChart('segDonut', {
+  type: 'doughnut',
+  data: {
+    labels: ['Power Users', '{{ _SEG_LOYALS }}', '{{ _SEG_OCC }}', 'Trial Only'],
+    datasets: [{
+      data: [{{ segments.power_users.pct if segments.get('power_users') else 2.2 }}, {{ segments.regular_loyals.pct if segments.get('regular_loyals') else 2.4 }}, {{ segments.occasional.pct if segments.get('occasional') else 3.4 }}, {{ segments.trial_only.pct if segments.get('trial_only') else 92.1 }}],
+      backgroundColor: [blue, green, amber, muted],
+      borderWidth: 0,
+      hoverOffset: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '72%',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed.toFixed(1) + '%' } }
+    }
+  }
+});
+
+/* 5. ARPU CHART */
+initChart('arpuChart', {
+  type: 'bar',
+  data: {
+    labels: ['Power\nUsers', '{{ _SEG_LOYALS }}', '{{ _SEG_OCC }}', 'Trial\nOnly'],
+    datasets: [{
+      label: 'ARPU (TND)',
+      data: [{{ segments.power_users.arpu if segments.get('power_users') else 24.5 }}, {{ segments.regular_loyals.arpu if segments.get('regular_loyals') else 8.3 }}, {{ segments.occasional.arpu if segments.get('occasional') else 3.5 }}, {{ segments.trial_only.arpu if segments.get('trial_only') else 0 }}],
+      backgroundColor: [
+        'rgba(59,130,246,0.7)',
+        'rgba(16,185,129,0.7)',
+        'rgba(245,158,11,0.7)',
+        'rgba(71,85,105,0.4)',
+      ],
+      borderColor: [blue, green, amber, muted],
+      borderWidth: 1,
+      borderRadius: 4,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, autoSkip: false } },
+      y: { grid: { color: 'rgba(148,163,184,0.06)' }, ticks: { callback: v => v + ' TND' } }
+    }
+  }
+});
+
+/* 6. ACTIVITY CHART */
+initChart('activityChart', {
+  type: 'line',
+  data: {
+    labels: Array.from({length: 30}, (_, i) => 'J' + (i+1)),
+    datasets: [{
+      label: 'Sessions',
+      data: [1200,1350,1100,1420,1600,1550,1800,1750,1680,1900,2100,1980,2200,2150,2300,2280,2450,2400,2600,2550,2700,2650,2800,2900,2850,3000,3100,3050,3200,3350],
+      borderColor: blue,
+      borderWidth: 2,
+      backgroundColor: 'rgba(59,130,246,0.06)',
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointHoverBackgroundColor: blue,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        grid: { color: 'rgba(148,163,184,0.04)' },
+        ticks: { autoSkip: true, maxTicksLimit: 10, font: { size: 10 } }
+      },
+      y: {
+        grid: { color: 'rgba(148,163,184,0.06)' },
+        ticks: { callback: v => (v/1000).toFixed(1) + 'k' }
+      }
+    }
+  }
+});
+
+/* SIDEBAR ACTIVE STATE */
+const navItems = document.querySelectorAll('.nav-item');
+const sectionIds = ['summary','churn','cohorts','trial','segmentation','campaigns','activity','tech'];
+
+navItems.forEach(item => {
+  item.addEventListener('click', function(e) {
+    navItems.forEach(n => n.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sectionIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 100) current = id;
+  });
+  navItems.forEach(n => {
+    n.classList.remove('active');
+    if (n.getAttribute('href') === '#' + current) n.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

@@ -1,3 +1,9 @@
+import asyncio
+import sys
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,6 +11,11 @@ import os
 import time
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
+
+backend_root = Path(__file__).resolve().parents[1]
+load_dotenv(backend_root / ".env")
 
 from app.core.database import SessionLocal
 import app.models  # ensure models are registered on Base.metadata
@@ -27,6 +38,7 @@ from app.routers import segmentation
 from ml_models import anomalies
 from app.routers import nrr
 from app.routers import notes
+from app.routers import reports as reports_router
 
 from app.core.security import hash_password
 from app.models.platform_users import PlatformUser
@@ -120,6 +132,7 @@ app.include_router(segmentation.router)
 app.include_router(anomalies.router)
 app.include_router(nrr.router, prefix="/analytics", tags=["NRR"])
 app.include_router(notes.router)
+app.include_router(reports_router.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

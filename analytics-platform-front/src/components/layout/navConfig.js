@@ -15,9 +15,9 @@ import {
   UserCog,
   Settings,
   AlertTriangle,
+  Grid2x2,
+  FileText,
 } from 'lucide-react'
-
-import { Squares2X2Icon } from "@heroicons/react/24/outline"
 
 export const navigationConfig = [
   {
@@ -60,10 +60,21 @@ export const navigationConfig = [
         icon: GitBranch,
         route: '/analytics/cross-service',
       },
+      {
+        label: 'Subscribers',
+        icon: Users,
+        route: '/management/subscribers',
+      },
+      {
+        label: 'Analyst Notes',
+        icon: NotebookPen,
+        route: '/notes',
+      },
     ],
   },
   {
     section: 'AI INSIGHTS',
+    collapsible: true,
     items: [
       {
         label: 'Anomaly Detection',
@@ -82,33 +93,29 @@ export const navigationConfig = [
       },
     ],
   },
-  {
-    section: 'MANAGEMENT',
-    items: [
-      {
-        label: 'Subscribers',
-        icon: Users,
-        route: '/management/subscribers',
-      },
-      {
-        label: 'Analyst Notes',
-        icon: NotebookPen,
-        route: '/notes',
-      },
-    ],
-  },
+  
   {
     section: 'ADMIN',
     adminOnly: true,
     items: [
+      {
+        label: 'Report Generator',
+        icon: FileText,
+        route: '/admin/reports',
+      },
+      {
+        label: 'Run AI Models',
+        icon: BrainCircuit,
+        route: '/admin/run-ai-models',
+      },
       {
         label: 'Import Data',
         icon: Upload,
         route: '/admin/import',
       },
       {
-        label: 'Management',
-        icon: Squares2X2Icon,
+        label: 'services and campaigns',
+        icon: Grid2x2,
         route: '/admin/management',
       },
       {
@@ -121,6 +128,7 @@ export const navigationConfig = [
         icon: Settings,
         route: '/admin/settings',
       },
+
     ],
   },
 ]

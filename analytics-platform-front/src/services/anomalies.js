@@ -1,4 +1,4 @@
-import api from "./api"
+import api, { getWithCache } from "./api"
 
 function withFilterParams(filters = {}, params = {}) {
     const out = { ...params }
@@ -11,23 +11,31 @@ function withFilterParams(filters = {}, params = {}) {
 }
 
 export async function getAnomalySummary(filters) {
-    const res = await api.get("/anomalies/summary", { params: withFilterParams(filters) })
-    return res.data
+    return await getWithCache("/anomalies/summary", {
+        params: withFilterParams(filters),
+        ttlMs: 5 * 60 * 1000,
+    })
 }
 
 export async function getAnomalyTimeline(filters) {
-    const res = await api.get("/anomalies/timeline", { params: withFilterParams(filters) })
-    return res.data
+    return await getWithCache("/anomalies/timeline", {
+        params: withFilterParams(filters),
+        ttlMs: 5 * 60 * 1000,
+    })
 }
 
 export async function getAnomalyDistribution(filters) {
-    const res = await api.get("/anomalies/distribution", { params: withFilterParams(filters) })
-    return res.data
+    return await getWithCache("/anomalies/distribution", {
+        params: withFilterParams(filters),
+        ttlMs: 5 * 60 * 1000,
+    })
 }
 
 export async function getAnomalyHeatmap(filters) {
-    const res = await api.get("/anomalies/heatmap", { params: withFilterParams(filters) })
-    return res.data
+    return await getWithCache("/anomalies/heatmap", {
+        params: withFilterParams(filters),
+        ttlMs: 5 * 60 * 1000,
+    })
 }
 
 export async function getAnomalyDetails(filters) {
@@ -35,13 +43,17 @@ export async function getAnomalyDetails(filters) {
         limit: filters.limit ?? 10,
         offset: filters.offset ?? 0,
     })
-    const res = await api.get("/anomalies/details", { params })
-    return res.data
+    return await getWithCache("/anomalies/details", {
+        params,
+        ttlMs: 2 * 60 * 1000,
+    })
 }
 
 export async function getAnomalyInsights(filters) {
-    const res = await api.get("/anomalies/insights", { params: withFilterParams(filters) })
-    return res.data
+    return await getWithCache("/anomalies/insights", {
+        params: withFilterParams(filters),
+        ttlMs: 5 * 60 * 1000,
+    })
 }
 
 export async function runAnomalyDetection(payload) {

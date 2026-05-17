@@ -34,10 +34,10 @@ export function useUserActivity({ start_date, end_date, service_id } = {}) {
       })
       return res.data ?? null
     },
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: LONG_CACHE_MS,
     cacheTime: LONG_CACHE_MS,
-    refetchOnMount: "always",
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     keepPreviousData: true,

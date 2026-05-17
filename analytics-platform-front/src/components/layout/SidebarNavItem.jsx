@@ -1,19 +1,12 @@
 import { NavLink } from "react-router-dom";
 
-/**
- * SidebarNavItem
- * @param {Object} props
- * @param {React.ElementType} props.icon - lucide-react icon component
- * @param {string} props.label - item label text
- * @param {string} props.route - target route path
- * @param {boolean} props.isCollapsed - sidebar collapse state
- */
 export default function SidebarNavItem({
   icon: IconComponent,
   label,
   route,
   isCollapsed,
   badgeCount = 0,
+  onClick,
 }) {
   const tooltipVisibleClass = isCollapsed ? "group-hover:visible" : "invisible";
   const showBadge = Number(badgeCount || 0) > 0;
@@ -31,13 +24,12 @@ export default function SidebarNavItem({
         color: isActive ? "var(--color-primary)" : "var(--color-text-muted)",
         borderLeftColor: isActive ? "var(--color-primary)" : "transparent",
       })}
+      onClick={onClick}
     >
       {({ isActive }) => (
         <>
           <IconComponent
-            className={`w-5 h-5 flex-shrink-0 transition-colors duration-200 ${
-              isActive ? "" : ""
-            }`}
+            className={`w-5 h-5 flex-shrink-0 transition-colors duration-200`}
             style={{
               color: isActive
                 ? "var(--color-primary)"

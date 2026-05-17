@@ -17,6 +17,7 @@ from.platform_users import PlatformUser
 from .platform_user_invites import PlatformUserInvite
 from .analyst_note import AnalystNote
 from .import_logs import ImportLog
+from .report_history import ReportHistory
 
 __all__ = [
     "User",
@@ -33,4 +34,5 @@ __all__ = [
     "PlatformUserInvite",
     "AnalystNote",
     "ImportLog",
+    "ReportHistory",
 ]

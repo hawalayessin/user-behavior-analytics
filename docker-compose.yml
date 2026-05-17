@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+      - ./user-analytics-backend/.env
     environment:
       # Optional: seed an initial admin user at startup (dev/demo)
       ADMIN_EMAIL: admin@local.tn
@@ -20,6 +21,18 @@ services:
       - ./user-analytics-backend:/app
     ports:
       - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - analytics_net
 
@@ -39,7 +52,8 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - analytics_backend
+      analytics_backend:
+        condition: service_healthy
     networks:
       - analytics_net
 

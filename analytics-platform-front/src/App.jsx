@@ -22,8 +22,10 @@ import UserSegmentationPage from "./pages/dashboard/UserSegmentationPage";
 import AnomalyDetectionPage from "./pages/dashboard/AnomalyDetectionPage";
 import ManagementPage from "./pages/admin/ManagementPage";
 import SystemSettingsPage from "./pages/admin/SystemSettingsPage";
+import RunAIModelsPage from "./pages/admin/RunAIModelsPage";
 import ProfileSettingsPage from "./pages/account/ProfileSettingsPage";
 import NotesPage from "./pages/NotesPage";
+import ReportGeneratorPage from "./pages/admin/ReportGeneratorPage";
 
 function App() {
   return (
@@ -160,6 +162,22 @@ function App() {
             element={
               <AdminRoute>
                 <SystemSettingsPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/run-ai-models"
+            element={
+              <AdminRoute>
+                <RunAIModelsPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <AdminRoute>
+                <ReportGeneratorPage />
               </AdminRoute>
             }
           />

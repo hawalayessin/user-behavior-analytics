@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Plus, Search, RotateCcw } from "lucide-react";
+import {
+  AlertCircle,
+  Plus,
+  Search,
+  RotateCcw,
+  Building2,
+  Megaphone,
+} from "lucide-react";
 
 import AppLayout from "../../components/layout/AppLayout";
 import { useToast } from "../../hooks/useToast";
@@ -154,7 +161,7 @@ export default function ManagementPage() {
             <div className="flex items-center gap-4">
               <TabButton
                 active={tab === "services"}
-                icon={() => <span>🏢</span>}
+                icon={Building2}
                 label="Services"
                 count={services.length}
                 onClick={() => {
@@ -164,7 +171,7 @@ export default function ManagementPage() {
               />
               <TabButton
                 active={tab === "campaigns"}
-                icon={() => <span>📣</span>}
+                icon={Megaphone}
                 label="Campaigns"
                 count={campaigns.length}
                 onClick={() => {

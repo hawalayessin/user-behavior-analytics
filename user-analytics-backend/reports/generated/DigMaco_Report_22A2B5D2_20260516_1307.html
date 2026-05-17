@@ -1,0 +1,259 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #020b2b;
+    font-family: 'Inter', sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .pdf-page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: #ffffff;
+    color: #0f172a;
+    padding: 18mm;
+    page-break-after: always;
+    position: relative;
+  }
+  .pdf-page:last-child { page-break-after: auto; }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid #e9edf4;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  .brand { display: flex; gap: 10px; align-items: center; }
+  .logo {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: #adc6ff; display: grid; place-items: center;
+    color: #223a70; font-size: 11px; font-weight: 800;
+  }
+  .brand-title { font-size: 18px; font-weight: 800; line-height: 1; }
+  .brand-sub {
+    font-size: 9px; text-transform: uppercase; letter-spacing: .15em;
+    color: #8b9ab5; font-weight: 700;
+  }
+  .meta {
+    text-align: right;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: #9aa9c5;
+    font-weight: 600;
+  }
+  h1 { font-size: 48px; margin: 0 0 14px; letter-spacing: -0.03em; }
+  h2 { font-size: 26px; margin: 0 0 16px; letter-spacing: -0.02em; }
+  .lead {
+    color: #5a6f95;
+    font-size: 14px;
+    line-height: 1.8;
+    max-width: 82%;
+    margin-bottom: 18px;
+  }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0 28px; }
+  .kpi {
+    background: #f8fafe;
+    border: 1px solid #edf2fa;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .kpi .label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: .12em;
+    color: #97a7c4; font-weight: 700;
+  }
+  .kpi .value { font-size: 40px; font-weight: 900; margin-top: 6px; letter-spacing: -0.02em; }
+  .kpi .delta { font-size: 11px; font-weight: 700; }
+  .up { color: #00a267; }
+  .down { color: #00a267; }
+  .divider { height: 1px; background: #edf1f7; margin: 18px 0 24px; }
+  .grid2 { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; }
+  .focus-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .16em;
+    color: #1f2b45; font-weight: 800; margin-bottom: 10px;
+  }
+  ul { margin: 0; padding: 0; list-style: none; }
+  li { display: flex; gap: 8px; margin-bottom: 10px; color: #5a6f95; font-size: 13px; line-height: 1.45; }
+  .bullet { color: #7ca3ff; font-weight: 700; }
+  .ai-card {
+    border: 1px solid #e4ebfa;
+    background: #f8fbff;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .ai-title {
+    color: #80a1e8;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .ai-text { color: #566a90; font-size: 13px; line-height: 1.55; font-style: italic; }
+  .viz-box {
+    width: 100%; height: 188px;
+    border: 1px solid #e8edf7;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #eef2f8, #e6ebf3);
+    display: flex; align-items: center; justify-content: center;
+    color: #6f86ad; font-size: 13px; font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .section-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .14em;
+    color: #9cadc8; font-weight: 800; margin: 12px 0 8px;
+  }
+  table { width: 100%; border-collapse: collapse; border: 1px solid #e9eef7; border-radius: 10px; overflow: hidden; }
+  th {
+    background: #f4f7fc; color: #6f83a5; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .1em; text-align: left; padding: 10px;
+  }
+  td { border-top: 1px solid #edf2f8; padding: 10px; font-size: 12px; color: #2d3e60; }
+  .tag { display: inline-block; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 700; }
+  .good { background: #e9f9f2; color: #0f8a56; }
+  .bad { background: #fdecec; color: #d0373f; }
+  .insight {
+    margin-top: 16px;
+    border: 1px solid #e6ecfb;
+    background: #f8fbff;
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .insight h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .insight p { margin: 0 0 10px; color: #5a6f95; font-size: 13px; line-height: 1.55; }
+  .chips { display: flex; gap: 8px; }
+  .chip { border: 1px solid #e8eef9; background: #fff; color: #8fa0bb; font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 3px 6px; border-radius: 6px; }
+  .footer {
+    position: absolute; left: 18mm; right: 18mm; bottom: 14mm;
+    border-top: 1px solid #f0f3f8; padding-top: 8px;
+    display: flex; justify-content: space-between;
+    color: #c0cbde; font-size: 9px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .12em;
+  }
+</style>
+</head>
+<body>
+<div class="pdf-page">
+  <header class="header">
+    <div class="brand">
+      <div class="logo">DM</div>
+      <div>
+        <div class="brand-title">DigMaco</div>
+        <div class="brand-sub">Precision Observatory</div>
+      </div>
+    </div>
+    <div class="meta">Rapport Analytique Confidentiel<br/>Page 01</div>
+  </header>
+
+  <main>
+    <h1>Résumé Exécutif</h1>
+    <p class="lead">Active base is 43,214 users with churn at 3.7%. D30 retention is 62.1%, indicating stable recurring behavior. Conversion rate stands at 6.8%, showing healthy monetization efficiency.</p>
+
+    <div class="grid3">
+      <div class="kpi">
+        <div class="label">Abonnés Totaux</div>
+        <div class="value">945,580</div>
+        <div class="delta up">+12%</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Taux de Churn</div>
+        <div class="value">3.7%</div>
+        <div class="delta down">-0.4%</div>
+      </div>
+      <div class="kpi">
+        <div class="label">ARPU Moyen</div>
+        <div class="value">12.4</div>
+        <div class="delta">TND</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="grid2">
+      <div>
+        <div class="focus-title">Focus Stratégique</div>
+        <ul>
+          <li><span class="bullet">◉</span><span>Expansion du catalogue premium sur <strong>ElJournal</strong> pour capturer les segments à haute valeur.</span></li>
+          <li><span class="bullet">◉</span><span>Refonte du modèle de rétention pour <strong>ttoons</strong> via un système de récompenses gamifié.</span></li>
+        </ul>
+      </div>
+      <div class="ai-card">
+        <div class="ai-title">Indice de Confiance IA</div>
+        <div class="ai-text">Based on current trajectory, predictive models estimate the platform will maintain approximately 43,214 active users next quarter with a churn variance of ±0.3%. Revenue growth is projected at 4-7% QoQ assuming campaign ROI holds at 3.5x.</div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>© 2026 DigMaco Precision Observatory</span>
+    <span>Confidentiel • Interne</span>
+  </footer>
+</div>
+
+<div class="pdf-page">
+  <header class="header">
+    <div class="brand">
+      <div class="logo">DM</div>
+      <div>
+        <div class="brand-title">DigMaco</div>
+        <div class="brand-sub">Precision Observatory</div>
+      </div>
+    </div>
+    <div class="meta">Rapport Analytique Confidentiel<br/>Page 02</div>
+  </header>
+
+  <main>
+    <h2>Analyse du Churn et de la Rétention</h2>
+
+    <div class="section-label">Évolution du Churn Mensuel (Last 3M)</div>
+    <div class="viz-box">Visualisation churn/revenus (data-driven)</div>
+
+    <div class="section-label">Cohortes de Rétention par Service</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Service</th><th>D7 Retention</th><th>D30 Retention</th><th>D90 Retention</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>ElJournal</td><td><span class="tag good">84.2%</span></td><td>62.1%</td><td>45.8%</td></tr>
+        <tr><td>Esports.tn</td><td><span class="tag good">91.5%</span></td><td>78.3%</td><td>58.2%</td></tr>
+        <tr><td>ttoons</td><td><span class="tag">76.8%</span></td><td>44.5%</td><td>32.1%</td></tr>
+        <tr><td>Tawer</td><td><span class="tag bad">68.4%</span></td><td>38.2%</td><td>24.5%</td></tr>
+      </tbody>
+    </table>
+
+    <div class="insight">
+      <h4>Insights IA</h4>
+      <p>Churn risk is moderate at 3.7% globally, driven primarily by trial user attrition (63.5%). D7 retention at 45.2% suggests early engagement barriers. Service-level analysis indicates lower-tier services contribute disproportionately to voluntary churn.</p>
+      <div class="chips">
+        <span class="chip">Action recommandée</span>
+        <span class="chip">Priorité haute</span>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <span>© 2026 DigMaco Precision Observatory</span>
+    <span>Confidentiel • Interne</span>
+  </footer>
+</div>
+</body>
+</html>

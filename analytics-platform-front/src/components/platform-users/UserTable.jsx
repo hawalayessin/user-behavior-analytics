@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import { Pencil, Ban, CheckCircle, Trash2 } from "lucide-react";
+import { Pencil, Ban, CheckCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const UserTable = ({
@@ -7,7 +7,6 @@ const UserTable = ({
   loading,
   onEdit,
   onToggleStatus,
-  onDelete,
   page,
   total,
   limit,
@@ -195,17 +194,6 @@ const UserTable = ({
                         )}
                       </button>
 
-                      <button
-                        onClick={() => onDelete(user)}
-                        disabled={isOwnAccount}
-                        className={`p-1.5 ${
-                          isOwnAccount
-                            ? "text-slate-600 cursor-not-allowed"
-                            : "hover:text-red-500"
-                        }`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -278,7 +266,6 @@ UserTable.propTypes = {
   loading: PropTypes.bool.isRequired,
   onEdit: PropTypes.func.isRequired,
   onToggleStatus: PropTypes.func.isRequired,
-  onDelete: PropTypes.func.isRequired,
   page: PropTypes.number.isRequired,
   total: PropTypes.number.isRequired,
   limit: PropTypes.number.isRequired,

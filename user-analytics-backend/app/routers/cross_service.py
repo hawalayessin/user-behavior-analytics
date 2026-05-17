@@ -527,7 +527,9 @@ def get_all_cross_service(
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
 ):
-    start_dt, end_dt = resolve_date_range(start_date, end_date, db=db, source="subscription")
+    params = _resolve_params(db, start_date, end_date, service_id)
+    start_dt = params["start_dt"]
+    end_dt = params["end_dt"]
     cache_key = build_cache_key(
         "cross-service:all",
         {
@@ -546,10 +548,12 @@ def get_all_cross_service(
             logger.info("cross_service.%s computed in %sms", section_name, took_ms)
             return value, None, took_ms
         except OperationalError as exc:
+            db.rollback()
             took_ms = round((time.perf_counter() - t0) * 1000)
             logger.warning("cross_service.%s failed after %sms: %s", section_name, took_ms, exc)
             return fallback, "database_timeout", took_ms
         except Exception as exc:  # keep endpoint resilient for dashboard rendering
+            db.rollback()
             took_ms = round((time.perf_counter() - t0) * 1000)
             logger.exception("cross_service.%s unexpected failure after %sms", section_name, took_ms)
             return fallback, "internal_error", took_ms

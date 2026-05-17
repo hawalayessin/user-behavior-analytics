@@ -1,0 +1,1522 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      Rapport Complet - DIGMACO
+    </title>
+
+    <style>
+      /* ============================================================
+         GOOGLE FONTS & RESET
+         ============================================================ */
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+      * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+      }
+
+      /* ============================================================
+         PAGE SETUP (WeasyPrint)
+         ============================================================ */
+      @page {
+          size: A4;
+          margin: 15mm 15mm 20mm 15mm;
+      }
+
+      @page :first {
+          margin: 0;
+      }
+
+      @page :not(:first) {
+          @bottom-center {
+              content: "� 2026 DIGMACO PRECISION OBSERVATORY | Page " counter(page) " / " counter(pages);
+              font-family: Inter, Arial, sans-serif;
+              font-size: 8pt;
+              color: #94A3B8;
+              border-top: 0.5pt solid #E2E8F0;
+              padding-top: 5mm;
+          }
+      }
+
+      /* ============================================================
+         GLOBAL STYLES
+         ============================================================ */
+      html, body {
+          font-family: Inter, Arial, sans-serif;
+          font-size: 10pt;
+          line-height: 1.6;
+          color: #1E293B;
+          background: white;
+      }
+
+      h1 {
+          font-size: 28pt;
+          font-weight: 700;
+          line-height: 1.2;
+          margin-bottom: 12pt;
+          color: #0B1628;
+      }
+
+      h2 {
+          font-size: 14pt;
+          font-weight: 700;
+          color: #0B1628;
+          margin-top: 8pt;
+          margin-bottom: 6pt;
+          border-bottom: 2pt solid #4F46E5;
+          padding-bottom: 4pt;
+      }
+
+      h3 {
+          font-size: 11pt;
+          font-weight: 600;
+          color: #1E293B;
+          margin-top: 6pt;
+          margin-bottom: 4pt;
+      }
+
+      p {
+          margin-bottom: 8pt;
+          line-height: 1.6;
+      }
+
+      strong {
+          font-weight: 600;
+          color: #0B1628;
+      }
+
+      /* ============================================================
+         PAGE BREAKS & LAYOUT
+         ============================================================ */
+      .page-break {
+          page-break-after: always;
+          break-after: page;
+      }
+
+      .no-break {
+          page-break-inside: avoid;
+          break-inside: avoid;
+      }
+
+      /* ============================================================
+         COVER PAGE (adapt�e au report_type)
+         ============================================================ */
+      .cover-page {
+          background: linear-gradient(135deg, #0B1628 0%, #1A2F50 100%);
+          color: white;
+          min-height: 277mm;
+          padding: 25mm;
+          display: table;
+          width: 100%;
+          position: relative;
+          overflow: hidden;
+      }
+
+      .cover-page::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          right: -50%;
+          width: 150%;
+          height: 150%;
+          background: radial-gradient(circle, rgba(79, 70, 229, 0.1) 0%, transparent 70%);
+          pointer-events: none;
+      }
+
+      .cover-content {
+          position: relative;
+          z-index: 1;
+          display: table-cell;
+          vertical-align: middle;
+          text-align: left;
+      }
+
+      .cover-header {
+          display: table;
+          width: 100%;
+          margin-bottom: 30mm;
+      }
+
+      .cover-logo {
+          display: table-cell;
+          width: 20%;
+          vertical-align: top;
+      }
+
+      .cover-logo svg {
+          width: 35mm;
+          height: auto;
+      }
+
+      .cover-badge {
+          display: table-cell;
+          width: 80%;
+          text-align: right;
+          vertical-align: top;
+      }
+
+      .badge-cover {
+          display: inline-block;
+          padding: 4pt 10pt;
+          border-radius: 4px;
+          font-size: 8pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          margin-bottom: 8pt;
+      }
+
+      
+      .cover-page { background: linear-gradient(135deg, #0B1628 0%, #1A2F50 100%); }
+      .badge-cover { background: rgba(107, 114, 128, 0.2); color: #D1D5DB; }
+      
+
+      .cover-title {
+          font-size: 36pt;
+          font-weight: 800;
+          line-height: 1.1;
+          margin: 20mm 0 8mm 0;
+          color: white;
+          letter-spacing: -0.02em;
+      }
+
+      .cover-subtitle {
+          font-size: 16pt;
+          font-weight: 400;
+          line-height: 1.3;
+          color: #06B6D4;
+          margin-bottom: 15mm;
+      }
+
+      .cover-divider {
+          width: 40mm;
+          height: 2pt;
+          background: linear-gradient(90deg, #4F46E5, #06B6D4);
+          margin-bottom: 12mm;
+      }
+
+      .cover-meta {
+          font-size: 9pt;
+          color: #CBD5E1;
+          margin-bottom: 20mm;
+          line-height: 1.8;
+      }
+
+      .cover-kpis {
+          display: table;
+          width: 100%;
+          margin-bottom: 20mm;
+          border-spacing: 6mm;
+          border-collapse: separate;
+      }
+
+      .cover-kpi-row {
+          display: table-row;
+      }
+
+      .cover-kpi {
+          display: table-cell;
+          width: 33%;
+          background: rgba(30, 58, 95, 0.6);
+          border: 1pt solid rgba(107, 114, 128, 0.3);
+          border-radius: 6px;
+          padding: 8pt 10pt;
+          text-align: center;
+          vertical-align: middle;
+      }
+
+      .cover-kpi-value {
+          font-size: 20pt;
+          font-weight: 800;
+          color: #06B6D4;
+          display: block;
+          line-height: 1.1;
+          margin-bottom: 3pt;
+      }
+
+      .cover-kpi-label {
+          font-size: 8pt;
+          color: #94A3B8;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          font-weight: 600;
+      }
+
+      .cover-health {
+          display: table;
+          width: 100%;
+          margin-top: 20mm;
+          border-collapse: collapse;
+      }
+
+      .cover-health-row {
+          display: table-row;
+      }
+
+      .cover-health-cell {
+          display: table-cell;
+          padding: 6pt 0;
+          font-size: 9pt;
+      }
+
+      .cover-health-label {
+          color: #94A3B8;
+          width: 25%;
+      }
+
+      .cover-health-value {
+          color: white;
+          font-weight: 600;
+      }
+
+      .progress-bar-container {
+          display: inline-block;
+          width: 40mm;
+          height: 3pt;
+          background: rgba(148, 163, 184, 0.2);
+          border-radius: 2pt;
+          margin-left: 6pt;
+          vertical-align: middle;
+          overflow: hidden;
+      }
+
+      .progress-bar-fill {
+          display: block;
+          height: 100%;
+          background: linear-gradient(90deg, #06B6D4, #4F46E5);
+          width: 86%;
+          border-radius: 2pt;
+      }
+
+      .cover-footer {
+          position: absolute;
+          bottom: 15mm;
+          left: 25mm;
+          right: 25mm;
+          border-top: 0.5pt solid rgba(107, 114, 128, 0.2);
+          padding-top: 8pt;
+          font-size: 8pt;
+          color: #94A3B8;
+          display: table;
+          width: calc(100% - 50mm);
+      }
+
+      .cover-footer-left {
+          display: table-cell;
+          text-align: left;
+      }
+
+      .cover-footer-right {
+          display: table-cell;
+          text-align: right;
+      }
+
+      /* ============================================================
+         CONTENT PAGES
+         ============================================================ */
+      .content-page {
+          page-break-after: always;
+          break-after: page;
+          padding-top: 15mm;
+      }
+
+      .page-header-bar {
+          background: linear-gradient(90deg, #4F46E5, #06B6D4);
+          height: 6mm;
+          margin: -15mm -15mm 12mm -15mm;
+          margin-bottom: 12mm;
+      }
+
+      
+
+      .section-header {
+          background: #4F46E5;
+          color: white;
+          padding: 5pt 8pt;
+          border-radius: 4px;
+          margin-bottom: 6pt;
+          font-size: 11pt;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          display: inline-block;
+      }
+
+      
+
+      .section-number {
+          display: inline-block;
+          background: rgba(255, 255, 255, 0.25);
+          border-radius: 3px;
+          padding: 0 3pt;
+          margin-right: 3pt;
+          font-size: 8pt;
+          font-weight: 700;
+      }
+
+      /* ============================================================
+         KPI GRIDS & CARDS
+         ============================================================ */
+      .kpi-grid {
+          display: table;
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 6mm;
+          margin-bottom: 10mm;
+      }
+
+      .kpi-row {
+          display: table-row;
+      }
+
+      .kpi-card {
+          display: table-cell;
+          width: 33%;
+          background: #F8FAFC;
+          border: 1pt solid #E2E8F0;
+          border-radius: 6px;
+          padding: 8pt;
+          text-align: center;
+          vertical-align: middle;
+      }
+
+      .kpi-card.highlight-success {
+          background: #ECFDF5;
+          border-color: #10B981;
+      }
+
+      .kpi-card.highlight-danger {
+          background: #FEF2F2;
+          border-color: #EF4444;
+      }
+
+      .kpi-value {
+          font-size: 20pt;
+          font-weight: 800;
+          color: #4F46E5;
+          display: block;
+          line-height: 1.1;
+          margin-bottom: 3pt;
+      }
+
+      .kpi-label {
+          font-size: 8pt;
+          color: #64748B;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          font-weight: 600;
+          display: block;
+          margin-bottom: 3pt;
+      }
+
+      .kpi-delta {
+          font-size: 8pt;
+          font-weight: 600;
+          display: block;
+      }
+
+      .kpi-delta.positive {
+          color: #10B981;
+      }
+
+      .kpi-delta.negative {
+          color: #EF4444;
+      }
+
+      /* ============================================================
+         AI BLOCKS
+         ============================================================ */
+      .ai-block {
+          background: #F0F4FF;
+          border-left: 3pt solid #4F46E5;
+          padding: 6pt 8pt;
+          margin: 6mm 0;
+          border-radius: 0 6px 6px 0;
+          font-size: 9pt;
+          line-height: 1.6;
+          color: #1E293B;
+          page-break-inside: avoid;
+      }
+
+      
+
+      .ai-block-label {
+          font-size: 7pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: #4F46E5;
+          margin-bottom: 3pt;
+          display: block;
+      }
+
+      
+
+      /* ============================================================
+         DATA TABLES
+         ============================================================ */
+      .data-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 9pt;
+          margin: 6mm 0;
+          page-break-inside: avoid;
+      }
+
+      .data-table th {
+          background: #4F46E5;
+          color: white;
+          padding: 4pt 5pt;
+          text-align: left;
+          font-weight: 600;
+          font-size: 8pt;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+      }
+
+      
+
+      .data-table td {
+          padding: 4pt 5pt;
+          border-bottom: 0.5pt solid #E2E8F0;
+      }
+
+      .data-table tr:nth-child(even) td {
+          background: #F8FAFC;
+      }
+
+      .data-table tr.best td {
+          background: #ECFDF5;
+          color: #065F46;
+          font-weight: 600;
+      }
+
+      .data-table tr.worst td {
+          background: #FEF2F2;
+          color: #991B1B;
+          font-weight: 600;
+      }
+
+      /* ============================================================
+         BADGES & LABELS
+         ============================================================ */
+      .badge {
+          display: inline-block;
+          padding: 2pt 4pt;
+          border-radius: 3px;
+          font-size: 7pt;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+      }
+
+      .badge-success {
+          background: #ECFDF5;
+          color: #065F46;
+      }
+
+      .badge-danger {
+          background: #FEF2F2;
+          color: #991B1B;
+      }
+
+      .badge-warning {
+          background: #FFFBEB;
+          color: #92400E;
+      }
+
+      .badge-info {
+          background: #EFF6FF;
+          color: #1E40AF;
+      }
+
+      /* ============================================================
+         CHARTS & GRAPHICS
+         ============================================================ */
+      .chart-container {
+          margin: 8mm 0;
+          text-align: center;
+          page-break-inside: avoid;
+      }
+
+      .chart-title {
+          font-size: 9pt;
+          font-weight: 600;
+          color: #64748B;
+          margin-bottom: 4mm;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+      }
+
+      svg.inline-chart {
+          max-width: 100%;
+          height: auto;
+          border-radius: 4px;
+          background: #F8FAFC;
+          border: 0.5pt solid #E2E8F0;
+      }
+
+      /* ============================================================
+         MISC UTILITIES
+         ============================================================ */
+      .divider {
+          border: none;
+          border-top: 0.5pt solid #E2E8F0;
+          margin: 6mm 0;
+      }
+
+      .text-muted {
+          color: #64748B;
+          font-size: 9pt;
+      }
+
+      .text-danger {
+          color: #EF4444;
+          font-weight: 600;
+      }
+
+      .text-success {
+          color: #10B981;
+          font-weight: 600;
+      }
+
+      .highlight {
+          background: #FFFBEB;
+          padding: 1pt 2pt;
+          border-radius: 2px;
+      }
+
+      .two-col {
+          display: table;
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 6mm;
+      }
+
+      .col {
+          display: table-cell;
+          width: 50%;
+          vertical-align: top;
+      }
+
+      pre {
+          font-family: monospace;
+          font-size: 7pt;
+          background: #F8FAFC;
+          padding: 6pt;
+          border-radius: 4px;
+          overflow-x: auto;
+          line-height: 1.3;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body>
+      
+    <div class="cover-page">
+      <div class="cover-content">
+        <div class="cover-header">
+          <div class="cover-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
+              <defs>
+                <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop
+                    offset="0%"
+                    style="stop-color: #06b6d4; stop-opacity: 1"
+                  />
+                  <stop
+                    offset="100%"
+                    style="stop-color: #4f46e5; stop-opacity: 1"
+                  />
+                </linearGradient>
+              </defs>
+              <path
+                d="M5,30 Q15,10 25,30 T45,30 T65,30 T85,30 L85,35 Q75,50 65,35 T45,35 T25,35 T5,35 Z"
+                fill="url(#waveGrad)"
+                opacity="0.8"
+              />
+              <text
+                x="5"
+                y="50"
+                font-family="Arial, sans-serif"
+                font-size="14"
+                font-weight="bold"
+                fill="white"
+              >
+                DIGMACO
+              </text>
+            </svg>
+          </div>
+          <div class="cover-badge">
+            
+            <div class="badge-cover">COMPREHENSIVE</div>
+            
+          </div>
+        </div>
+
+        <h1 class="cover-title">
+           RAPPORT COMPLET 
+        </h1>
+
+        <p class="cover-subtitle">
+           Analyse compl�te tous modules � Intelligence
+          analytique 
+        </p>
+
+        <div class="cover-divider"></div>
+
+        <div class="cover-meta">
+          P�riode :
+          <strong>2025-09-01 — 2025-10-31</strong><br />
+          Services :
+          <strong>ElJournal By TT, Esports By TT, LiveHeathy, Mou7a9e9 By TT, Rafi9ni, Rafi9ni+, Smarttoons, Tawer, test, TToons</strong><br />
+          G�n�r� par :
+          <strong>Admin Principal</strong>
+        </div>
+
+        <table class="cover-kpis">
+          <tr class="cover-kpi-row">
+            <td class="cover-kpi">
+              <span class="cover-kpi-value">945,580</span>
+              <span class="cover-kpi-label"
+                >Abonn�s</span
+              >
+            </td>
+            <td class="cover-kpi">
+              <span class="cover-kpi-value">3.7%</span>
+              <span class="cover-kpi-label"
+                >Taux Churn</span
+              >
+            </td>
+            <td class="cover-kpi">
+              <span class="cover-kpi-value">12.4 TND</span>
+              <span class="cover-kpi-label"
+                >ARPU Moyen</span
+              >
+            </td>
+          </tr>
+        </table>
+
+        <table class="cover-health">
+          <tr class="cover-health-row">
+            <td class="cover-health-cell cover-health-label">
+              Score Sant� :
+            </td>
+            <td class="cover-health-cell cover-health-value">
+              <strong>A</strong>
+              <div class="progress-bar-container">
+                <div class="progress-bar-fill"></div>
+              </div>
+            </td>
+          </tr>
+          <tr class="cover-health-row">
+            <td class="cover-health-cell cover-health-label">
+              Confiance IA :
+            </td>
+            <td class="cover-health-cell cover-health-value">
+              <strong>72%</strong>
+              <div class="progress-bar-container">
+                <div
+                  class="progress-bar-fill"
+                  style="width: 72%;"
+                ></div>
+              </div>
+            </td>
+          </tr>
+          <tr class="cover-health-row">
+            <td class="cover-health-cell cover-health-label">
+              Source IA :
+            </td>
+            <td class="cover-health-cell cover-health-value">
+              <strong
+                >Rule-based Fallback</strong
+              >
+            </td>
+          </tr>
+        </table>
+
+        <div class="cover-footer">
+          <div class="cover-footer-left">
+            <strong>2026-05-16 14:08 UTC</strong>
+          </div>
+          <div class="cover-footer-right">
+            <strong>Rapport FULL</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+       
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">01</span>R�sum� Ex�cutif
+      </h2>
+
+      <p>
+        <strong>La base active est de 43,214 utilisateurs avec un churn de 3.7%. La retention D30 est de 62.1%, ce qui indique une pression de retention necessitant des actions lifecycle immediates. Le taux de conversion est de 6.8%.</strong>
+      </p>
+
+      <h3>
+        Indicateurs
+        Cl�s de Performance
+      </h3>
+      <table class="kpi-grid">
+        <tr class="kpi-row">
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Abonn�s
+              Totaux</span
+            >
+            <span class="kpi-value">945,580</span>
+            <span class="kpi-delta positive">? 12%</span>
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Taux de Churn</span
+            >
+            <span class="kpi-value">3.7%</span>
+            <span class="kpi-delta positive">? -0.4%</span>
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >ARPU Moyen</span
+            >
+            <span class="kpi-value">12.4 TND</span>
+            <span class="kpi-delta positive">+0.3 TND</span>
+          </td>
+        </tr>
+        <tr class="kpi-row">
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Taux de
+              Conversion</span
+            >
+            <span class="kpi-value">6.8%</span>
+            <span class="kpi-delta positive">++1.2%</span>
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >R�tention D30</span
+            >
+            <span class="kpi-value">62.1</span>
+            <span class="kpi-delta positive"
+              >Stable</span
+            >
+          </td>
+          <td class="kpi-card highlight-danger">
+            <span class="kpi-label"
+              >Utilisateurs �
+              Risque</span
+            >
+            <span class="kpi-value">302</span>
+            <span class="kpi-delta negative"
+              >?? � surveiller</span
+            >
+          </td>
+        </tr>
+      </table>
+
+      <h3>
+        Insights Aliment�s
+        par l'IA
+      </h3>
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Priorit�s
+          Strat�giques</span
+        >
+        1. Reduce trial churn from 63.5% via personalized onboarding nudges at J+1 and J+3. 2. Expand premium catalog on high-ARPU services to capture value-seeking segments. 3. Deploy automated re-engagement campaigns targeting the 302 high-risk subscribers identified.
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Pr�vision
+          Pr�dictive</span
+        >
+        Les modeles predictifs estiment le maintien d'environ 43,214 utilisateurs actifs au prochain trimestre avec une variance de churn de ±0.3%. Croissance revenue projetee: 4-7% QoQ.
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Am�liorations KPI Attendues</span
+        >
+        Projection apres execution du plan: churn 3.7% -> ~2.5%, conversion 6.8% -> ~9.3%, ROI 3.5x -> ~4.3x.
+      </div>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">02</span>Analyse du Churn & de la R�tention
+      </h2>
+
+      <h3>
+        �volution Mensuelle du Churn (3 derniers mois)
+      </h3>
+      <div class="chart-container">
+        <svg
+          class="inline-chart"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 500 140"
+          width="100%"
+          height="140"
+        >
+          <rect
+            x="0"
+            y="0"
+            width="500"
+            height="140"
+            fill="#EEF2F8"
+            stroke="#E6ECF7"
+            stroke-width="0.5"
+          />
+          <line
+            x1="20"
+            y1="20"
+            x2="480"
+            y2="20"
+            stroke="#D8E1F0"
+            stroke-width="0.6"
+          />
+          <line
+            x1="20"
+            y1="45"
+            x2="480"
+            y2="45"
+            stroke="#D8E1F0"
+            stroke-width="0.6"
+          />
+          <line
+            x1="20"
+            y1="70"
+            x2="480"
+            y2="70"
+            stroke="#D8E1F0"
+            stroke-width="0.6"
+          />
+          <line
+            x1="20"
+            y1="95"
+            x2="480"
+            y2="95"
+            stroke="#D8E1F0"
+            stroke-width="0.6"
+          />
+          <line
+            x1="20"
+            y1="120"
+            x2="480"
+            y2="120"
+            stroke="#D8E1F0"
+            stroke-width="0.6"
+          />
+          <rect
+            x="35"
+            y="70"
+            width="18"
+            height="40"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="59"
+            y="55"
+            width="18"
+            height="55"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="83"
+            y="60"
+            width="18"
+            height="50"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="107"
+            y="45"
+            width="18"
+            height="65"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="131"
+            y="55"
+            width="18"
+            height="55"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="155"
+            y="40"
+            width="18"
+            height="70"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="179"
+            y="35"
+            width="18"
+            height="75"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="203"
+            y="50"
+            width="18"
+            height="60"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="227"
+            y="40"
+            width="18"
+            height="70"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <rect
+            x="251"
+            y="20"
+            width="18"
+            height="90"
+            fill="#BFD4FF"
+            stroke="none"
+          />
+          <polyline
+            points="44,75 68,57 92,62 116,48 140,57 164,42 188,37 212,52 236,42 260,22"
+            stroke="#FFFFFF"
+            stroke-width="2"
+            fill="none"
+          />
+          <text
+            x="35"
+            y="135"
+            font-family="Arial"
+            font-size="7"
+            fill="#8DA2C4"
+            text-anchor="middle"
+          >
+            OCT
+          </text>
+          <text
+            x="144"
+            y="135"
+            font-family="Arial"
+            font-size="7"
+            fill="#8DA2C4"
+            text-anchor="middle"
+          >
+            NOV
+          </text>
+          <text
+            x="253"
+            y="135"
+            font-family="Arial"
+            font-size="7"
+            fill="#8DA2C4"
+            text-anchor="middle"
+          >
+            DEC
+          </text>
+        </svg>
+      </div>
+
+      <h3>
+        Analyse &
+        Insights Churn
+      </h3>
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Analyse des
+          Causes Racines</span
+        >
+        Le risque de churn est a 3.7% globalement, principalement porte par le churn trial (63.5%). La retention D7 a 45.2% suggere des frictions d'activation precoce.
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Pr�vision
+          Pr�dictive</span
+        >
+        Churn is projected to remain between 3.2% and 4.2% over the next 90 days. Early re-engagement interventions at D+1 could reduce trial churn by an estimated 8-12 percentage points. Without intervention, the 302 high-risk users are projected to churn within 30 days.
+      </div>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">03</span>Cohortes de R�tention par Service
+      </h2>
+
+      <p class="text-muted">
+        Taux de r�tention D7, D30, D90 mesur�s depuis la premi�re
+        souscription. Meilleurs et pires performers surlign�s.
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>
+              Service
+            </th>
+            <th>
+              R�tention D7
+            </th>
+            <th>
+              R�tention D30
+            </th>
+            <th>
+              R�tention D90
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="best">
+            <td><strong>Esports.tn</strong></td>
+            <td>91.5%</td>
+            <td>78.3%</td>
+            <td>58.2%</td>
+          </tr>
+          <tr>
+            <td><strong>ElJournal</strong></td>
+            <td>84.2%</td>
+            <td>62.1%</td>
+            <td>45.8%</td>
+          </tr>
+          <tr>
+            <td><strong>ttoons</strong></td>
+            <td>76.8%</td>
+            <td>44.5%</td>
+            <td>32.1%</td>
+          </tr>
+          <tr class="worst">
+            <td><strong>Tawer</strong></td>
+            <td>68.4%</td>
+            <td>38.2%</td>
+            <td>24.5%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="text-muted">
+        Esports.tn dommine avec la meilleure r�tention � tous les horizons.
+        Tawer n�cessite une attention imm�diate avec une r�tention D90 < 25%.
+      </p>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">04</span>Comportement Essai Gratuit & Funnel
+      </h2>
+
+      <h3>
+        Funnel
+        Essai ? Payant
+      </h3>
+      <div class="chart-container">
+        <svg
+          class="inline-chart"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 500 160"
+          width="100%"
+          height="160"
+        >
+          <polygon
+            points="50,20 450,20 430,50 70,50"
+            fill="#4F46E5"
+            opacity="0.2"
+            stroke="#4F46E5"
+            stroke-width="1"
+          />
+          <text
+            x="250"
+            y="38"
+            font-family="Arial"
+            font-size="11"
+            font-weight="bold"
+            fill="#0B1628"
+            text-anchor="middle"
+          >
+            100% - Trial Starts
+          </text>
+          <polygon
+            points="85,55 415,55 385,85 115,85"
+            fill="#4F46E5"
+            opacity="0.4"
+            stroke="#4F46E5"
+            stroke-width="1"
+          />
+          <text
+            x="250"
+            y="73"
+            font-family="Arial"
+            font-size="11"
+            font-weight="bold"
+            fill="#0B1628"
+            text-anchor="middle"
+          >
+            67% - Active Week 1
+          </text>
+          <polygon
+            points="120,90 380,90 340,120 160,120"
+            fill="#06B6D4"
+            opacity="0.4"
+            stroke="#06B6D4"
+            stroke-width="1"
+          />
+          <text
+            x="250"
+            y="108"
+            font-family="Arial"
+            font-size="11"
+            font-weight="bold"
+            fill="#0B1628"
+            text-anchor="middle"
+          >
+            45% - Engaged
+          </text>
+          <polygon
+            points="155,125 345,125 305,155 195,155"
+            fill="#10B981"
+            opacity="0.4"
+            stroke="#10B981"
+            stroke-width="1"
+          />
+          <text
+            x="250"
+            y="143"
+            font-family="Arial"
+            font-size="10"
+            font-weight="bold"
+            fill="#065F46"
+            text-anchor="middle"
+          >
+            28% - Conversion Intent
+          </text>
+        </svg>
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Activit� des
+          Sessions</span
+        >
+        Les sessions culminent entre 19h et 22h. Les abonnes actifs ont une duree de session moyenne superieure aux trial users.
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Recommandations d'Optimisation</span
+        >
+        Deployer des nudges personnalises a J+1 et J+3 pour reduire le churn trial (63.5% -> ~54%).
+      </div>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">05</span>Segmentation IA & K-Means
+        Clustering
+      </h2>
+
+      <p class="text-muted">
+        Clustering K-means avec k=4 identifie des segments
+        distincts. Score de silhouette: 0.72 (excellente
+        s�paration).
+      </p>
+
+      <h3>
+        Profils de Segments
+      </h3>
+      <p>Power Users: 2.2% of base, ARPU 24.5 TND, Churn 23.6% | Loyaux Réguliers: 2.4% of base, ARPU 8.3 TND, Churn 23.2% | Occasionnels: 3.4% of base, ARPU 3.5 TND, Churn 21.8% | Trial Only: 92.1% of base, ARPU 0.0 TND, Churn 63.5%</p>
+
+      <h3>
+        Matrice de
+        Comparaison
+      </h3>
+      <p>Power Users: ARPU=24.5 TND, Retention=76% | Loyaux Réguliers: ARPU=8.3 TND, Retention=77% | Occasionnels: ARPU=3.5 TND, Retention=78% | Trial Only: ARPU=0.0 TND, Retention=36%</p>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Analyse
+          de Migration</span
+        >
+        Les migrations montrent un flux majoritaire Trial-only vers Occasional, avec une part reduite vers Power User.
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Matrice Rentabilit� & Croissance</span
+        >
+        Segment profitability ranks: Premium (highest ARPU, lowest churn) > Loyal Regulars > Occasional > Trial-only. Focusing retention investments on the Loyal-to-Premium transition offers the highest marginal ROI per user.
+      </div>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">06</span>Performance des Campagnes & ROI
+      </h2>
+
+      <h3>
+        M�triques
+        d'Efficacit�
+      </h3>
+      <table class="kpi-grid">
+        <tr class="kpi-row">
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >ROI Moyen</span
+            >
+            <span class="kpi-value">3.5x</span>
+            <span class="kpi-delta"
+              >par TND d�pens�</span
+            >
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Efficacit�
+              SMS</span
+            >
+            <span class="kpi-value">67%</span>
+            <span class="kpi-delta positive"
+              >Taux de clic</span
+            >
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Hausse
+              d'Engagement</span
+            >
+            <span class="kpi-value">+23%</span>
+            <span class="kpi-delta positive"
+              >vs baseline</span
+            >
+          </td>
+        </tr>
+      </table>
+
+      <h3>
+        Conversion par Canal
+      </h3>
+      <p class="text-muted">Impression → Click: 12.4% | Click → Trial: 34.2% | Trial → Paid: 6.8%</p>
+
+      <h3>
+        Attribution
+        Revenu
+      </h3>
+      <p class="text-muted">Organic: 45% | SMS Campaign: 28% | Push Notification: 18% | Referral: 9%</p>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Strat�gie
+          Campagnes</span
+        >
+        Le ROI campagne (3.50x) suggere d'intensifier les campagnes segmentees sur les plages horaires soir/weekend et d'optimiser le reciblage des utilisateurs inactifs sous 48h.
+      </div>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">07</span>Activit� Utilisateur & Patterns
+      </h2>
+
+      <h3>
+        Tendances
+        d'Activit�
+      </h3>
+      <div class="chart-container">
+        <svg
+          class="inline-chart"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 500 120"
+          width="100%"
+          height="120"
+        >
+          <rect
+            x="0"
+            y="0"
+            width="500"
+            height="120"
+            fill="#F8FAFC"
+            stroke="#E2E8F0"
+            stroke-width="0.5"
+          />
+          <line
+            x1="20"
+            y1="30"
+            x2="480"
+            y2="30"
+            stroke="#E2E8F0"
+            stroke-width="0.5"
+          />
+          <line
+            x1="20"
+            y1="60"
+            x2="480"
+            y2="60"
+            stroke="#E2E8F0"
+            stroke-width="0.5"
+          />
+          <line
+            x1="20"
+            y1="90"
+            x2="480"
+            y2="90"
+            stroke="#E2E8F0"
+            stroke-width="0.5"
+          />
+          <polyline
+            points="20,80 50,65 80,50 110,55 140,45 170,40 200,48 230,42 260,35 290,40 320,32 350,38 380,28 410,35 440,25 470,30"
+            stroke="#4F46E5"
+            stroke-width="2"
+            fill="none"
+          />
+          <circle cx="20" cy="80" r="2" fill="#4F46E5" />
+          <circle cx="470" cy="30" r="2" fill="#4F46E5" />
+        </svg>
+      </div>
+
+      <div class="ai-block">
+        <span class="ai-block-label"
+          >Analyse des
+          Sessions</span
+        >
+        Les sessions culminent entre 19h et 22h. Les abonnes actifs ont une duree de session moyenne superieure aux trial users.
+      </div>
+    </div>
+        
+    <div class="page-break"></div>
+    <div class="content-page">
+      <div class="page-header-bar"></div>
+      <h2>
+        <span class="section-number">08</span>Annexe Technique & Donn�es Brutes
+      </h2>
+
+      <h3>
+        M�triques de
+        Performance
+      </h3>
+      <table class="kpi-grid">
+        <tr class="kpi-row">
+          <td class="kpi-card">
+            <span class="kpi-label">ROC-AUC</span>
+            <span class="kpi-value">0.84</span>
+            <span class="kpi-delta"
+              >Excellent</span
+            >
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Intervalles</span
+            >
+            <span class="kpi-value" style="font-size: 11pt"
+              >95% CI: [0.81, 0.87]</span
+            >
+          </td>
+          <td class="kpi-card">
+            <span class="kpi-label"
+              >Confiance du
+              Mod�le</span
+            >
+            <span class="kpi-value">84%</span>
+          </td>
+        </tr>
+      </table>
+
+      <h3>
+        Importance des
+        Features
+      </h3>
+      <p class="text-muted">tenure (0.32), session_count (0.24), service_count (0.18), payment_failures (0.14)</p>
+
+      <h3>
+        M�triques Backend
+      </h3>
+      <p class="text-muted">active_users=43214, conversion=6.8%, churn=3.7%</p>
+
+      <h3>
+        M�tadonn�es
+        Techniques
+      </h3>
+      <p class="text-muted" style="font-size: 8pt">
+        Engine v2.1 | Model: gemini-1.5-flash | Generated: 2026-05-16T14:08:58.993856 | AI source: fallback
+      </p>
+
+      <h3>
+        Export JSON
+        Complet
+      </h3>
+      <pre>{
+  "active_users": 43214,
+  "total_subs": 1172575,
+  "paying_users": 75044,
+  "conversion_rate": 6.8,
+  "churn_rate": 3.7,
+  "retention_d7": 45.2,
+  "retention_d30": 62.1,
+  "high_risk_users": 302,
+  "arpu": 12.4,
+  "global_churn_rate": 3.7,
+  "trial_churn_rate": 63.5,
+  "voluntary_pct": 55.0,
+  "technical_pct": 45.0,
+  "avg_lifetime_days": 28.4,
+  "segments": {
+    "power_users": {
+      "pct": 2.2,
+      "arpu": 24.5,
+      "churn": 23.6,
+      "label": "Power Users"
+    },
+    "regular_loyals": {
+      "pct": 2.4,
+      "arpu": 8.3,
+      "churn": 23.2,
+      "label": "Loyaux Réguliers"
+    },
+    "occasional": {
+      "pct": 3.4,
+      "arpu": 3.5,
+      "churn": 21.8,
+      "label": "Occasionnels"
+    },
+    "trial_only": {
+      "pct": 92.1,
+      "arpu": 0.0,
+      "churn": 63.5,
+      "label": "Trial Only"
+    }
+  },
+  "total_campaigns": 12,
+  "avg_conversion_rate": 6.8,
+  "campaign_roi": 3.5,
+  "anomaly_score": 0.0,
+  "anomaly_count": 0
+}</pre>
+    </div>
+    
+  </body>
+</html>

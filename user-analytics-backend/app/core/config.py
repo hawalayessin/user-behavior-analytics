@@ -1,7 +1,28 @@
 ﻿# app/core/config.py
 
+import os
+from urllib.parse import urlparse, urlunparse
+
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _running_in_docker() -> bool:
+    """Best-effort Docker detection for local-vs-container DB host normalization."""
+    return os.path.exists("/.dockerenv")
+
+
+def _normalize_host_for_local_run(url: str) -> str:
+    """When running on host OS, map Docker-internal hostnames to localhost."""
+    parsed = urlparse(url)
+    if parsed.hostname != "host.docker.internal" or _running_in_docker():
+        return url
+
+    if parsed.port is None:
+        return url
+
+    netloc = parsed.netloc.replace("host.docker.internal", "localhost", 1)
+    return urlunparse(parsed._replace(netloc=netloc))
 
 
 class Settings(BaseSettings):
@@ -31,6 +52,9 @@ class Settings(BaseSettings):
     CAMPAIGN_CACHE_TTL_SECONDS: int = 86400
     ML_SCORES_CACHE_TTL_SECONDS: int = 86400
     ML_METRICS_CACHE_TTL_SECONDS: int = 86400
+    ANOMALY_DAILY_METRICS_CACHE_TTL_SECONDS: int = 86400
+    ANOMALY_RESULTS_CACHE_TTL_SECONDS: int = 86400
+    ANOMALY_MOST_AFFECTED_CACHE_TTL_SECONDS: int = 86400
     SEGMENTATION_SQL_TIMEOUT_MS: int = 180000
     CACHE_LOCK_TTL_SECONDS: int = 30
     CACHE_LOCK_WAIT_MS: int = 1200
@@ -43,7 +67,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str | None = None
     SMTP_FROM: str = "noreply@digmaco.tn"
     SMTP_USE_TLS: bool = True
+    SMTP_STRICT_DELIVERY: bool = False
     FRONTEND_BASE_URL: str = "http://localhost:5173"
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    REPORTS_OUTPUT_DIR: str = os.getenv("REPORTS_OUTPUT_DIR", "reports/generated")
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -57,6 +84,7 @@ class Settings(BaseSettings):
             self.DATABASE_URL = self.ANALYTICS_CONN or self.analytics_conn
         if not self.DATABASE_URL:
             raise ValueError("DATABASE_URL (or ANALYTICS_CONN) is required")
+        self.DATABASE_URL = _normalize_host_for_local_run(self.DATABASE_URL)
         return self
 
 

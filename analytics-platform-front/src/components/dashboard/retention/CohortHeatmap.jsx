@@ -12,8 +12,22 @@ function getCellClasses(value) {
 
 export default function CohortHeatmap({ data }) {
   const [page, setPage] = useState(1);
+  const rows = useMemo(() => data ?? [], [data]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
 
-  if (!data?.length) {
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const pageRows = useMemo(() => {
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    return rows.slice(start, start + ROWS_PER_PAGE);
+  }, [currentPage, rows]);
+
+  if (!rows.length) {
     return (
       <div
         className="rounded-xl p-6 h-full flex items-center justify-center text-sm"
@@ -28,21 +42,6 @@ export default function CohortHeatmap({ data }) {
       </div>
     );
   }
-
-  const rows = useMemo(() => data, [data]);
-  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
-  const currentPage = Math.min(page, totalPages);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  const pageRows = useMemo(() => {
-    const start = (currentPage - 1) * ROWS_PER_PAGE;
-    return rows.slice(start, start + ROWS_PER_PAGE);
-  }, [currentPage, rows]);
 
   return (
     <div

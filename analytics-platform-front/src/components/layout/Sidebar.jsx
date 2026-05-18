@@ -1,13 +1,27 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ChevronLeft, ChevronRight, LogOut, Zap, ChevronDown } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { navigationConfig } from "./navConfig";
 import { ThemeToggleWithLabel } from "./ThemeToggle";
 
 export default function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedSections, setExpandedSections] = useState({});
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar-collapsed') === 'true';
+  });
+  const [expandedSections, setExpandedSections] = useState(() => {
+    const saved = localStorage.getItem('sidebar-expanded');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', isCollapsed);
+  }, [isCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-expanded', JSON.stringify(expandedSections));
+  }, [expandedSections]);
+
   const navRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,8 +83,7 @@ export default function Sidebar() {
 
   const sidebarWidth = isCollapsed ? "w-16" : "w-[220px]";
 
-  const handleNavClick = useCallback((route) => (e) => {
-    e.preventDefault();
+  const handleNavClick = useCallback((route) => () => {
     if (navRef.current) {
       sessionStorage.setItem(sidebarScrollKey, String(navRef.current.scrollTop));
     }
@@ -81,7 +94,6 @@ export default function Sidebar() {
       const currentPath = location.pathname;
 
       sessionStorage.setItem(`scroll-${currentPath}`, scrollPos);
-      navigate(route);
 
       requestAnimationFrame(() => {
         const savedScroll = sessionStorage.getItem(`scroll-${route}`);
@@ -89,10 +101,8 @@ export default function Sidebar() {
           mainContent.scrollTop = parseInt(savedScroll, 10);
         }
       });
-    } else {
-      navigate(route);
     }
-  }, [navigate, location.pathname]);
+  }, [location.pathname]);
 
   return (
     <aside
@@ -194,9 +204,9 @@ export default function Sidebar() {
                   {section.items.map((item) => {
                     const isActive = location.pathname === item.route;
                     return (
-                      <a
+                      <NavLink
                         key={item.route}
-                        href={item.route}
+                        to={item.route}
                         onClick={handleNavClick(item.route)}
                         className="group relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 border-l-2 cursor-pointer"
                         style={{
@@ -216,7 +226,7 @@ export default function Sidebar() {
                         {!isCollapsed && (
                           <span className="text-sm font-medium truncate">{item.label}</span>
                         )}
-                      </a>
+                      </NavLink>
                     );
                   })}
 

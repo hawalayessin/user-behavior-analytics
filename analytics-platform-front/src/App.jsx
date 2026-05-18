@@ -6,6 +6,7 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import PrivateRoute from "./router/PrivateRoute";
 import AdminRoute from "./router/AdminRoute";
+import AppLayout from "./components/layout/AppLayout";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import RootRedirect from "./pages/RootRedirect";
 import PlatformUsersPage from "./pages/platform-users/PlatformUsersPage";
@@ -37,166 +38,39 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <DashboardPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/dashboard-1"
-            element={
-              <PrivateRoute>
-                <DashboardPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/behaviors"
-            element={
-              <PrivateRoute>
-                <UserActivityPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/trial"
-            element={
-              <PrivateRoute>
-                <FreeTrialBehaviorPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/retention"
-            element={
-              <PrivateRoute>
-                <RetentionPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/campaigns"
-            element={
-              <PrivateRoute>
-                <CampaignImpactPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/churn"
-            element={
-              <PrivateRoute>
-                <ChurnAnalysisPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/churn-prediction"
-            element={
-              <PrivateRoute>
-                <AIChurnInsights />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/cross-service"
-            element={
-              <PrivateRoute>
-                <CrossServiceBehaviorPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/segmentation"
-            element={
-              <PrivateRoute>
-                <UserSegmentationPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/analytics/anomalies"
-            element={
-              <PrivateRoute>
-                <AnomalyDetectionPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/management/subscribers"
-            element={
-              <PrivateRoute>
-                <SubscribersPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/admin/users"
-            element={
-              <AdminRoute>
-                <PlatformUsersPage />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/import"
-            element={
-              <AdminRoute>
-                <ImportDataPage />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/management"
-            element={
-              <AdminRoute>
-                <ManagementPage />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/settings"
-            element={
-              <AdminRoute>
-                <SystemSettingsPage />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/run-ai-models"
-            element={
-              <AdminRoute>
-                <RunAIModelsPage />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin/reports"
-            element={
-              <AdminRoute>
-                <ReportGeneratorPage />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/account/profile"
-            element={
-              <PrivateRoute>
-                <ProfileSettingsPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/notes"
-            element={
-              <PrivateRoute>
-                <NotesPage />
-              </PrivateRoute>
-            }
-          />
+
+          {/* Protected routes — PrivateRoute + AppLayout persist across navigations */}
+          <Route element={<PrivateRoute />}>
+            <Route element={<AppLayout />}>
+              <Route index element={<RootRedirect />} />
+
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard-1" element={<DashboardPage />} />
+              <Route path="/analytics/behaviors" element={<UserActivityPage />} />
+              <Route path="/analytics/trial" element={<FreeTrialBehaviorPage />} />
+              <Route path="/analytics/retention" element={<RetentionPage />} />
+              <Route path="/analytics/campaigns" element={<CampaignImpactPage />} />
+              <Route path="/analytics/churn" element={<ChurnAnalysisPage />} />
+              <Route path="/analytics/churn-prediction" element={<AIChurnInsights />} />
+              <Route path="/analytics/cross-service" element={<CrossServiceBehaviorPage />} />
+              <Route path="/analytics/segmentation" element={<UserSegmentationPage />} />
+              <Route path="/analytics/anomalies" element={<AnomalyDetectionPage />} />
+              <Route path="/management/subscribers" element={<SubscribersPage />} />
+              <Route path="/admin/reports" element={<ReportGeneratorPage />} />
+              <Route path="/account/profile" element={<ProfileSettingsPage />} />
+              <Route path="/notes" element={<NotesPage />} />
+
+              {/* Admin-only routes */}
+              <Route element={<AdminRoute />}>
+                <Route path="/admin/users" element={<PlatformUsersPage />} />
+                <Route path="/admin/import" element={<ImportDataPage />} />
+                <Route path="/admin/management" element={<ManagementPage />} />
+                <Route path="/admin/settings" element={<SystemSettingsPage />} />
+                <Route path="/admin/run-ai-models" element={<RunAIModelsPage />} />
+              </Route>
+            </Route>
+          </Route>
+
           <Route path="*" element={<RootRedirect />} />
         </Routes>
       </BrowserRouter>

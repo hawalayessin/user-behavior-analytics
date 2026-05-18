@@ -1,4 +1,4 @@
-import io
+﻿import io
 import json
 import re
 import os
@@ -34,13 +34,13 @@ SQL_MAX_FILE_BYTES = 50 * 1024 * 1024
 ImportMode = Literal["append", "replace", "demo"]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# STEP 0 — TABLE_REGISTRY (derived from app/models/*)
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# STEP 0 - TABLE_REGISTRY (derived from app/models/*)
 # Notes:
 # - "required" = columns with nullable=False AND no default/server_default
 # - "optional" = nullable=True OR has default/server_default
 # - "defaults_excluded" = columns with default/server_default (import should omit)
-# ──────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 TABLE_REGISTRY: dict[str, dict[str, Any]] = {
     "service_types": {
@@ -494,7 +494,7 @@ def _load_from_staging(
     import_id: uuid.UUID,
     force: bool,
 ) -> tuple[int, int]:
-    # If invalid and not forced → refuse
+    # If invalid and not forced -> refuse
     counts = db.execute(
         text(
             """
@@ -1017,7 +1017,7 @@ def import_history(
             {
                 "id": str(l.id),
                 "imported_at": l.imported_at.isoformat() if l.imported_at else None,
-                "admin_name": getattr(admin, "full_name", None) or getattr(admin, "email", None) or "—",
+                "admin_name": getattr(admin, "full_name", None) or getattr(admin, "email", None) or "-",
                 "file_name": l.file_name,
                 "file_type": l.file_type,
                 "target_table": l.target_table,
@@ -1066,7 +1066,7 @@ def import_history_details(
     return {
         "id": str(log.id),
         "imported_at": log.imported_at.isoformat() if log.imported_at else None,
-        "admin_name": getattr(admin, "full_name", None) or getattr(admin, "email", None) or "—",
+        "admin_name": getattr(admin, "full_name", None) or getattr(admin, "email", None) or "-",
         "file_name": log.file_name,
         "file_type": log.file_type,
         "target_table": log.target_table,
@@ -1324,6 +1324,8 @@ async def _execute_etl_background(
                     stderr=subprocess.STDOUT,
                     env=env,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     bufsize=1,
                 )
                 _active_processes[log_id] = process
@@ -1650,3 +1652,4 @@ def get_etl_history(
             }
         )
     return response
+

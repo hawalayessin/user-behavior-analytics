@@ -7,7 +7,6 @@ import {
   Settings,
   Shield,
 } from "lucide-react";
-import AppLayout from "../../components/layout/AppLayout";
 
 const defaultSettings = {
   appName: "InsightHub",
@@ -58,7 +57,6 @@ export default function SystemSettingsPage() {
   };
 
   return (
-    <AppLayout pageTitle="System Settings">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-100 mb-2">
@@ -240,6 +238,6 @@ export default function SystemSettingsPage() {
           </p>
         </div>
       </div>
-    </AppLayout>
+
   );
 }

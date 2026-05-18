@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import {
   Play,
   BrainCircuit,
@@ -9,7 +9,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import AppLayout from "../../components/layout/AppLayout";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 import { useAnomalies } from "../../hooks/useAnomalies";
 import { useSegmentationTrain } from "../../hooks/useSegmentationTrain";
@@ -248,151 +247,149 @@ export default function RunAIModelsPage() {
   );
 
   return (
-    <AppLayout pageTitle="Run AI Models">
-      <div className="rounded-xl border p-4 md:p-6 space-y-4" style={{
-        borderColor: "var(--color-border)",
-        backgroundColor: "var(--color-bg-primary)"
-      }}>
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold" style={{
-              color: "var(--color-text-secondary)"
-            }}>System Monitoring</p>
-            <h1 className="text-4xl font-extrabold mt-1" style={{
-              color: "var(--color-text-primary)"
-            }}>Run AI Models</h1>
-            <p className="text-xs mt-1" style={{
-              color: "var(--color-text-secondary)"
-            }}>
-              Unified observatory for Tunisian market predictive analytics.
-            </p>
-            <p className="text-[10px] mt-2 tracking-wider" style={{
-              color: "var(--color-text-primary)"
-            }}>ADMIN ONLY ACCESS</p>
-          </div>
-
-          <button
-            onClick={handleRunAll}
-            disabled={runningAll}
-            className="h-10 px-5 text-sm rounded-lg font-bold flex items-center gap-2 disabled:opacity-60 transition"
-            style={{
-              backgroundColor: "var(--color-primary)",
-              color: "white"
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = "var(--color-primary-hover)"}
-            onMouseLeave={(e) => e.target.style.backgroundColor = "var(--color-primary)"}
-          >
-            {runningAll ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}
-            {runningAll ? "Initializing..." : "Initialize All Models"}
-          </button>
-        </div>
-
-        {firstError && (
-          <div className="flex items-center gap-2 p-3 rounded-lg border" style={{
-            backgroundColor: "var(--color-danger-bg)",
-            borderColor: "var(--color-danger)"
+    <div className="rounded-xl border p-4 md:p-6 space-y-4" style={{
+      borderColor: "var(--color-border)",
+      backgroundColor: "var(--color-bg-primary)"
+    }}>
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={{
+            color: "var(--color-text-secondary)"
+          }}>System Monitoring</p>
+          <h1 className="text-4xl font-extrabold mt-1" style={{
+            color: "var(--color-text-primary)"
+          }}>Run AI Models</h1>
+          <p className="text-xs mt-1" style={{
+            color: "var(--color-text-secondary)"
           }}>
-            <AlertCircle size={18} className="flex-shrink-0" style={{
-              color: "var(--color-danger)"
-            }} />
-            <p className="flex-1 text-xs" style={{
-              color: "var(--color-danger)"
-            }}>{firstError}</p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <ModuleCard
-            icon={TrendingDown}
-            title="Churn Prediction"
-            subtitle="Logistic Regression model trained on subscriber activity and recharge frequency."
-            primaryMetricLabel="Accuracy"
-            primaryMetricValue={churnAccuracy}
-            secondaryMetricLabel="Last Run"
-            secondaryMetricValue={churnLastRun}
-            loadPct={0}
-            actionLabel="Train Model"
-            loading={churnTrain.loading}
-            status={churnTrain.job?.status}
-            onRun={churnTrain.train}
-          />
-          <ModuleCard
-            icon={Users}
-            title="User Segmentation"
-            subtitle="K-Means clustering for customer profiling and behavioral archetypes."
-            primaryMetricLabel="Dominant Share"
-            primaryMetricValue={segDominantPct}
-            secondaryMetricLabel="Users"
-            secondaryMetricValue={segUsers}
-            loadPct={68}
-            actionLabel="Recalculate Model"
-            loading={segmentationTrain.loading}
-            status={segmentationTrain.job?.status}
-            onRun={segmentationTrain.train}
-          />
-          <ModuleCard
-            icon={AlertTriangle}
-            title="Anomaly Detection"
-            subtitle="Isolation Forest for detecting irregular recharge patterns and fraud."
-            primaryMetricLabel="Critical Alerts"
-            primaryMetricValue={anomalyCritical}
-            secondaryMetricLabel="Last Run"
-            secondaryMetricValue={anomalyLastRun}
-            loadPct={0}
-            actionLabel="Run Detection"
-            loading={runDetectionLoading}
-            status={detectionJob?.status}
-            onRun={runDetection}
-          />
+            Unified observatory for Tunisian market predictive analytics.
+          </p>
+          <p className="text-[10px] mt-2 tracking-wider" style={{
+            color: "var(--color-text-primary)"
+          }}>ADMIN ONLY ACCESS</p>
         </div>
 
-        <div className="rounded-xl border overflow-hidden" style={{
+        <button
+          onClick={handleRunAll}
+          disabled={runningAll}
+          className="h-10 px-5 text-sm rounded-lg font-bold flex items-center gap-2 disabled:opacity-60 transition"
+          style={{
+            backgroundColor: "var(--color-primary)",
+            color: "white"
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = "var(--color-primary-hover)"}
+          onMouseLeave={(e) => e.target.style.backgroundColor = "var(--color-primary)"}
+        >
+          {runningAll ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}
+          {runningAll ? "Initializing..." : "Initialize All Models"}
+        </button>
+      </div>
+
+      {firstError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg border" style={{
+          backgroundColor: "var(--color-danger-bg)",
+          borderColor: "var(--color-danger)"
+        }}>
+          <AlertCircle size={18} className="flex-shrink-0" style={{
+            color: "var(--color-danger)"
+          }} />
+          <p className="flex-1 text-xs" style={{
+            color: "var(--color-danger)"
+          }}>{firstError}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <ModuleCard
+          icon={TrendingDown}
+          title="Churn Prediction"
+          subtitle="Logistic Regression model trained on subscriber activity and recharge frequency."
+          primaryMetricLabel="Accuracy"
+          primaryMetricValue={churnAccuracy}
+          secondaryMetricLabel="Last Run"
+          secondaryMetricValue={churnLastRun}
+          loadPct={0}
+          actionLabel="Train Model"
+          loading={churnTrain.loading}
+          status={churnTrain.job?.status}
+          onRun={churnTrain.train}
+        />
+        <ModuleCard
+          icon={Users}
+          title="User Segmentation"
+          subtitle="K-Means clustering for customer profiling and behavioral archetypes."
+          primaryMetricLabel="Dominant Share"
+          primaryMetricValue={segDominantPct}
+          secondaryMetricLabel="Users"
+          secondaryMetricValue={segUsers}
+          loadPct={68}
+          actionLabel="Recalculate Model"
+          loading={segmentationTrain.loading}
+          status={segmentationTrain.job?.status}
+          onRun={segmentationTrain.train}
+        />
+        <ModuleCard
+          icon={AlertTriangle}
+          title="Anomaly Detection"
+          subtitle="Isolation Forest for detecting irregular recharge patterns and fraud."
+          primaryMetricLabel="Critical Alerts"
+          primaryMetricValue={anomalyCritical}
+          secondaryMetricLabel="Last Run"
+          secondaryMetricValue={anomalyLastRun}
+          loadPct={0}
+          actionLabel="Run Detection"
+          loading={runDetectionLoading}
+          status={detectionJob?.status}
+          onRun={runDetection}
+        />
+      </div>
+
+      <div className="rounded-xl border overflow-hidden" style={{
+        borderColor: "var(--color-border)",
+        backgroundColor: "var(--color-bg-card)"
+      }}>
+        <div className="h-10 px-4 flex items-center gap-2 border-b" style={{
           borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-bg-elevated)"
+        }}>
+          <BrainCircuit size={12} style={{
+            color: "var(--color-primary)"
+          }} />
+          <p className="text-lg tracking-wide font-semibold" style={{
+            color: "var(--color-text-primary)"
+          }}>
+            REAL-TIME EXECUTION LOGS
+          </p>
+          <span className="ml-4 text-[10px]" style={{
+            color: "var(--color-text-muted)"
+          }}>System.uptime: 142h 12m</span>
+        </div>
+        <div className="max-h-64 overflow-auto p-3" style={{
           backgroundColor: "var(--color-bg-card)"
         }}>
-          <div className="h-10 px-4 flex items-center gap-2 border-b" style={{
-            borderColor: "var(--color-border)",
-            backgroundColor: "var(--color-bg-elevated)"
-          }}>
-            <BrainCircuit size={12} style={{
-              color: "var(--color-primary)"
-            }} />
-            <p className="text-lg tracking-wide font-semibold" style={{
-              color: "var(--color-text-primary)"
-            }}>
-              REAL-TIME EXECUTION LOGS
-            </p>
-            <span className="ml-4 text-[10px]" style={{
-              color: "var(--color-text-muted)"
-            }}>System.uptime: 142h 12m</span>
-          </div>
-          <div className="max-h-64 overflow-auto p-3" style={{
-            backgroundColor: "var(--color-bg-card)"
-          }}>
-            {mergedLogs.length === 0 ? (
-              <p className="text-xs" style={{
-                color: "var(--color-text-secondary)"
-              }}>No logs yet.</p>
-            ) : (
-              <div className="space-y-1 text-xs font-mono">
-                {mergedLogs.map((l, idx) => (
-                  <div key={`${l.source}-${l.ts}-${idx}`} style={{
-                    color: "var(--color-text-primary)"
-                  }}>
-                    <span className="mr-2" style={{
-                      color: "var(--color-text-muted)"
-                    }}>[{new Date(l.ts).toLocaleTimeString()}]</span>
-                    <span className="mr-2" style={{
-                      color: "var(--color-primary)"
-                    }}>{l.source}</span>
-                    <span>{l.message}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {mergedLogs.length === 0 ? (
+            <p className="text-xs" style={{
+              color: "var(--color-text-secondary)"
+            }}>No logs yet.</p>
+          ) : (
+            <div className="space-y-1 text-xs font-mono">
+              {mergedLogs.map((l, idx) => (
+                <div key={`${l.source}-${l.ts}-${idx}`} style={{
+                  color: "var(--color-text-primary)"
+                }}>
+                  <span className="mr-2" style={{
+                    color: "var(--color-text-muted)"
+                  }}>[{new Date(l.ts).toLocaleTimeString()}]</span>
+                  <span className="mr-2" style={{
+                    color: "var(--color-primary)"
+                  }}>{l.source}</span>
+                  <span>{l.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-    </AppLayout>
+    </div>
   );
 }

@@ -1,8 +1,19 @@
-import axios from "axios"
+﻿import axios from "axios"
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",   // ✅ IMPORTANT
+  baseURL: import.meta.env.VITE_API_URL || "/api",
+  withCredentials: true,
 })
+
+let inMemoryAccessToken = null
+
+export function setAccessToken(token) {
+  inMemoryAccessToken = token || null
+}
+
+export function getAccessToken() {
+  return inMemoryAccessToken
+}
 
 const inFlightGetRequests = new Map()
 const getResponseCache = new Map()
@@ -27,7 +38,6 @@ function loadPersistedGetCache() {
 function persistGetCache() {
   try {
     const now = Date.now()
-    // Keep persisted cache bounded and reasonably fresh.
     const entries = Array.from(getResponseCache.entries())
       .filter(([, value]) => now - value.timestamp < 24 * 60 * 60 * 1000)
       .slice(-300)
@@ -56,9 +66,8 @@ function buildCacheKey(url, params = null) {
   return qs ? `${url}?${qs}` : url
 }
 
-// Intercepteur JWT automatique
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token")
+  const token = getAccessToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

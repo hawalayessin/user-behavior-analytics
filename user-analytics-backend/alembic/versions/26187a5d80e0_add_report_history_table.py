@@ -70,6 +70,54 @@ def upgrade() -> None:
                comment='Expiration du token de réinitialisation',
                existing_nullable=True)
     op.drop_index(op.f('ix_platform_users_reset_token'), table_name='platform_users')
+    # Backfill sms_events.user_id before enforcing NOT NULL.
+    # 1) Create users for missing phone numbers present in sms_events rows with NULL user_id.
+    op.execute(
+        """
+        INSERT INTO users (id, phone_number, status)
+        SELECT gen_random_uuid(), se.phone_number, 'active'
+        FROM (
+          SELECT DISTINCT phone_number
+          FROM sms_events
+          WHERE user_id IS NULL
+            AND phone_number IS NOT NULL
+            AND btrim(phone_number) <> ''
+        ) se
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM users u
+          WHERE u.phone_number = se.phone_number
+        )
+        """
+    )
+    # 2) Link sms_events NULL user_id rows to users by phone_number.
+    op.execute(
+        """
+        UPDATE sms_events se
+        SET user_id = u.id
+        FROM users u
+        WHERE se.user_id IS NULL
+          AND se.phone_number IS NOT NULL
+          AND btrim(se.phone_number) <> ''
+          AND u.phone_number = se.phone_number
+        """
+    )
+    # 3) Ensure a fallback placeholder user for any remaining NULL user_id rows.
+    op.execute(
+        """
+        INSERT INTO users (id, phone_number, status)
+        VALUES ('00000000-0000-0000-0000-000000000001', '__unknown_sms_user__', 'inactive')
+        ON CONFLICT (phone_number) DO NOTHING
+        """
+    )
+    op.execute(
+        """
+        UPDATE sms_events
+        SET user_id = '00000000-0000-0000-0000-000000000001'
+        WHERE user_id IS NULL
+        """
+    )
+
     op.alter_column('sms_events', 'user_id',
                existing_type=sa.UUID(),
                nullable=False)

@@ -1,11 +1,14 @@
 import os
 import bcrypt
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 
 SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me")
 ALGORITHM: str = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
 
 def hash_password(plain: str) -> str:
@@ -36,3 +39,12 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 def decode_access_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+
+def create_refresh_token() -> str:
+    # 32 random bytes URL-safe token for cookie transport.
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

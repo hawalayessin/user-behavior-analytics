@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import AppLayout from "../components/layout/AppLayout";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import NotePanel from "../components/notes/NotePanel";
 import NotesList from "../components/notes/NotesList";
 import api from "../services/api";
@@ -115,7 +114,7 @@ export default function NotesPage() {
   };
 
   return (
-    <AppLayout pageTitle="Analyst Notes">
+    <>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -219,6 +218,6 @@ export default function NotesPage() {
       />
 
       {Toast}
-    </AppLayout>
+    </>
   );
 }

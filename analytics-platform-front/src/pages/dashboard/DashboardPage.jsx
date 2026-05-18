@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import AppLayout from "../../components/layout/AppLayout";
 import FilterBar from "../../components/dashboard/FilterBar";
 import TabNavigation from "../../components/dashboard/TabNavigation";
 import OverviewTab from "../../components/dashboard/tabs/OverviewTab";
@@ -228,7 +227,6 @@ export default function DashboardPage() {
     "Impossible de charger les données.";
 
   return (
-    <AppLayout pageTitle="Analytics Overview" hasNotifications showExportButton>
       <div className="space-y-5 pb-6">
         {/* Filter Bar — toujours visible */}
         <FilterBar
@@ -384,6 +382,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+
   );
 }

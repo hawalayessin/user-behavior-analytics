@@ -1,4 +1,3 @@
-import AppLayout from "../components/layout/AppLayout";
 import UserListSection from "../components/subscribers/UserListSection";
 import { useSubscribersKPIs } from "../hooks/useSubscribersKPIs";
 
@@ -15,7 +14,6 @@ export default function SubscribersPage() {
   const kpiWeb = loading ? "..." : kpis.channelWeb.toLocaleString();
 
   return (
-    <AppLayout pageTitle="Abonnés">
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -169,6 +167,6 @@ export default function SubscribersPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+
   );
 }

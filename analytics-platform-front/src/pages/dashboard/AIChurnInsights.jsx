@@ -1,13 +1,7 @@
-import AppLayout from "../../components/layout/AppLayout";
 import ChurnPredictionDashboard from "../../components/dashboard/churn_prediction/churn_dashboard";
 
 export default function AIChurnInsights() {
   return (
-    <AppLayout
-      pageTitle="Churn Prediction"
-      hasNotifications={false}
-      showExportButton={false}
-    >
       <div className="space-y-6">
         <div>
           <h1
@@ -24,6 +18,6 @@ export default function AIChurnInsights() {
 
         <ChurnPredictionDashboard />
       </div>
-    </AppLayout>
+
   );
 }

@@ -9,15 +9,6 @@ export function useManagement() {
   const [error, setError] = useState(null)
 
   const fetchAll = useCallback(async () => {
-    const token = localStorage.getItem("access_token")
-    if (!token) {
-      setServices([])
-      setCampaigns([])
-      setError("Unauthorized: please login as admin")
-      setLoading(false)
-      return
-    }
-
     setLoading(true)
     setError(null)
     try {

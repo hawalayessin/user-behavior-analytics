@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { FileText, ChevronRight, Check, Loader2, Download, AlertCircle } from 'lucide-react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import { FileText, Check, Loader2, Download, AlertCircle, ChevronDown, X, Lightbulb, Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import AppLayout from '../../components/layout/AppLayout';
 import { useAuth } from '../../context/AuthContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -114,7 +113,7 @@ const REPORT_TYPE_SECTIONS = {
 
 export default function ReportGeneratorPage() {
   const navigate = useNavigate();
-  const { access_token, logout } = useAuth();
+  const { access_token, logout, refreshAccessToken } = useAuth();
   const [reportType, setReportType] = useState('full');
   const [selectedServices, setSelectedServices] = useState([
     'ElJournal',
@@ -138,26 +137,62 @@ export default function ReportGeneratorPage() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState(null);
+  const [fakeProgress, setFakeProgress] = useState(0);
 
   const [history, setHistory] = useState([]);
   const [histLoading, setHistLoading] = useState(false);
 
   const pollingRef = useRef(null);
+  const fakeProgressRef = useRef(null);
+  const servicesDropdownRef = useRef(null);
+  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
 
   const allServiceIds = services.map((s) => s.id);
   const allServicesSelected = selectedServices.length === allServiceIds.length;
 
-  const handleServicesDropdown = (event) => {
-    const value = event.target.value;
-    if (value === '__all__') {
-      setSelectedServices(allServicesSelected ? [] : allServiceIds);
-      return;
+  const authFetch = useCallback(async (url, opts = {}) => {
+    const buildHeaders = (token) => ({
+      ...(opts.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    });
+
+    const doRequest = (token) =>
+      fetch(url, {
+        ...opts,
+        credentials: 'include',
+        headers: buildHeaders(token),
+      });
+
+    let res = await doRequest(access_token);
+    if (res.status !== 401) return res;
+
+    const newToken = await refreshAccessToken();
+    if (!newToken) {
+      await logout();
+      navigate('/login');
+      return null;
     }
-    if (!value) return;
+
+    res = await doRequest(newToken);
+    if (res.status === 401) {
+      await logout();
+      navigate('/login');
+      return null;
+    }
+    return res;
+  }, [access_token, logout, navigate, refreshAccessToken]);
+
+  const toggleService = useCallback((id) => {
     setSelectedServices((prev) =>
-      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
-  };
+  }, []);
+
+  const toggleAllServices = useCallback(() => {
+    setSelectedServices((prev) =>
+      prev.length === allServiceIds.length ? [] : allServiceIds
+    );
+  }, [allServiceIds]);
 
   const toggleSection = (id) => {
     setSelectedSections((prev) =>
@@ -179,23 +214,24 @@ export default function ReportGeneratorPage() {
 
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await fetch(
-          `${API_BASE}/reports/status/${id}`,
-          {
-            headers: { Authorization: `Bearer ${access_token}` },
-          }
-        );
-        if (res.status === 401) {
-          logout();
-          navigate('/login');
-          return;
-        }
+        const res = await authFetch(`${API_BASE}/reports/status/${id}`);
+        if (!res) return;
         const data = await res.json();
+
+        if (data.progress_pct > 0 && fakeProgressRef.current) {
+          clearInterval(fakeProgressRef.current);
+          fakeProgressRef.current = null;
+        }
+
         setActiveRun(data);
 
         if (data.status === 'success' || data.status === 'failed') {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
+          if (fakeProgressRef.current) {
+            clearInterval(fakeProgressRef.current);
+            fakeProgressRef.current = null;
+          }
           if (data.status === 'success') {
             fetchHistory();
           }
@@ -208,8 +244,17 @@ export default function ReportGeneratorPage() {
   };
 
   useEffect(() => {
+    // Close services dropdown when clicking outside
+    const handleClickOutside = (e) => {
+      if (servicesDropdownRef.current && !servicesDropdownRef.current.contains(e.target)) {
+        setServicesDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
+      if (fakeProgressRef.current) clearInterval(fakeProgressRef.current);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -217,9 +262,10 @@ export default function ReportGeneratorPage() {
     const fetchServices = async () => {
       if (!access_token) return;
       try {
-        const res = await fetch(`${API_BASE}/services`, {
+        const res = await authFetch(`${API_BASE}/services`, {
           headers: { Authorization: `Bearer ${access_token}` },
         });
+        if (!res) return;
         if (!res.ok) return;
         const data = await res.json();
         const list = Array.isArray(data) ? data : data?.items || [];
@@ -272,6 +318,7 @@ export default function ReportGeneratorPage() {
     }
     setIsLaunching(true);
     setShowModal(true);
+    setFakeProgress(0);
     setActiveRun({
       status: 'generating',
       current_step: GENERATION_STEPS[0],
@@ -280,8 +327,21 @@ export default function ReportGeneratorPage() {
       progress_pct: 0,
     });
 
+    // Animate fake progress from 0 -> 55% while waiting for real backend data
+    if (fakeProgressRef.current) clearInterval(fakeProgressRef.current);
+    let fp = 0;
+    fakeProgressRef.current = setInterval(() => {
+      fp += Math.random() * 3 + 1;
+      if (fp >= 55) {
+        fp = 55;
+        clearInterval(fakeProgressRef.current);
+        fakeProgressRef.current = null;
+      }
+      setFakeProgress(Math.round(fp));
+    }, 400);
+
     try {
-      const res = await fetch(`${API_BASE}/reports/generate`, {
+      const res = await authFetch(`${API_BASE}/reports/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -300,13 +360,8 @@ export default function ReportGeneratorPage() {
           gemini_prompt_template: geminiPromptTemplate,
         }),
       });
-
+      if (!res) return;
       const data = await res.json();
-      if (res.status === 401) {
-        logout();
-        navigate('/login');
-        return;
-      }
 
       if (!res.ok) {
         throw new Error(data.detail || 'Erreur de génération');
@@ -333,17 +388,13 @@ export default function ReportGeneratorPage() {
       return;
     }
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `${API_BASE}/reports/download/${id}`,
         {
           headers: { Authorization: `Bearer ${access_token}` },
         }
       );
-      if (res.status === 401) {
-        logout();
-        navigate('/login');
-        return;
-      }
+      if (!res) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -360,14 +411,10 @@ export default function ReportGeneratorPage() {
     if (!access_token) return;
     setHistLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/reports/history`, {
+      const res = await authFetch(`${API_BASE}/reports/history`, {
         headers: { Authorization: `Bearer ${access_token}` },
       });
-      if (res.status === 401) {
-        logout();
-        navigate('/login');
-        return;
-      }
+      if (!res) return;
       const data = await res.json();
       setHistory(data);
     } catch {
@@ -382,674 +429,841 @@ export default function ReportGeneratorPage() {
   }, [access_token]);
 
   return (
-    <AppLayout pageTitle="Report Generator">
-      <div style={styles.page}>
-      <main style={styles.mainContent}>
-        <div style={styles.contentWrapper}>
-          {/* LEFT CONFIG PANEL */}
-          <section style={styles.leftPanel}>
-            {/* Header */}
-            <div style={styles.pageHeader}>
-              <div style={styles.headerLeft}>
-                <div style={styles.headerIcon}>
-                  <FileText size={24} color="var(--color-primary)" />
-                </div>
-                <div>
-                  <h1 style={styles.pageTitle}>Report Generator</h1>
-                  <p style={styles.pageDesc}>
-                    Generate custom PDF reports enriched with AI-powered insights and analytics
-                  </p>
-                </div>
+    <div style={styles.page}>
+    <main style={styles.mainContent}>
+      <div className="rg-content-wrapper" style={styles.contentWrapper}>
+        {/* LEFT CONFIG PANEL */}
+        <section className="rg-left-panel" style={styles.leftPanel}>
+          {/* Header */}
+          <div style={styles.pageHeader}>
+            <div style={styles.headerLeft}>
+              <div style={styles.headerIcon}>
+                <FileText size={24} color="var(--color-primary)" />
               </div>
-              <div style={styles.headerBadge}>
-                <span style={styles.badgeIcon}>💡</span>
-                <span style={styles.badgeText}>AI-Powered</span>
+              <div>
+                <h1 style={styles.pageTitle}>Report Generator</h1>
+                <p style={styles.pageDesc}>
+                  Generate custom PDF reports enriched with AI-powered insights and analytics
+                </p>
               </div>
             </div>
+            <div style={styles.headerBadge}>
+              <span style={styles.badgeIcon}>
+                <Lightbulb size={16} color="#f59e0b" />
+              </span>
+              <span style={styles.badgeText}>AI-Powered</span>
+            </div>
+          </div>
 
-            {/* Config Card */}
-            <div style={styles.configCard}>
-              {/* STEP 1: Report Type */}
-              <div style={styles.stepSection}>
-                <div style={styles.stepLabel}>
-                  <span style={styles.stepNumber}>01</span>
-                  <h3 style={styles.stepTitle}>Report Type</h3>
-                </div>
-                <div style={styles.reportTypeGrid}>
-                  {REPORT_TYPES.map((type) => (
-                    <button
-                      key={type.id}
-                      onClick={() => setReportType(type.id)}
-                      style={{
-                        ...styles.reportTypeCard,
-                        ...(reportType === type.id && {
-                          borderColor: type.color,
-                          borderWidth: '2px',
-                          backgroundColor: `${type.color}15`,
-                        }),
-                      }}
-                    >
-                      <div style={styles.reportTypeHeader}>
+          {/* Config Card */}
+          <div className="rg-config-card" style={styles.configCard}>
+            {/* STEP 1: Report Type */}
+            <div style={styles.stepSection}>
+              <div style={styles.stepLabel}>
+                <span style={styles.stepNumber}>01</span>
+                <h3 style={styles.stepTitle}>Report Type</h3>
+              </div>
+              <div className="rg-report-type-grid" style={styles.reportTypeGrid}>
+                {REPORT_TYPES.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => setReportType(type.id)}
+                    style={{
+                      ...styles.reportTypeCard,
+                      ...(reportType === type.id && {
+                        borderColor: type.color,
+                        borderWidth: '2px',
+                        backgroundColor: `${type.color}15`,
+                      }),
+                    }}
+                  >
+                    <div style={styles.reportTypeHeader}>
+                      <div
+                        style={{
+                          ...styles.reportTypeIcon,
+                          color: type.color,
+                        }}
+                      >
+                        <FileText size={20} />
+                      </div>
+                      {reportType === type.id && (
                         <div
                           style={{
-                            ...styles.reportTypeIcon,
-                            color: type.color,
+                            ...styles.checkIcon,
+                            backgroundColor: type.color,
                           }}
                         >
-                          <FileText size={20} />
+                          <Check size={14} color="white" />
                         </div>
-                        {reportType === type.id && (
-                          <div
-                            style={{
-                              ...styles.checkIcon,
-                              backgroundColor: type.color,
-                            }}
-                          >
-                            <Check size={14} color="white" />
-                          </div>
-                        )}
+                      )}
+                    </div>
+                    {type.badge && (
+                      <span
+                        style={{
+                          ...styles.typeBadge,
+                          backgroundColor: `${type.badgeColor}20`,
+                          color: type.badgeColor,
+                        }}
+                      >
+                        {type.badge}
+                      </span>
+                    )}
+                    <h4 style={styles.reportTypeName}>{type.label}</h4>
+                    <p style={styles.reportTypeDesc}>{type.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* STEP 2: Services */}
+            <div style={styles.stepSection}>
+              <div style={styles.stepLabel}>
+                <span style={styles.stepNumber}>02</span>
+                <h3 style={styles.stepTitle}>Included Services</h3>
+              </div>
+              <div className="rg-date-range-row" style={styles.dateRangeRow}>
+                <div style={styles.dateField}>
+                  <label style={styles.aiConfigLabel}>Start date</label>
+                  <input
+                    type="date"
+                    value={periodStart}
+                    onChange={(e) => setPeriodStart(e.target.value)}
+                    style={styles.aiConfigSelect}
+                  />
+                </div>
+                <div style={styles.dateField}>
+                  <label style={styles.aiConfigLabel}>End date</label>
+                  <input
+                    type="date"
+                    value={periodEnd}
+                    onChange={(e) => setPeriodEnd(e.target.value)}
+                    style={styles.aiConfigSelect}
+                  />
+                </div>
+              </div>
+              <div ref={servicesDropdownRef} style={styles.serviceDropdownWrap}>
+                {/* Custom dropdown trigger */}
+                <button
+                  type="button"
+                  onClick={() => setServicesDropdownOpen((o) => !o)}
+                  style={styles.serviceDropdownTrigger}
+                >
+                  <span style={styles.serviceDropdownLabel}>
+                    {allServicesSelected
+                      ? '✦ All services selected'
+                      : selectedServices.length === 0
+                      ? 'No services selected'
+                      : `${selectedServices.length} / ${services.length} services selected`}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    style={{
+                      transition: 'transform 0.2s',
+                      transform: servicesDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      color: 'var(--color-text-muted)',
+                    }}
+                  />
+                </button>
+
+                {/* Dropdown panel */}
+                {servicesDropdownOpen && (
+                  <div style={styles.serviceDropdownPanel}>
+                    {/* Select all row */}
+                    <button
+                      type="button"
+                      onClick={toggleAllServices}
+                      style={styles.serviceDropdownSelectAll}
+                    >
+                      <div style={{
+                        ...styles.serviceDropdownCheckbox,
+                        backgroundColor: allServicesSelected ? 'var(--color-primary)' : 'transparent',
+                        borderColor: allServicesSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                      }}>
+                        {allServicesSelected && <Check size={11} color="white" />}
                       </div>
-                      {type.badge && (
-                        <span
+                      <span style={styles.serviceDropdownSelectAllLabel}>
+                        {allServicesSelected ? 'Deselect all' : 'Select all services'}
+                      </span>
+                    </button>
+                    <div style={styles.serviceDropdownDivider} />
+                    {/* Service rows */}
+                    {services.map((service) => {
+                      const isSelected = selectedServices.includes(service.id);
+                      return (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() => toggleService(service.id)}
                           style={{
-                            ...styles.typeBadge,
-                            backgroundColor: `${type.badgeColor}20`,
-                            color: type.badgeColor,
+                            ...styles.serviceDropdownItem,
+                            backgroundColor: isSelected ? `${service.color}10` : 'transparent',
                           }}
                         >
-                          {type.badge}
-                        </span>
-                      )}
-                      <h4 style={styles.reportTypeName}>{type.label}</h4>
-                      <p style={styles.reportTypeDesc}>{type.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
+                          <div style={{
+                            ...styles.serviceDropdownDot,
+                            backgroundColor: service.color,
+                          }} />
+                          <span style={styles.serviceDropdownItemLabel}>{service.id}</span>
+                          <div style={{
+                            ...styles.serviceDropdownCheckbox,
+                            marginLeft: 'auto',
+                            backgroundColor: isSelected ? service.color : 'transparent',
+                            borderColor: isSelected ? service.color : 'var(--color-border)',
+                          }}>
+                            {isSelected && <Check size={11} color="white" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-              {/* STEP 2: Services */}
-              <div style={styles.stepSection}>
-                <div style={styles.stepLabel}>
-                  <span style={styles.stepNumber}>02</span>
-                  <h3 style={styles.stepTitle}>Included Services</h3>
-                </div>
-                <div style={styles.dateRangeRow}>
-                  <div style={styles.dateField}>
-                    <label style={styles.aiConfigLabel}>Start date</label>
-                    <input
-                      type="date"
-                      value={periodStart}
-                      onChange={(e) => setPeriodStart(e.target.value)}
-                      style={styles.aiConfigSelect}
-                    />
-                  </div>
-                  <div style={styles.dateField}>
-                    <label style={styles.aiConfigLabel}>End date</label>
-                    <input
-                      type="date"
-                      value={periodEnd}
-                      onChange={(e) => setPeriodEnd(e.target.value)}
-                      style={styles.aiConfigSelect}
-                    />
-                  </div>
-                </div>
-                <div style={styles.serviceDropdownWrap}>
-                  <select
-                    onChange={handleServicesDropdown}
-                    value=""
-                    style={styles.serviceDropdown}
-                  >
-                    <option value="" disabled>
-                      {allServicesSelected
-                        ? 'All services selected'
-                        : `${selectedServices.length} service(s) selected`}
-                    </option>
-                    <option value="__all__">
-                      {allServicesSelected ? 'Unselect all services' : 'Select all services'}
-                    </option>
-                    {services.map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {selectedServices.includes(service.id) ? '✓ ' : ''}{service.id}
-                      </option>
-                    ))}
-                  </select>
+                {/* Selected chips */}
+                {selectedServices.length > 0 && (
                   <div style={styles.selectedServicesChips}>
-                    {selectedServices.map((serviceId) => (
-                      <span key={serviceId} style={styles.selectedServiceChip}>
-                        {serviceId}
+                    {selectedServices.map((serviceId) => {
+                      const svc = services.find((s) => s.id === serviceId);
+                      return (
+                        <span
+                          key={serviceId}
+                          style={{
+                            ...styles.selectedServiceChip,
+                            borderColor: svc?.color || 'var(--color-border)',
+                            color: svc?.color || 'var(--color-primary)',
+                          }}
+                        >
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: svc?.color || 'var(--color-primary)',
+                            display: 'inline-block',
+                            marginRight: '5px',
+                          }} />
+                          {serviceId}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); toggleService(serviceId); }}
+                            style={styles.chipRemoveBtn}
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* STEP 3: Sections */}
+            <div style={styles.stepSection}>
+              <div style={styles.stepLabel}>
+                <span style={styles.stepNumber}>03</span>
+                <h3 style={styles.stepTitle}>Report Sections</h3>
+              </div>
+              <button
+                onClick={toggleAllSections}
+                style={styles.selectAllButton}
+              >
+                {selectedSections.length === SECTIONS.length
+                  ? 'Deselect All'
+                  : 'Select All'}
+              </button>
+              <div style={styles.sectionsList}>
+                {SECTIONS.map((section) => (
+                  <label
+                    key={section.id}
+                    style={styles.sectionRow}
+                  >
+                    <div style={styles.sectionCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSections.includes(section.id)}
+                        onChange={() => toggleSection(section.id)}
+                        style={styles.checkboxInput}
+                      />
+                      {selectedSections.includes(section.id) && (
+                        <Check
+                          size={14}
+                          color="white"
+                          style={styles.checkmark}
+                        />
+                      )}
+                    </div>
+                    <div style={styles.sectionInfo}>
+                      <span style={styles.sectionLabelText}>
+                        {section.label}
                       </span>
-                    ))}
+                      <p style={styles.sectionDesc}>
+                        {section.desc}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* STEP 4: AI Options */}
+            <div style={styles.stepSection}>
+              <div style={styles.stepLabel}>
+                <span style={{ ...styles.stepNumber, color: '#f59e0b' }}>
+                  04
+                </span>
+                <h3 style={styles.stepTitle}>AI Options</h3>
+              </div>
+              <div className="rg-ai-options-grid" style={styles.aiOptionsGrid}>
+                <div className="rg-ai-option-card" style={styles.aiOptionCard}>
+                  <div style={styles.aiOptionLeft}>
+                    <div style={styles.aiOptionTitle}>
+                      AI Insights Generation
+                      <span style={styles.apiBadge}>Gemini API</span>
+                    </div>
+                    <p style={styles.aiOptionDesc}>
+                      Advanced behavioral anomaly detection.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIncludeAI(!includeAI)}
+                    style={{
+                      ...styles.toggleSwitch,
+                      backgroundColor: includeAI
+                        ? 'var(--color-primary)'
+                        : 'var(--color-border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...styles.toggleThumb,
+                        transform: includeAI
+                          ? 'translateX(20px)'
+                          : 'translateX(0)',
+                      }}
+                    />
+                  </button>
+                </div>
+
+                <div className="rg-ai-option-card" style={styles.aiOptionCard}>
+                  <div style={styles.aiOptionLeft}>
+                    <div style={styles.aiOptionTitle}>
+                      Strategic Recommendations
+                    </div>
+                    <p style={styles.aiOptionDesc}>
+                      Recommended actions for retention.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIncludeRecs(!includeRecs)}
+                    style={{
+                      ...styles.toggleSwitch,
+                      backgroundColor: includeRecs
+                        ? 'var(--color-primary)'
+                        : 'var(--color-border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...styles.toggleThumb,
+                        transform: includeRecs
+                          ? 'translateX(20px)'
+                          : 'translateX(0)',
+                      }}
+                    />
+                  </button>
+                </div>
+              </div>
+              <div style={styles.aiConfigRow}>
+                <div style={styles.aiConfigBlock}>
+                  <label style={styles.aiConfigLabel}>Report language</label>
+                  <select
+                    value={reportLanguage}
+                    onChange={(e) => setReportLanguage(e.target.value)}
+                    style={styles.aiConfigSelect}
+                  >
+                    <option value="fr">Français</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+                <div style={styles.aiConfigBlock}>
+                  <label style={styles.aiConfigLabel}>Gemini custom prompt</label>
+                  <textarea
+                    value={geminiPromptTemplate}
+                    onChange={(e) => setGeminiPromptTemplate(e.target.value)}
+                    placeholder="Ex: Prioritize concise recommendations, include quantified impact and confidence score."
+                    style={styles.aiConfigTextarea}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <button
+              className="rg-generate-button"
+              onClick={handleGenerate}
+              disabled={isLaunching}
+              style={{
+                ...styles.generateButton,
+                ...(isLaunching && styles.generateButtonDisabled),
+              }}
+            >
+              {isLaunching ? (
+                <>
+                  <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  Generating Report...
+                </>
+              ) : (
+                <>
+                  <span style={styles.generateIcon}>
+                    <Sparkles size={18} />
+                  </span>
+                  <div style={styles.generateButtonText}>
+                    <span style={styles.generateButtonMain}>
+                      Generate Report
+                    </span>
+                    <span style={styles.generateButtonSub}>
+                      ~15 seconds
+                    </span>
+                  </div>
+                </>
+              )}
+            </button>
+          </div>
+        </section>
+
+        {/* RIGHT PREVIEW & HISTORY PANEL */}
+        <section className="rg-right-panel" style={styles.rightPanel}>
+          {/* PDF Preview */}
+          <div style={styles.previewCard}>
+            <div style={styles.previewHeader}>
+              <h3 style={styles.previewTitle}>Document Preview</h3>
+              <div style={styles.previewDots}>
+                <div style={{ ...styles.dot, backgroundColor: '#ef4444' }} />
+                <div style={{ ...styles.dot, backgroundColor: '#f59e0b' }} />
+                <div style={{ ...styles.dot, backgroundColor: '#3b82f6' }} />
+              </div>
+            </div>
+
+            <div style={styles.previewContent}>
+              {/* 3D Page Stack */}
+              <div style={styles.pageStack}>
+                {/* Back page */}
+                <div
+                  style={{
+                    ...styles.stackedPage,
+                    transform: 'rotate(6deg) translateX(48px) translateY(16px)',
+                    opacity: 0.3,
+                    zIndex: 1,
+                  }}
+                />
+
+                {/* Mid page */}
+                <div
+                  style={{
+                    ...styles.stackedPage,
+                    transform: 'rotate(3deg) translateX(24px) translateY(8px)',
+                    opacity: 0.6,
+                    zIndex: 2,
+                  }}
+                />
+
+                {/* Front page */}
+                <div
+                  style={{
+                    ...styles.stackedPage,
+                    zIndex: 10,
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={styles.pageHeaderBar}>
+                    <div style={styles.pageLogoArea}>
+                      <div style={styles.pageLogoBadge}>
+                        <FileText size={20} color="#adc6ff" />
+                      </div>
+                      <span style={styles.pageLogoText}>DIGMACO</span>
+                    </div>
+                    <span style={styles.pageRefId}>ID: REF-2025-042</span>
+                  </div>
+
+                  <div style={styles.pageTitleArea}>
+                    <h4 style={styles.pageMainTitle}>
+                      RAPPORT
+                      <br />
+                      ANALYTIQUE
+                    </h4>
+                    <p style={styles.pageDateRange}>
+                      Septembre – Octobre 2025
+                    </p>
+                  </div>
+
+                  <div style={styles.pageTableOfContents}>
+                    <p style={styles.tocLabel}>Table of Contents</p>
+                    <div style={styles.tocEntry}>
+                      <span style={styles.tocItem}>
+                        01. Executive Summary
+                      </span>
+                      <span style={styles.tocPage}>p.02</span>
+                    </div>
+                    <div style={styles.tocEntry}>
+                      <span style={styles.tocItem}>
+                        02. Churn Analytics
+                      </span>
+                      <span style={styles.tocPage}>p.04</span>
+                    </div>
+                    <div style={styles.tocEntry}>
+                      <span style={styles.tocItem}>
+                        03. AI & Segmentation
+                      </span>
+                      <span style={styles.tocPage}>p.08</span>
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* STEP 3: Sections */}
-              <div style={styles.stepSection}>
-                <div style={styles.stepLabel}>
-                  <span style={styles.stepNumber}>03</span>
-                  <h3 style={styles.stepTitle}>Report Sections</h3>
+            <div style={styles.previewStats}>
+              <span style={styles.statChip}>~18 pages estimated</span>
+              <span style={styles.statChip}>PDF Format</span>
+              <span style={styles.statChip}>Gemini AI included</span>
+              <span style={styles.statChip}>
+                {selectedServices.length} services
+              </span>
+            </div>
+          </div>
+
+          {/* History */}
+          <div style={styles.historyCard}>
+            <div style={styles.historyHeader}>
+              <h3 style={styles.historyTitle}>Recent Reports</h3>
+              <button style={styles.seeAllButton}>View all →</button>
+            </div>
+
+            {history.length === 0 ? (
+              <div style={styles.emptyState}>
+                <div style={styles.emptyIcon}>
+                  <FileText size={48} color="var(--color-text-muted)" style={{ opacity: 0.5 }} />
                 </div>
+                <h3 style={styles.emptyTitle}>No Reports Generated</h3>
+                <p style={styles.emptyDesc}>
+                  Configure and launch your first report to see
+                  your report history here.
+                </p>
                 <button
-                  onClick={toggleAllSections}
-                  style={styles.selectAllButton}
+                  onClick={handleGenerate}
+                  style={styles.emptyButton}
                 >
-                  {selectedSections.length === SECTIONS.length
-                    ? 'Deselect All'
-                    : 'Select All'}
+                  Generate Now
                 </button>
-                <div style={styles.sectionsList}>
-                  {SECTIONS.map((section) => (
-                    <label
-                      key={section.id}
-                      style={styles.sectionRow}
-                    >
-                      <div style={styles.sectionCheckbox}>
-                        <input
-                          type="checkbox"
-                          checked={selectedSections.includes(section.id)}
-                          onChange={() => toggleSection(section.id)}
-                          style={styles.checkboxInput}
+              </div>
+            ) : (
+              <div style={styles.historyList}>
+                {history.map((item) => (
+                  <div key={item.id} style={styles.historyItem}>
+                    <div style={styles.historyItemLeft}>
+                      <div style={styles.historyIcon}>
+                        <FileText
+                          size={18}
+                          color="#ef4444"
                         />
-                        {selectedSections.includes(section.id) && (
-                          <Check
-                            size={14}
-                            color="white"
-                            style={styles.checkmark}
-                          />
-                        )}
                       </div>
-                      <div style={styles.sectionInfo}>
-                        <span style={styles.sectionLabelText}>
-                          {section.label}
-                        </span>
-                        <p style={styles.sectionDesc}>
-                          {section.desc}
+                      <div style={styles.historyInfo}>
+                        <p style={styles.historyName}>
+                          {item.file_name?.substring(0, 28)}...
+                        </p>
+                        <p style={styles.historyMeta}>
+                          {new Date(item.created_at).toLocaleDateString()} •{' '}
+                          {(item.file_size_kb / 1024).toFixed(1)} MB
                         </p>
                       </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* STEP 4: AI Options */}
-              <div style={styles.stepSection}>
-                <div style={styles.stepLabel}>
-                  <span style={{ ...styles.stepNumber, color: '#f59e0b' }}>
-                    04
-                  </span>
-                  <h3 style={styles.stepTitle}>AI Options</h3>
-                </div>
-                <div style={styles.aiOptionsGrid}>
-                  <div style={styles.aiOptionCard}>
-                    <div style={styles.aiOptionLeft}>
-                      <div style={styles.aiOptionTitle}>
-                        AI Insights Generation
-                        <span style={styles.apiBadge}>Gemini API</span>
-                      </div>
-                      <p style={styles.aiOptionDesc}>
-                        Advanced behavioral anomaly detection.
-                      </p>
                     </div>
                     <button
-                      onClick={() => setIncludeAI(!includeAI)}
-                      style={{
-                        ...styles.toggleSwitch,
-                        backgroundColor: includeAI
-                          ? 'var(--color-primary)'
-                          : 'var(--color-border)',
-                      }}
+                      onClick={() => handleDownload(item.id)}
+                      style={styles.downloadButton}
                     >
-                      <div
-                        style={{
-                          ...styles.toggleThumb,
-                          transform: includeAI
-                            ? 'translateX(20px)'
-                            : 'translateX(0)',
-                        }}
-                      />
+                      <Download size={16} />
                     </button>
                   </div>
-
-                  <div style={styles.aiOptionCard}>
-                    <div style={styles.aiOptionLeft}>
-                      <div style={styles.aiOptionTitle}>
-                        Strategic Recommendations
-                      </div>
-                      <p style={styles.aiOptionDesc}>
-                        Recommended actions for retention.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setIncludeRecs(!includeRecs)}
-                      style={{
-                        ...styles.toggleSwitch,
-                        backgroundColor: includeRecs
-                          ? 'var(--color-primary)'
-                          : 'var(--color-border)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          ...styles.toggleThumb,
-                          transform: includeRecs
-                            ? 'translateX(20px)'
-                            : 'translateX(0)',
-                        }}
-                      />
-                    </button>
-                  </div>
-                </div>
-                <div style={styles.aiConfigRow}>
-                  <div style={styles.aiConfigBlock}>
-                    <label style={styles.aiConfigLabel}>Report language</label>
-                    <select
-                      value={reportLanguage}
-                      onChange={(e) => setReportLanguage(e.target.value)}
-                      style={styles.aiConfigSelect}
-                    >
-                      <option value="fr">Français</option>
-                      <option value="en">English</option>
-                    </select>
-                  </div>
-                  <div style={styles.aiConfigBlock}>
-                    <label style={styles.aiConfigLabel}>Gemini custom prompt</label>
-                    <textarea
-                      value={geminiPromptTemplate}
-                      onChange={(e) => setGeminiPromptTemplate(e.target.value)}
-                      placeholder="Ex: Prioritize concise recommendations, include quantified impact and confidence score."
-                      style={styles.aiConfigTextarea}
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
 
-              {/* Generate Button */}
-              <button
-                onClick={handleGenerate}
-                disabled={isLaunching}
-                style={{
-                  ...styles.generateButton,
-                  ...(isLaunching && styles.generateButtonDisabled),
-                }}
+    {/* GENERATION MODAL */}
+    {showModal && activeRun && (
+      <div style={styles.modalOverlay}>
+        <div style={styles.modalCard}>
+          <div style={styles.modalGlowTop} />
+          <div style={styles.modalGlowBottom} />
+
+          <div style={styles.modalContent}>
+            {/* Progress Circle */}
+            <div style={styles.progressCircleContainer}>
+              <svg
+                style={styles.progressSvg}
+                viewBox="0 0 128 128"
               >
-                {isLaunching ? (
-                  <>
-                    <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                    Generating Report...
-                  </>
-                ) : (
-                  <>
-                    <span style={styles.generateIcon}>✨</span>
-                    <div style={styles.generateButtonText}>
-                      <span style={styles.generateButtonMain}>
-                        Generate Report
-                      </span>
-                      <span style={styles.generateButtonSub}>
-                        ~15 seconds
-                      </span>
-                    </div>
-                  </>
-                )}
-              </button>
-            </div>
-          </section>
-
-          {/* RIGHT PREVIEW & HISTORY PANEL */}
-          <section style={styles.rightPanel}>
-            {/* PDF Preview */}
-            <div style={styles.previewCard}>
-              <div style={styles.previewHeader}>
-                <h3 style={styles.previewTitle}>Document Preview</h3>
-                <div style={styles.previewDots}>
-                  <div style={{ ...styles.dot, backgroundColor: '#ef4444' }} />
-                  <div style={{ ...styles.dot, backgroundColor: '#f59e0b' }} />
-                  <div style={{ ...styles.dot, backgroundColor: '#3b82f6' }} />
-                </div>
-              </div>
-
-              <div style={styles.previewContent}>
-                {/* 3D Page Stack */}
-                <div style={styles.pageStack}>
-                  {/* Back page */}
-                  <div
-                    style={{
-                      ...styles.stackedPage,
-                      transform: 'rotate(6deg) translateX(48px) translateY(16px)',
-                      opacity: 0.3,
-                      zIndex: 1,
-                    }}
-                  />
-
-                  {/* Mid page */}
-                  <div
-                    style={{
-                      ...styles.stackedPage,
-                      transform: 'rotate(3deg) translateX(24px) translateY(8px)',
-                      opacity: 0.6,
-                      zIndex: 2,
-                    }}
-                  />
-
-                  {/* Front page */}
-                  <div
-                    style={{
-                      ...styles.stackedPage,
-                      zIndex: 10,
-                      padding: '24px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '12px',
-                    }}
-                  >
-                    <div style={styles.pageHeaderBar}>
-                      <div style={styles.pageLogoArea}>
-                        <div style={styles.pageLogoBadge}>
-                          <FileText size={20} color="#adc6ff" />
-                        </div>
-                        <span style={styles.pageLogoText}>DIGMACO</span>
-                      </div>
-                      <span style={styles.pageRefId}>ID: REF-2025-042</span>
-                    </div>
-
-                    <div style={styles.pageTitleArea}>
-                      <h4 style={styles.pageMainTitle}>
-                        RAPPORT
-                        <br />
-                        ANALYTIQUE
-                      </h4>
-                      <p style={styles.pageDateRange}>
-                        Septembre – Octobre 2025
-                      </p>
-                    </div>
-
-                    <div style={styles.pageTableOfContents}>
-                      <p style={styles.tocLabel}>Table of Contents</p>
-                      <div style={styles.tocEntry}>
-                        <span style={styles.tocItem}>
-                          01. Executive Summary
-                        </span>
-                        <span style={styles.tocPage}>p.02</span>
-                      </div>
-                      <div style={styles.tocEntry}>
-                        <span style={styles.tocItem}>
-                          02. Churn Analytics
-                        </span>
-                        <span style={styles.tocPage}>p.04</span>
-                      </div>
-                      <div style={styles.tocEntry}>
-                        <span style={styles.tocItem}>
-                          03. AI & Segmentation
-                        </span>
-                        <span style={styles.tocPage}>p.08</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.previewStats}>
-                <span style={styles.statChip}>~18 pages estimated</span>
-                <span style={styles.statChip}>PDF Format</span>
-                <span style={styles.statChip}>Gemini AI included</span>
-                <span style={styles.statChip}>
-                  {selectedServices.length} services
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="58"
+                  fill="none"
+                  stroke="var(--color-border)"
+                  strokeWidth="6"
+                />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="58"
+                  fill="none"
+                  stroke="var(--color-primary)"
+                  strokeWidth="8"
+                  strokeDasharray={`${364.4}`}
+                  strokeDashoffset={`${
+                    364.4 - (364.4 * Math.max(fakeProgress, activeRun.progress_pct || 0)) / 100
+                  }`}
+                  style={{
+                    transform: 'rotate(-90deg)',
+                    transformOrigin: 'center',
+                    transition: 'stroke-dashoffset 0.4s ease',
+                  }}
+                />
+              </svg>
+              <div style={styles.progressText}>
+                <span style={styles.progressPercent}>
+                  {Math.max(fakeProgress, activeRun.progress_pct || 0)}%
                 </span>
               </div>
             </div>
 
-            {/* History */}
-            <div style={styles.historyCard}>
-              <div style={styles.historyHeader}>
-                <h3 style={styles.historyTitle}>Recent Reports</h3>
-                <button style={styles.seeAllButton}>View all →</button>
-              </div>
+            {/* Title */}
+            <h3 style={styles.modalTitle}>
+              {activeRun.status === 'success' ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                  Report Generated <CheckCircle size={20} color="var(--color-success)" />
+                </span>
+              ) : activeRun.status === 'failed' ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                  Generation Failed <XCircle size={20} color="#ef4444" />
+                </span>
+              ) : (
+                'Generating Report...'
+              )}
+            </h3>
 
-              {history.length === 0 ? (
-                <div style={styles.emptyState}>
-                  <div style={styles.emptyIcon}>📄</div>
-                  <h3 style={styles.emptyTitle}>No Reports Generated</h3>
-                  <p style={styles.emptyDesc}>
-                    Configure and launch your first report to see
-                    your report history here.
-                  </p>
+            <p style={styles.modalSubtitle}>
+              {activeRun.status === 'success'
+                ? 'Your PDF report is ready to download'
+                : 'AI is analyzing your DigMaco data...'}
+            </p>
+
+            {/* Steps List */}
+            {activeRun.status === 'generating' && (
+              <div style={styles.stepsList}>
+                {GENERATION_STEPS.map((step, idx) => {
+                  const stepNum = idx + 1;
+                  const isDone = stepNum < activeRun.current_step_num;
+                  const isCurrent = stepNum === activeRun.current_step_num;
+
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        ...styles.stepsItem,
+                        backgroundColor: isDone
+                          ? 'rgba(34,197,94,0.12)'
+                          : isCurrent
+                          ? 'rgba(77,141,255,0.15)'
+                          : 'transparent',
+                        border: isDone
+                          ? '1px solid rgba(34,197,94,0.3)'
+                          : isCurrent
+                          ? '1px solid rgba(77,141,255,0.3)'
+                          : '1px solid transparent',
+                      }}
+                    >
+                      <div style={styles.stepsIcon}>
+                        {isDone ? (
+                          <Check size={16} color="#22c55e" />
+                        ) : isCurrent ? (
+                          <Loader2
+                            size={16}
+                            style={{
+                              color: 'var(--color-primary)',
+                              animation: 'spin 1s linear infinite',
+                            }}
+                          />
+                        ) : (
+                          <span style={styles.stepsPending}>
+                            {stepNum}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        ...styles.stepsLabel,
+                        color: isDone
+                          ? '#4ade80'
+                          : isCurrent
+                          ? '#93c5fd'
+                          : 'var(--color-text-muted)',
+                        fontWeight: isCurrent ? 600 : 500,
+                      }}>{step}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Progress Bar */}
+            <div style={styles.progressBar}>
+              <div
+                style={{
+                  ...styles.progressBarFill,
+                  width: `${Math.max(fakeProgress, activeRun.progress_pct || 0)}%`,
+                }}
+              />
+            </div>
+
+            {/* Status Text */}
+            {activeRun.status === 'generating' && (
+              <p style={styles.statusText}>
+                Step {activeRun.current_step_num} of 5 — Estimated time: ~10s
+              </p>
+            )}
+
+            {/* Error Message */}
+            {activeRun.status === 'failed' && activeRun.error && (
+              <div style={styles.errorBox}>
+                <AlertCircle size={16} />
+                <span>{activeRun.error}</span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={styles.modalButtons}>
+              {activeRun.status === 'generating' && (
+                <>
+                  <button
+                    onClick={() => {
+                      clearInterval(pollingRef.current);
+                      pollingRef.current = null;
+                      setShowModal(false);
+                    }}
+                    style={styles.buttonOutlined}
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+
+              {activeRun.status === 'success' && (
+                <>
+                  <button
+                    onClick={() => {
+                      handleDownload(reportId);
+                    }}
+                    style={styles.buttonPrimary}
+                  >
+                    <Download size={16} />
+                    Download PDF
+                  </button>
+                  <button
+                    onClick={() => setShowModal(false)}
+                    style={styles.buttonOutlined}
+                  >
+                    Close
+                  </button>
+                </>
+              )}
+
+              {activeRun.status === 'failed' && (
+                <>
                   <button
                     onClick={handleGenerate}
-                    style={styles.emptyButton}
+                    style={styles.buttonPrimary}
                   >
-                    Generate Now
+                    Retry
                   </button>
-                </div>
-              ) : (
-                <div style={styles.historyList}>
-                  {history.map((item) => (
-                    <div key={item.id} style={styles.historyItem}>
-                      <div style={styles.historyItemLeft}>
-                        <div style={styles.historyIcon}>
-                          <FileText
-                            size={18}
-                            color="#ef4444"
-                          />
-                        </div>
-                        <div style={styles.historyInfo}>
-                          <p style={styles.historyName}>
-                            {item.file_name?.substring(0, 28)}...
-                          </p>
-                          <p style={styles.historyMeta}>
-                            {new Date(item.created_at).toLocaleDateString()} •{' '}
-                            {(item.file_size_kb / 1024).toFixed(1)} MB
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleDownload(item.id)}
-                        style={styles.downloadButton}
-                      >
-                        <Download size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                  <button
+                    onClick={() => setShowModal(false)}
+                    style={styles.buttonOutlined}
+                  >
+                    Close
+                  </button>
+                </>
               )}
-            </div>
-          </section>
-        </div>
-      </main>
-
-      {/* GENERATION MODAL */}
-      {showModal && activeRun && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
-            <div style={styles.modalGlowTop} />
-            <div style={styles.modalGlowBottom} />
-
-            <div style={styles.modalContent}>
-              {/* Progress Circle */}
-              <div style={styles.progressCircleContainer}>
-                <svg
-                  style={styles.progressSvg}
-                  viewBox="0 0 128 128"
-                >
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="58"
-                    fill="none"
-                    stroke="var(--color-border)"
-                    strokeWidth="6"
-                  />
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="58"
-                    fill="none"
-                    stroke="var(--color-primary)"
-                    strokeWidth="8"
-                    strokeDasharray={`${364.4}`}
-                    strokeDashoffset={`${
-                      364.4 - (364.4 * activeRun.progress_pct) / 100
-                    }`}
-                    style={{
-                      transform: 'rotate(-90deg)',
-                      transformOrigin: 'center',
-                      transition: 'stroke-dashoffset 0.5s ease',
-                    }}
-                  />
-                </svg>
-                <div style={styles.progressText}>
-                  <span style={styles.progressPercent}>
-                    {activeRun.progress_pct || 0}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Title */}
-              <h3 style={styles.modalTitle}>
-                {activeRun.status === 'success'
-                  ? 'Report Generated ✅'
-                  : activeRun.status === 'failed'
-                  ? 'Generation Failed ❌'
-                  : 'Generating Report...'}
-              </h3>
-
-              <p style={styles.modalSubtitle}>
-                {activeRun.status === 'success'
-                  ? 'Your PDF report is ready to download'
-                  : 'AI is analyzing your DigMaco data...'}
-              </p>
-
-              {/* Steps List */}
-              {activeRun.status === 'generating' && (
-                <div style={styles.stepsList}>
-                  {GENERATION_STEPS.map((step, idx) => {
-                    const stepNum = idx + 1;
-                    const isDone = stepNum < activeRun.current_step_num;
-                    const isCurrent = stepNum === activeRun.current_step_num;
-
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          ...styles.stepsItem,
-                          ...(isDone && styles.stepsItemDone),
-                          ...(isCurrent && styles.stepsItemCurrent),
-                        }}
-                      >
-                        <div style={styles.stepsIcon}>
-                          {isDone ? (
-                            <Check size={16} color="var(--color-success)" />
-                          ) : isCurrent ? (
-                            <Loader2
-                              size={16}
-                              style={{
-                                color: 'var(--color-primary)',
-                                animation: 'spin 1s linear infinite',
-                              }}
-                            />
-                          ) : (
-                            <span style={styles.stepsPending}>
-                              {stepNum}
-                            </span>
-                          )}
-                        </div>
-                        <span style={styles.stepsLabel}>{step}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Progress Bar */}
-              <div style={styles.progressBar}>
-                <div
-                  style={{
-                    ...styles.progressBarFill,
-                    width: `${activeRun.progress_pct || 0}%`,
-                  }}
-                />
-              </div>
-
-              {/* Status Text */}
-              {activeRun.status === 'generating' && (
-                <p style={styles.statusText}>
-                  Step {activeRun.current_step_num} of 5 — Estimated time: ~10s
-                </p>
-              )}
-
-              {/* Error Message */}
-              {activeRun.status === 'failed' && activeRun.error && (
-                <div style={styles.errorBox}>
-                  <AlertCircle size={16} />
-                  <span>{activeRun.error}</span>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div style={styles.modalButtons}>
-                {activeRun.status === 'generating' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        clearInterval(pollingRef.current);
-                        pollingRef.current = null;
-                        setShowModal(false);
-                      }}
-                      style={styles.buttonOutlined}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                )}
-
-                {activeRun.status === 'success' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        handleDownload(reportId);
-                      }}
-                      style={styles.buttonPrimary}
-                    >
-                      <Download size={16} />
-                      Download PDF
-                    </button>
-                    <button
-                      onClick={() => setShowModal(false)}
-                      style={styles.buttonOutlined}
-                    >
-                      Close
-                    </button>
-                  </>
-                )}
-
-                {activeRun.status === 'failed' && (
-                  <>
-                    <button
-                      onClick={handleGenerate}
-                      style={styles.buttonPrimary}
-                    >
-                      Retry
-                    </button>
-                    <button
-                      onClick={() => setShowModal(false)}
-                      style={styles.buttonOutlined}
-                    >
-                      Close
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
           </div>
-
-          <style>{`
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `}</style>
         </div>
-      )}
-    </div>
-    </AppLayout>
+
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    )}
+
+    {/* Responsive styles */}
+    <style>{`
+      @media (max-width: 960px) {
+        .rg-content-wrapper {
+          flex-direction: column !important;
+        }
+        .rg-left-panel {
+          flex: 1 1 100% !important;
+          border-right: none !important;
+          border-bottom: 1px solid var(--color-border);
+          padding: 20px !important;
+        }
+        .rg-right-panel {
+          flex: 1 1 100% !important;
+          padding: 20px !important;
+        }
+      }
+      @media (max-width: 640px) {
+        .rg-report-type-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .rg-ai-options-grid {
+          grid-template-columns: 1fr !important;
+        }
+        .rg-date-range-row {
+          grid-template-columns: 1fr !important;
+        }
+        .rg-config-card {
+          padding: 16px !important;
+        }
+        .rg-generate-button {
+          padding: 14px 12px !important;
+        }
+        .rg-ai-option-card {
+          flex-wrap: wrap;
+        }
+      }
+      .rg-ai-option-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-width: 0;
+      }
+      .rg-toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: nowrap;
+        width: 100%;
+      }
+    `}</style>
+
+  </div>
   );
 }
 
@@ -1234,11 +1448,7 @@ const styles = {
     gridTemplateColumns: '1fr 1fr',
     gap: '10px',
   },
-  serviceDropdownWrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
+
   dateRangeRow: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -1249,14 +1459,109 @@ const styles = {
     flexDirection: 'column',
     gap: '6px',
   },
-  serviceDropdown: {
+  serviceDropdownWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    position: 'relative',
+  },
+  serviceDropdownTrigger: {
     width: '100%',
-    padding: '10px 12px',
+    padding: '11px 14px',
     borderRadius: '10px',
     border: '1px solid var(--color-border)',
     backgroundColor: 'var(--color-bg-elevated)',
     color: 'var(--color-text-primary)',
     fontSize: '13px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    transition: 'border-color 0.2s ease',
+    textAlign: 'left',
+  },
+  serviceDropdownLabel: {
+    flex: 1,
+    fontWeight: 500,
+    color: 'var(--color-text-primary)',
+    fontSize: '13px',
+  },
+  serviceDropdownPanel: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: '4px',
+    backgroundColor: 'var(--color-bg-card)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '10px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+    zIndex: 100,
+    overflow: 'hidden',
+    maxHeight: '260px',
+    overflowY: 'auto',
+  },
+  serviceDropdownSelectAll: {
+    width: '100%',
+    padding: '10px 14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    border: 'none',
+    backgroundColor: 'rgba(77,141,255,0.06)',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: 700,
+    color: 'var(--color-primary)',
+    textAlign: 'left',
+  },
+  serviceDropdownSelectAllLabel: {
+    flex: 1,
+    color: 'var(--color-primary)',
+    fontSize: '12px',
+    fontWeight: 700,
+  },
+  serviceDropdownDivider: {
+    height: '1px',
+    backgroundColor: 'var(--color-border)',
+    margin: 0,
+  },
+  serviceDropdownItem: {
+    width: '100%',
+    padding: '9px 14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '13px',
+    color: 'var(--color-text-primary)',
+    textAlign: 'left',
+    transition: 'background-color 0.15s ease',
+  },
+  serviceDropdownDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    flexShrink: 0,
+  },
+  serviceDropdownItemLabel: {
+    flex: 1,
+    fontSize: '13px',
+    fontWeight: 500,
+    color: 'var(--color-text-primary)',
+  },
+  serviceDropdownCheckbox: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '4px',
+    border: '1.5px solid',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'all 0.15s ease',
   },
   selectedServicesChips: {
     display: 'flex',
@@ -1264,13 +1569,25 @@ const styles = {
     gap: '8px',
   },
   selectedServiceChip: {
-    padding: '5px 10px',
+    padding: '4px 8px 4px 8px',
     borderRadius: '999px',
     fontSize: '11px',
     fontWeight: 600,
-    color: 'var(--color-primary)',
-    border: '1px solid var(--color-border)',
+    border: '1px solid',
     backgroundColor: 'var(--color-bg-elevated)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  chipRemoveBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '0 0 0 2px',
+    display: 'flex',
+    alignItems: 'center',
+    opacity: 0.6,
+    color: 'inherit',
   },
   serviceCard: {
     padding: '12px 14px',
@@ -2004,3 +2321,4 @@ const styles = {
     transition: 'all 0.2s ease',
   },
 };
+

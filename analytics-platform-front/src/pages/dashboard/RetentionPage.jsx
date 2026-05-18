@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
-import AppLayout from "../../components/layout/AppLayout";
 import FilterBar from "../../components/dashboard/FilterBar";
 import KPICard from "../../components/dashboard/KPICard";
 import CohortHeatmap from "../../components/dashboard/retention/CohortHeatmap";
@@ -303,7 +302,7 @@ export default function RetentionPage() {
   }, [cohorts, curveData?.data]);
 
   return (
-    <AppLayout pageTitle="Retention Analysis">
+    <>
       <div className="space-y-6">
         <div>
           <h1
@@ -838,6 +837,6 @@ export default function RetentionPage() {
           {toastMsg}
         </div>
       )}
-    </AppLayout>
+    </>
   );
 }

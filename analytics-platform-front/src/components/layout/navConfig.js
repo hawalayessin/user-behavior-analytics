@@ -93,16 +93,21 @@ export const navigationConfig = [
       },
     ],
   },
-  
   {
-    section: 'ADMIN',
-    adminOnly: true,
+    section: 'REPORTS',
     items: [
       {
         label: 'Report Generator',
         icon: FileText,
         route: '/admin/reports',
       },
+    ],
+  },
+  
+  {
+    section: 'ADMIN',
+    adminOnly: true,
+    items: [
       {
         label: 'Run AI Models',
         icon: BrainCircuit,

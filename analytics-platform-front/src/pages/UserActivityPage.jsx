@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { AlertCircle, RotateCcw } from "lucide-react";
-import AppLayout from "../components/layout/AppLayout";
 import FilterBar from "../components/dashboard/FilterBar";
 import KPICard from "../components/dashboard/KPICard";
 import DAUTrendChart from "../components/dashboard/userActivity/DAUTrendChart";
@@ -78,7 +77,6 @@ export default function UserActivityPage() {
   };
 
   return (
-    <AppLayout pageTitle="Users Activity">
       <div className="space-y-6">
         {/* ── Header ────────────────────────────────────────── */}
         <div>
@@ -230,6 +228,6 @@ export default function UserActivityPage() {
           </div>
         )}
       </div>
-    </AppLayout>
+
   );
 }

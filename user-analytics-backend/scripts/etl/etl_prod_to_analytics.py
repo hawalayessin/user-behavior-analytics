@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -50,6 +51,20 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 PLAIN_LOGGING = os.getenv("ETL_LOG_PLAIN") == "1"
+
+
+def _running_in_docker() -> bool:
+    return os.path.exists("/.dockerenv")
+
+
+def _normalize_host_for_local_run(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.hostname != "host.docker.internal" or _running_in_docker():
+        return url
+    if parsed.port is None:
+        return url
+    netloc = parsed.netloc.replace("host.docker.internal", "localhost", 1)
+    return urlunparse(parsed._replace(netloc=netloc))
 
 
 USER_NS        = uuid.UUID("11111111-1111-1111-1111-111111111111")
@@ -2000,6 +2015,8 @@ def main() -> None:
 
     source_url = os.getenv("PROD_CONN",    "postgresql://postgres:12345prod_db@localhost:5433/prod_db")
     target_url = os.getenv("ANALYTICS_CONN", "postgresql://postgres:12345prod_db@localhost:5433/analytics_db")
+    source_url = _normalize_host_for_local_run(source_url)
+    target_url = _normalize_host_for_local_run(target_url)
 
     runner = ETLRunner(
         source_url=source_url,

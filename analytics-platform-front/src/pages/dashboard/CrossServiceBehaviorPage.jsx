@@ -24,7 +24,6 @@ import {
   Cell,
 } from "recharts";
 
-import AppLayout from "../../components/layout/AppLayout";
 import KPICard from "../../components/dashboard/KPICard";
 import FilterBar from "../../components/dashboard/FilterBar";
 import { useCrossService } from "../../hooks/useCrossService";
@@ -239,7 +238,6 @@ export default function CrossServiceBehaviorPage() {
   }, [overview, migrations]);
 
   return (
-    <AppLayout pageTitle="Cross-Service Behavior">
       <div className="space-y-6">
         {/* ── Page Header ── */}
         <div className="flex items-start justify-between gap-4">
@@ -709,6 +707,6 @@ export default function CrossServiceBehaviorPage() {
           </div>
         </div>
       </div>
-    </AppLayout>
+
   );
 }

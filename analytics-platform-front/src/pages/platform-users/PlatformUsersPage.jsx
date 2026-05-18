@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import { UserPlus } from "lucide-react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../hooks/useToast";
-import AppLayout from "../../components/layout/AppLayout";
 import UserTable from "../../components/platform-users/UserTable";
 import UserFilters from "../../components/platform-users/UserFilters";
 import UserKPICards from "../../components/platform-users/UserKPICards";
@@ -168,83 +167,76 @@ export default function PlatformUsersPage() {
 
 
   return (
-    <AppLayout
-      pageTitle="Platform Users"
-      hasNotifications={false}
-      showExportButton={false}
-    >
-      <div className="max-w-full">
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100 mb-1">
-              Platform Users
-            </h1>
-            <p className="text-slate-400">Manage dashboard access and roles</p>
-          </div>
-          {currentRole === "admin" && (
-            <button
-              onClick={handleInviteClick}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition"
-            >
-              <UserPlus size={18} />
-              Invite Analyst
-            </button>
-          )}
+    <div className="max-w-full">
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-100 mb-1">
+            Platform Users
+          </h1>
+          <p className="text-slate-400">Manage dashboard access and roles</p>
         </div>
-
-        <UserKPICards
-          total={statsData.total}
-          administrators={statsData.administrators}
-          activeNow={statsData.activeNow}
-          inactiveAccounts={statsData.inactiveAccounts}
-        />
-
-        <div className="mt-8">
-          <UserFilters
-            search={searchInput}
-            onSearchChange={handleSearchChange}
-            onClearSearch={handleClearSearch}
-            roleFilter={roleFilter}
-            onRoleFilter={handleRoleFilter}
-            statusFilter={statusFilter}
-            onStatusFilter={handleStatusFilter}
-          />
-        </div>
-
-        <div className="mt-6 mb-8">
-          <UserTable
-            users={users}
-            loading={loading}
-            onEdit={handleEditClick}
-            onToggleStatus={handleToggleStatus}
-            page={page}
-            total={total}
-            limit={PAGE_LIMIT}
-            onPageChange={handlePageChange}
-          />
-        </div>
-
-        {showInviteModal && (
-          <InviteUserModal
-            onClose={() => setShowInviteModal(false)}
-            onSuccess={handleInviteSuccess}
-          />
+        {currentRole === "admin" && (
+          <button
+            onClick={handleInviteClick}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition"
+          >
+            <UserPlus size={18} />
+            Invite Analyst
+          </button>
         )}
-
-        {showEditModal && selectedUser && (
-          <EditUserModal
-            user={selectedUser}
-            onClose={() => {
-              setShowEditModal(false);
-              setSelectedUser(null);
-            }}
-            onSuccess={handleEditSuccess}
-          />
-        )}
-
       </div>
 
+      <UserKPICards
+        total={statsData.total}
+        administrators={statsData.administrators}
+        activeNow={statsData.activeNow}
+        inactiveAccounts={statsData.inactiveAccounts}
+      />
+
+      <div className="mt-8">
+        <UserFilters
+          search={searchInput}
+          onSearchChange={handleSearchChange}
+          onClearSearch={handleClearSearch}
+          roleFilter={roleFilter}
+          onRoleFilter={handleRoleFilter}
+          statusFilter={statusFilter}
+          onStatusFilter={handleStatusFilter}
+        />
+      </div>
+
+      <div className="mt-6 mb-8">
+        <UserTable
+          users={users}
+          loading={loading}
+          onEdit={handleEditClick}
+          onToggleStatus={handleToggleStatus}
+          page={page}
+          total={total}
+          limit={PAGE_LIMIT}
+          onPageChange={handlePageChange}
+        />
+      </div>
+
+      {showInviteModal && (
+        <InviteUserModal
+          onClose={() => setShowInviteModal(false)}
+          onSuccess={handleInviteSuccess}
+        />
+      )}
+
+      {showEditModal && selectedUser && (
+        <EditUserModal
+          user={selectedUser}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedUser(null);
+          }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
       {Toast}
-    </AppLayout>
+    </div>
   );
 }

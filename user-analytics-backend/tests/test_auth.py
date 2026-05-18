@@ -24,9 +24,13 @@ class _FakeQuery:
 class _FakeDB:
     def __init__(self, user):
         self._user = user
+        self.rows = []
 
     def query(self, _model):
         return _FakeQuery(self._user)
+
+    def add(self, row):
+        self.rows.append(row)
 
     def commit(self):
         return None
@@ -50,6 +54,7 @@ async def test_login_valid(no_auth_client, monkeypatch):
     app.dependency_overrides[get_db] = _override_get_db
     monkeypatch.setattr(auth_router, "verify_password", lambda plain, hashed: True)
     monkeypatch.setattr(auth_router, "create_access_token", lambda data, expires_delta: "jwt_test_token")
+    monkeypatch.setattr(auth_router, "create_refresh_token", lambda: "refresh_token_test")
 
     response = await no_auth_client.post(
         "/auth/login",
@@ -62,6 +67,7 @@ async def test_login_valid(no_auth_client, monkeypatch):
     payload = response.json()
     assert "access_token" in payload
     assert payload["token_type"] == "bearer"
+    assert "refreshToken=" in response.headers.get("set-cookie", "")
 
 
 @pytest.mark.anyio

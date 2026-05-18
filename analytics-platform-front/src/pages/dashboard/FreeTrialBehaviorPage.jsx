@@ -8,7 +8,6 @@ import {
   Download,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import AppLayout from "../../components/layout/AppLayout";
 import FilterBar from "../../components/dashboard/FilterBar";
 import KPICard from "../../components/dashboard/KPICard";
 import TrialDropoffChart from "../../components/dashboard/TrialDropoffChart";
@@ -338,7 +337,7 @@ export default function FreeTrialBehaviorPage() {
   };
 
   return (
-    <AppLayout pageTitle="Free Trial Behavior">
+    <>
       <div className="space-y-6">
         {/* ── Header ────────────────────────────────────────── */}
         <div>
@@ -815,12 +814,11 @@ export default function FreeTrialBehaviorPage() {
         </div>
       </div>
 
-      {/* ── Toast ─────────────────────────────────────────────── */}
       {toastMsg && (
         <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-600 bg-slate-800 text-sm text-slate-100 shadow-xl">
           {toastMsg}
         </div>
       )}
-    </AppLayout>
+    </>
   );
 }

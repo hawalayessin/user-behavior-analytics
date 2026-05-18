@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   BarChart3,
@@ -19,7 +19,6 @@ import {
   Info,
   Users,
 } from "lucide-react";
-import AppLayout from "../../components/layout/AppLayout";
 import useImportData from "../../hooks/useImportData";
 import { useETLPipeline } from "../../hooks/useETLPipeline";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -1176,7 +1175,7 @@ function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
             color: "var(--color-text-muted)",
           }}
         >
-          <div style={{ fontSize: "32px", marginBottom: "8px" }}>�</div>
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>ï¿½</div>
           <div>No pipeline has been executed yet.</div>
           <div style={{ fontSize: "12px", marginTop: "4px" }}>
             Run your first ETL pipeline above.
@@ -1623,666 +1622,664 @@ export default function ImportDataPage() {
   };
 
   return (
-    <AppLayout pageTitle="Import Data">
-      <div className="space-y-6">
-        <div style={{ marginBottom: "32px" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: activeRun ? "1fr 1fr" : "1fr",
-              gap: "24px",
-              marginBottom: "24px",
-            }}
-          >
-            <ETLConfigPanel
-              mode={etlMode}
-              setMode={setEtlMode}
-              demoUsers={demoUsers}
-              setDemoUsers={setDemoUsers}
-              truncate={truncate}
-              setTruncate={setTruncate}
-              dryRun={dryRun}
-              setDryRun={setDryRun}
-              onLaunch={launchETL}
-              onStop={stopETL}
-              isLaunching={isLaunching}
-              isRunning={isStreaming}
-              isStopping={isStopping || isRunStopping}
-              canStop={!!activeRun && isStreaming}
-              error={etlError}
-            />
-            {activeRun && (
-              <ETLProgressPanel run={activeRun} ETL_STEPS={ETL_STEPS} />
+    <div className="space-y-6">
+      <div style={{ marginBottom: "32px" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: activeRun ? "1fr 1fr" : "1fr",
+            gap: "24px",
+            marginBottom: "24px",
+          }}
+        >
+          <ETLConfigPanel
+            mode={etlMode}
+            setMode={setEtlMode}
+            demoUsers={demoUsers}
+            setDemoUsers={setDemoUsers}
+            truncate={truncate}
+            setTruncate={setTruncate}
+            dryRun={dryRun}
+            setDryRun={setDryRun}
+            onLaunch={launchETL}
+            onStop={stopETL}
+            isLaunching={isLaunching}
+            isRunning={isStreaming}
+            isStopping={isStopping || isRunStopping}
+            canStop={!!activeRun && isStreaming}
+            error={etlError}
+          />
+          {activeRun && (
+            <ETLProgressPanel run={activeRun} ETL_STEPS={ETL_STEPS} />
+          )}
+        </div>
+
+        {activeRun && (
+          <div style={{ marginBottom: "24px" }}>
+            <ETLLiveLogPanel log={runLog} isRunning={isStreaming} />
+          </div>
+        )}
+
+        <ETLHistoryTable
+          history={etlHistory}
+          loading={etlHistoryLoading}
+          onRefresh={fetchEtlHistory}
+          onViewLog={handleViewEtlLog}
+        />
+      </div>
+
+      <div
+        className="relative overflow-hidden rounded-3xl border p-6 md:p-8"
+        style={{
+          borderColor: "var(--color-border)",
+          background:
+            "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-bg-card)) 0%, var(--color-bg-card) 55%, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 100%)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
+      >
+        <div
+          className="pointer-events-none absolute -top-14 -right-10 h-44 w-44 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 28%, transparent) 0%, transparent 70%)",
+          }}
+        />
+        <p
+          className="relative mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+          style={{
+            borderColor: "var(--color-border)",
+            color: "var(--color-text-secondary)",
+            backgroundColor:
+              "color-mix(in srgb, var(--color-bg-elevated) 75%, transparent)",
+          }}
+        >
+          <Database size={14} />
+          Administration Pipeline & Imports
+        </p>
+        <h1
+          className="relative text-3xl font-bold tracking-tight md:text-4xl"
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          Import Data Control Center
+        </h1>
+        <p
+          className="relative mt-2 max-w-3xl text-sm md:text-base"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          Manage CSV/SQL imports and ETL pipeline control from one unified
+          interface. All actions are logged and restricted to administrators.
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div
+        className="inline-flex gap-2 rounded-2xl border p-1.5"
+        style={{
+          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-bg-card)",
+        }}
+      >
+        <button
+          onClick={() => {
+            setActiveTab("csv");
+            setFile(null);
+            resetStateForNewFile();
+          }}
+          className={[
+            "px-4 py-2 rounded-xl text-sm font-semibold border transition",
+          ].join(" ")}
+          style={
+            activeTab === "csv"
+              ? {
+                  backgroundColor: "var(--color-primary)",
+                  color: "#fff",
+                  borderColor: "var(--color-primary)",
+                }
+              : {
+                  backgroundColor: "var(--color-bg-elevated)",
+                  color: "var(--color-text-secondary)",
+                  borderColor: "var(--color-border)",
+                }
+          }
+        >
+          CSV Import
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("sql");
+            setFile(null);
+            resetStateForNewFile();
+          }}
+          className={[
+            "px-4 py-2 rounded-xl text-sm font-semibold border transition",
+          ].join(" ")}
+          style={
+            activeTab === "sql"
+              ? {
+                  backgroundColor: "var(--color-primary)",
+                  color: "#fff",
+                  borderColor: "var(--color-primary)",
+                }
+              : {
+                  backgroundColor: "var(--color-bg-elevated)",
+                  color: "var(--color-text-secondary)",
+                  borderColor: "var(--color-border)",
+                }
+          }
+        >
+          SQL Import
+        </button>
+      </div>
+
+      {/* Main card */}
+      <div
+        className="rounded-3xl border p-6 space-y-6"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          borderColor: "var(--color-border)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
+      >
+        {activeTab === "csv" ? (
+          <>
+            {/* Table select */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                  <Database size={16} className="text-slate-400" /> Target
+                  table
+                </p>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center rounded-full p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition"
+                    aria-label="Show selected table schema"
+                  >
+                    <Info size={14} />
+                  </button>
+                  <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition absolute z-20 top-8 left-0 w-[420px] rounded-xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm p-4 shadow-2xl">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-400">
+                          Schema preview
+                        </p>
+                        <p className="text-sm font-semibold text-slate-100 mt-0.5">
+                          {targetTable}
+                        </p>
+                      </div>
+                      {schemaLoading && (
+                        <span className="text-[11px] px-2 py-1 rounded-md border border-slate-700 bg-slate-800 text-slate-300">
+                          Loading...
+                        </span>
+                      )}
+                    </div>
+
+                    {tableSchemaError ? (
+                      <p className="text-xs text-red-300">
+                        {tableSchemaError}
+                      </p>
+                    ) : tableSchema ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-200">
+                            Required {tableSchema.required?.length ?? 0}
+                          </span>
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-slate-700/60 border border-slate-600 text-slate-200">
+                            Optional {tableSchema.optional?.length ?? 0}
+                          </span>
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                            Defaults excluded{" "}
+                            {tableSchema.defaults_excluded?.length ?? 0}
+                          </span>
+                          <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200">
+                            Import order {tableSchema.import_order ?? "-"}
+                          </span>
+                        </div>
+
+                        <div className="max-h-52 overflow-auto rounded-lg border border-slate-800">
+                          <table className="w-full text-[11px]">
+                            <thead className="bg-slate-800 border-b border-slate-700">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-slate-300 font-semibold">
+                                  Column
+                                </th>
+                                <th className="px-3 py-2 text-left text-slate-300 font-semibold">
+                                  Role
+                                </th>
+                                <th className="px-3 py-2 text-left text-slate-300 font-semibold">
+                                  Relation
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800">
+                              {(tableSchema.columns ?? []).map((col) => (
+                                <tr
+                                  key={col.name}
+                                  className="hover:bg-slate-800/40"
+                                >
+                                  <td className="px-3 py-2 text-slate-200 font-medium">
+                                    {col.name}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <span
+                                      className={[
+                                        "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wide",
+                                        col.role === "required"
+                                          ? "bg-violet-500/10 border-violet-500/30 text-violet-200"
+                                          : "bg-slate-700/60 border-slate-600 text-slate-200",
+                                      ].join(" ")}
+                                    >
+                                      {col.role}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-400">
+                                    {col.fk ?? "-"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        No schema available for this table.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <select
+                  value={targetTable}
+                  onChange={(e) => setTargetTable(e.target.value)}
+                  className="px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-200 focus:outline-none focus:border-violet-500"
+                >
+                  {[
+                    "service_types",
+                    "services",
+                    "users",
+                    "campaigns",
+                    "subscriptions",
+                    "billing_events",
+                    "unsubscriptions",
+                    "sms_events",
+                    "user_activities",
+                  ].map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => downloadTemplate(targetTable)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700/60"
+                  type="button"
+                >
+                  <Download size={16} /> Template
+                </button>
+              </div>
+            </div>
+
+            {/* Mode */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                <Upload size={16} className="text-slate-400" /> Import mode
+              </p>
+              <div className="flex items-center gap-6 text-sm text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mode"
+                    checked={mode === "append"}
+                    onChange={() => setMode("append")}
+                  />
+                  Append
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mode"
+                    checked={mode === "replace"}
+                    onChange={() => setMode("replace")}
+                  />
+                  Replace
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mode"
+                    checked={mode === "demo"}
+                    onChange={() => setMode("demo")}
+                  />
+                  Test (No DB write)
+                </label>
+              </div>
+              {mode === "demo" && (
+                <p className="text-xs text-amber-300">
+                  Demo mode: validation only.
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <FileText size={16} className="text-slate-400" /> SQL file
+            </p>
+            <p className="text-xs text-slate-400">
+              Only INSERT/COPY allowed.
+              DROP/DELETE/TRUNCATE/ALTER/CREATE/UPDATE will be rejected.
+            </p>
+          </div>
+        )}
+
+        {/* Drop zone */}
+        <div
+          onDrop={onDrop}
+          onDragOver={(e) => e.preventDefault()}
+          onClick={() => inputRef.current?.click()}
+          className="border-dashed border-2 rounded-2xl p-6 transition cursor-pointer"
+          style={{
+            borderColor:
+              "color-mix(in srgb, var(--color-primary) 40%, var(--color-border))",
+            background:
+              "linear-gradient(180deg, color-mix(in srgb, var(--color-primary-bg) 60%, transparent) 0%, color-mix(in srgb, var(--color-bg-elevated) 55%, transparent) 100%)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl border"
+              style={{
+                borderColor: "var(--color-border)",
+                backgroundColor: "var(--color-bg-elevated)",
+                color: "var(--color-primary)",
+              }}
+            >
+              <Upload size={18} />
+            </div>
+            <div className="flex-1">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                Drag and drop your {activeTab === "csv" ? "CSV" : "SQL"} file
+                here
+              </p>
+              <p
+                className="text-xs"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                or click to select (max {maxMb}MB)
+              </p>
+            </div>
+            {file && (
+              <span
+                className="text-xs px-2 py-1 rounded-lg"
+                style={{
+                  color: "var(--color-text-secondary)",
+                  backgroundColor: "var(--color-bg-elevated)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                {file.name} ({bytesToMb(file.size)}MB)
+              </span>
             )}
           </div>
 
-          {activeRun && (
-            <div style={{ marginBottom: "24px" }}>
-              <ETLLiveLogPanel log={runLog} isRunning={isStreaming} />
-            </div>
-          )}
-
-          <ETLHistoryTable
-            history={etlHistory}
-            loading={etlHistoryLoading}
-            onRefresh={fetchEtlHistory}
-            onViewLog={handleViewEtlLog}
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
           />
         </div>
 
-        <div
-          className="relative overflow-hidden rounded-3xl border p-6 md:p-8"
-          style={{
-            borderColor: "var(--color-border)",
-            background:
-              "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-bg-card)) 0%, var(--color-bg-card) 55%, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 100%)",
-            boxShadow: "var(--color-card-shadow)",
-          }}
-        >
-          <div
-            className="pointer-events-none absolute -top-14 -right-10 h-44 w-44 rounded-full"
-            style={{
-              background:
-                "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 28%, transparent) 0%, transparent 70%)",
-            }}
-          />
-          <p
-            className="relative mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-            style={{
-              borderColor: "var(--color-border)",
-              color: "var(--color-text-secondary)",
-              backgroundColor:
-                "color-mix(in srgb, var(--color-bg-elevated) 75%, transparent)",
-            }}
-          >
-            <Database size={14} />
-            Administration Pipeline & Imports
-          </p>
-          <h1
-            className="relative text-3xl font-bold tracking-tight md:text-4xl"
-            style={{ color: "var(--color-text-primary)" }}
-          >
-            Import Data Control Center
-          </h1>
-          <p
-            className="relative mt-2 max-w-3xl text-sm md:text-base"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            Manage CSV/SQL imports and ETL pipeline control from one unified
-            interface. All actions are logged and restricted to administrators.
-          </p>
-        </div>
-
-        {/* Tabs */}
-        <div
-          className="inline-flex gap-2 rounded-2xl border p-1.5"
-          style={{
-            borderColor: "var(--color-border)",
-            backgroundColor: "var(--color-bg-card)",
-          }}
-        >
-          <button
-            onClick={() => {
-              setActiveTab("csv");
-              setFile(null);
-              resetStateForNewFile();
-            }}
-            className={[
-              "px-4 py-2 rounded-xl text-sm font-semibold border transition",
-            ].join(" ")}
-            style={
-              activeTab === "csv"
-                ? {
-                    backgroundColor: "var(--color-primary)",
-                    color: "#fff",
-                    borderColor: "var(--color-primary)",
-                  }
-                : {
-                    backgroundColor: "var(--color-bg-elevated)",
-                    color: "var(--color-text-secondary)",
-                    borderColor: "var(--color-border)",
-                  }
-            }
-          >
-            CSV Import
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("sql");
-              setFile(null);
-              resetStateForNewFile();
-            }}
-            className={[
-              "px-4 py-2 rounded-xl text-sm font-semibold border transition",
-            ].join(" ")}
-            style={
-              activeTab === "sql"
-                ? {
-                    backgroundColor: "var(--color-primary)",
-                    color: "#fff",
-                    borderColor: "var(--color-primary)",
-                  }
-                : {
-                    backgroundColor: "var(--color-bg-elevated)",
-                    color: "var(--color-text-secondary)",
-                    borderColor: "var(--color-border)",
-                  }
-            }
-          >
-            SQL Import
-          </button>
-        </div>
-
-        {/* Main card */}
-        <div
-          className="rounded-3xl border p-6 space-y-6"
-          style={{
-            backgroundColor: "var(--color-bg-card)",
-            borderColor: "var(--color-border)",
-            boxShadow: "var(--color-card-shadow)",
-          }}
-        >
-          {activeTab === "csv" ? (
-            <>
-              {/* Table select */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                    <Database size={16} className="text-slate-400" /> Target
-                    table
-                  </p>
-                  <div className="group relative">
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center rounded-full p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition"
-                      aria-label="Show selected table schema"
-                    >
-                      <Info size={14} />
-                    </button>
-                    <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition absolute z-20 top-8 left-0 w-[420px] rounded-xl border border-slate-700 bg-slate-900/95 backdrop-blur-sm p-4 shadow-2xl">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-slate-400">
-                            Schema preview
-                          </p>
-                          <p className="text-sm font-semibold text-slate-100 mt-0.5">
-                            {targetTable}
-                          </p>
-                        </div>
-                        {schemaLoading && (
-                          <span className="text-[11px] px-2 py-1 rounded-md border border-slate-700 bg-slate-800 text-slate-300">
-                            Loading...
-                          </span>
-                        )}
-                      </div>
-
-                      {tableSchemaError ? (
-                        <p className="text-xs text-red-300">
-                          {tableSchemaError}
-                        </p>
-                      ) : tableSchema ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] px-2 py-1 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-200">
-                              Required {tableSchema.required?.length ?? 0}
-                            </span>
-                            <span className="text-[11px] px-2 py-1 rounded-full bg-slate-700/60 border border-slate-600 text-slate-200">
-                              Optional {tableSchema.optional?.length ?? 0}
-                            </span>
-                            <span className="text-[11px] px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200">
-                              Defaults excluded{" "}
-                              {tableSchema.defaults_excluded?.length ?? 0}
-                            </span>
-                            <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200">
-                              Import order {tableSchema.import_order ?? "-"}
-                            </span>
-                          </div>
-
-                          <div className="max-h-52 overflow-auto rounded-lg border border-slate-800">
-                            <table className="w-full text-[11px]">
-                              <thead className="bg-slate-800 border-b border-slate-700">
-                                <tr>
-                                  <th className="px-3 py-2 text-left text-slate-300 font-semibold">
-                                    Column
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-slate-300 font-semibold">
-                                    Role
-                                  </th>
-                                  <th className="px-3 py-2 text-left text-slate-300 font-semibold">
-                                    Relation
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800">
-                                {(tableSchema.columns ?? []).map((col) => (
-                                  <tr
-                                    key={col.name}
-                                    className="hover:bg-slate-800/40"
-                                  >
-                                    <td className="px-3 py-2 text-slate-200 font-medium">
-                                      {col.name}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <span
-                                        className={[
-                                          "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-wide",
-                                          col.role === "required"
-                                            ? "bg-violet-500/10 border-violet-500/30 text-violet-200"
-                                            : "bg-slate-700/60 border-slate-600 text-slate-200",
-                                        ].join(" ")}
-                                      >
-                                        {col.role}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-400">
-                                      {col.fk ?? "-"}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-400">
-                          No schema available for this table.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <select
-                    value={targetTable}
-                    onChange={(e) => setTargetTable(e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-200 focus:outline-none focus:border-violet-500"
-                  >
-                    {[
-                      "service_types",
-                      "services",
-                      "users",
-                      "campaigns",
-                      "subscriptions",
-                      "billing_events",
-                      "unsubscriptions",
-                      "sms_events",
-                      "user_activities",
-                    ].map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => downloadTemplate(targetTable)}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700/60"
-                    type="button"
-                  >
-                    <Download size={16} /> Template
-                  </button>
-                </div>
-              </div>
-
-              {/* Mode */}
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Upload size={16} className="text-slate-400" /> Import mode
-                </p>
-                <div className="flex items-center gap-6 text-sm text-slate-300">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mode"
-                      checked={mode === "append"}
-                      onChange={() => setMode("append")}
-                    />
-                    Append
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mode"
-                      checked={mode === "replace"}
-                      onChange={() => setMode("replace")}
-                    />
-                    Replace
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mode"
-                      checked={mode === "demo"}
-                      onChange={() => setMode("demo")}
-                    />
-                    Test (No DB write)
-                  </label>
-                </div>
-                {mode === "demo" && (
-                  <p className="text-xs text-amber-300">
-                    Demo mode: validation only.
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                <FileText size={16} className="text-slate-400" /> SQL file
-              </p>
-              <p className="text-xs text-slate-400">
-                Only INSERT/COPY allowed.
-                DROP/DELETE/TRUNCATE/ALTER/CREATE/UPDATE will be rejected.
-              </p>
-            </div>
-          )}
-
-          {/* Drop zone */}
-          <div
-            onDrop={onDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => inputRef.current?.click()}
-            className="border-dashed border-2 rounded-2xl p-6 transition cursor-pointer"
-            style={{
-              borderColor:
-                "color-mix(in srgb, var(--color-primary) 40%, var(--color-border))",
-              background:
-                "linear-gradient(180deg, color-mix(in srgb, var(--color-primary-bg) 60%, transparent) 0%, color-mix(in srgb, var(--color-bg-elevated) 55%, transparent) 100%)",
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl border"
-                style={{
-                  borderColor: "var(--color-border)",
-                  backgroundColor: "var(--color-bg-elevated)",
-                  color: "var(--color-primary)",
-                }}
-              >
-                <Upload size={18} />
-              </div>
-              <div className="flex-1">
-                <p
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  Drag and drop your {activeTab === "csv" ? "CSV" : "SQL"} file
-                  here
-                </p>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--color-text-muted)" }}
-                >
-                  or click to select (max {maxMb}MB)
-                </p>
-              </div>
-              {file && (
-                <span
-                  className="text-xs px-2 py-1 rounded-lg"
-                  style={{
-                    color: "var(--color-text-secondary)",
-                    backgroundColor: "var(--color-bg-elevated)",
-                    border: "1px solid var(--color-border)",
-                  }}
-                >
-                  {file.name} ({bytesToMb(file.size)}MB)
-                </span>
-              )}
-            </div>
-
-            <input
-              ref={inputRef}
-              type="file"
-              accept={accept}
-              className="hidden"
-              onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
-            />
-          </div>
-
-          {/* Preview */}
-          {activeTab === "csv" && columns.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-200">
-                Preview (first 5 rows)
-              </p>
-              <div className="border border-slate-800 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-800 border-b border-slate-700">
-                      <tr>
-                        {columns.map((c) => (
-                          <th
-                            key={c}
-                            className="px-4 py-2 text-left text-slate-300 font-semibold"
-                          >
-                            {c}
-                          </th>
+        {/* Preview */}
+        {activeTab === "csv" && columns.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-200">
+              Preview (first 5 rows)
+            </p>
+            <div className="border border-slate-800 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-800 border-b border-slate-700">
+                    <tr>
+                      {columns.map((c) => (
+                        <th
+                          key={c}
+                          className="px-4 py-2 text-left text-slate-300 font-semibold"
+                        >
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {preview.map((r, idx) => (
+                      <tr key={idx} className="hover:bg-slate-800/30">
+                        {columns.map((_, i) => (
+                          <td key={i} className="px-4 py-2 text-slate-300">
+                            {r[i] ?? ""}
+                          </td>
                         ))}
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                      {preview.map((r, idx) => (
-                        <tr key={idx} className="hover:bg-slate-800/30">
-                          {columns.map((_, i) => (
-                            <td key={i} className="px-4 py-2 text-slate-300">
-                              {r[i] ?? ""}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
-
-          <button
-            disabled={!canSubmit || loading}
-            onClick={handleSubmit}
-            className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
-            style={{
-              background:
-                "linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 75%, var(--color-info)) 100%)",
-              boxShadow:
-                "0 10px 30px color-mix(in srgb, var(--color-primary) 30%, transparent)",
-            }}
-          >
-            {loading
-              ? "Working..."
-              : activeTab === "csv"
-                ? "Validate & Import"
-                : "Run database import"}
-          </button>
-        </div>
-
-        {/* Result */}
-        {result && (
-          <ResultBox
-            result={{
-              ...result,
-              success: !!result.success,
-              validation: result.validation,
-            }}
-          />
+          </div>
         )}
 
-        {/* History */}
-        <div
-          className="rounded-2xl border p-6 space-y-3"
+        <button
+          disabled={!canSubmit || loading}
+          onClick={handleSubmit}
+          className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
           style={{
-            backgroundColor: "var(--color-bg-card)",
-            borderColor: "var(--color-border)",
-            boxShadow: "var(--color-card-shadow)",
+            background:
+              "linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 75%, var(--color-info)) 100%)",
+            boxShadow:
+              "0 10px 30px color-mix(in srgb, var(--color-primary) 30%, transparent)",
           }}
         >
-          <h3
-            className="text-sm font-semibold"
-            style={{ color: "var(--color-text-primary)" }}
-          >
-            Import history
-          </h3>
-          {historyLoading && (
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Loading…
-            </p>
-          )}
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-800 border-b border-slate-700">
-                <tr>
-                  {[
-                    "Date",
-                    "Admin",
-                    "File",
-                    "Type",
-                    "Scope",
-                    "Table",
-                    "Mode",
-                    "Rows",
-                    "Status",
-                    "Details",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2 text-left text-slate-300 font-semibold"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {(history ?? []).map((h) => (
-                  <tr key={h.id} className="hover:bg-slate-800/30">
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.imported_at
-                        ? new Date(h.imported_at).toLocaleString("fr-FR")
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.admin_name ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.file_name ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.file_type ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.scope ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.target_table ?? h.table ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {h.mode ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-slate-300">
-                      {(h.rows_inserted ?? 0).toLocaleString()} /{" "}
-                      {(h.rows_skipped ?? 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={[
-                          "px-2 py-1 rounded-full border text-[11px] capitalize",
-                          h.status === "success"
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                            : h.status === "partial"
-                              ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
-                              : "bg-red-500/10 border-red-500/30 text-red-300",
-                        ].join(" ")}
-                      >
-                        {h.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => openImportLogDetails(h)}
-                        className="px-2 py-1 rounded border border-slate-600 text-slate-200 hover:bg-slate-800 text-[11px]"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {(!history || history.length === 0) && (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="px-4 py-8 text-center text-slate-500"
-                    >
-                      No import history yet
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <ConfirmReplaceModal
-          open={confirmReplace}
-          targetTable={targetTable}
-          onCancel={() => setConfirmReplace(false)}
-          onConfirm={async () => {
-            setConfirmReplace(false);
-            await submitCsv();
-          }}
-        />
-
-        <ValidationReportModal
-          open={validationModalOpen}
-          report={staged}
-          table={targetTable}
-          mode={mode}
-          onCancel={() => {
-            setValidationModalOpen(false);
-            setStaged(null);
-          }}
-          onConfirm={async (force) => {
-            if (!staged?.import_id) return;
-            setValidationModalOpen(false);
-            try {
-              const res = await confirmCsv({
-                importId: staged.import_id,
-                table: targetTable,
-                mode,
-                force,
-              });
-              setResult(res);
-              setStaged(null);
-              setFile(null);
-            } catch (e) {
-              setResult({
-                success: false,
-                detail: getApiErrorMessage(e, "Confirm failed"),
-              });
-            }
-          }}
-        />
-
-        <ETLLogModal
-          open={etlLogOpen}
-          title={etlLogTitle}
-          content={etlLogContent}
-          error={etlLogError}
-          loading={etlLogLoading}
-          subtitle="Showing latest lines from the ETL runner log."
-          onClose={() => setEtlLogOpen(false)}
-        />
-
-        <ETLLogModal
-          open={importLogOpen}
-          title={importLogTitle}
-          content={importLogContent}
-          error={importLogError}
-          loading={importLogLoading}
-          subtitle="Showing full import diagnostic payload (validation, errors, and runtime context)."
-          onClose={() => setImportLogOpen(false)}
-        />
+          {loading
+            ? "Working..."
+            : activeTab === "csv"
+              ? "Validate & Import"
+              : "Run database import"}
+        </button>
       </div>
-    </AppLayout>
+
+      {/* Result */}
+      {result && (
+        <ResultBox
+          result={{
+            ...result,
+            success: !!result.success,
+            validation: result.validation,
+          }}
+        />
+      )}
+
+      {/* History */}
+      <div
+        className="rounded-2xl border p-6 space-y-3"
+        style={{
+          backgroundColor: "var(--color-bg-card)",
+          borderColor: "var(--color-border)",
+          boxShadow: "var(--color-card-shadow)",
+        }}
+      >
+        <h3
+          className="text-sm font-semibold"
+          style={{ color: "var(--color-text-primary)" }}
+        >
+          Import history
+        </h3>
+        {historyLoading && (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Loading…
+          </p>
+        )}
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-800 border-b border-slate-700">
+              <tr>
+                {[
+                  "Date",
+                  "Admin",
+                  "File",
+                  "Type",
+                  "Scope",
+                  "Table",
+                  "Mode",
+                  "Rows",
+                  "Status",
+                  "Details",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-2 text-left text-slate-300 font-semibold"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {(history ?? []).map((h) => (
+                <tr key={h.id} className="hover:bg-slate-800/30">
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.imported_at
+                      ? new Date(h.imported_at).toLocaleString("fr-FR")
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.admin_name ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.file_name ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.file_type ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.scope ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.target_table ?? h.table ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {h.mode ?? "—"}
+                  </td>
+                  <td className="px-4 py-2 text-slate-300">
+                    {(h.rows_inserted ?? 0).toLocaleString()} /{" "}
+                    {(h.rows_skipped ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={[
+                        "px-2 py-1 rounded-full border text-[11px] capitalize",
+                        h.status === "success"
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                          : h.status === "partial"
+                            ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
+                            : "bg-red-500/10 border-red-500/30 text-red-300",
+                      ].join(" ")}
+                    >
+                      {h.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => openImportLogDetails(h)}
+                      className="px-2 py-1 rounded border border-slate-600 text-slate-200 hover:bg-slate-800 text-[11px]"
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {(!history || history.length === 0) && (
+                <tr>
+                  <td
+                    colSpan={10}
+                    className="px-4 py-8 text-center text-slate-500"
+                  >
+                    No import history yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <ConfirmReplaceModal
+        open={confirmReplace}
+        targetTable={targetTable}
+        onCancel={() => setConfirmReplace(false)}
+        onConfirm={async () => {
+          setConfirmReplace(false);
+          await submitCsv();
+        }}
+      />
+
+      <ValidationReportModal
+        open={validationModalOpen}
+        report={staged}
+        table={targetTable}
+        mode={mode}
+        onCancel={() => {
+          setValidationModalOpen(false);
+          setStaged(null);
+        }}
+        onConfirm={async (force) => {
+          if (!staged?.import_id) return;
+          setValidationModalOpen(false);
+          try {
+            const res = await confirmCsv({
+              importId: staged.import_id,
+              table: targetTable,
+              mode,
+              force,
+            });
+            setResult(res);
+            setStaged(null);
+            setFile(null);
+          } catch (e) {
+            setResult({
+              success: false,
+              detail: getApiErrorMessage(e, "Confirm failed"),
+            });
+          }
+        }}
+      />
+
+      <ETLLogModal
+        open={etlLogOpen}
+        title={etlLogTitle}
+        content={etlLogContent}
+        error={etlLogError}
+        loading={etlLogLoading}
+        subtitle="Showing latest lines from the ETL runner log."
+        onClose={() => setEtlLogOpen(false)}
+      />
+
+      <ETLLogModal
+        open={importLogOpen}
+        title={importLogTitle}
+        content={importLogContent}
+        error={importLogError}
+        loading={importLogLoading}
+        subtitle="Showing full import diagnostic payload (validation, errors, and runtime context)."
+        onClose={() => setImportLogOpen(false)}
+      />
+    </div>
   );
 }
 
@@ -2331,3 +2328,4 @@ function ETLLogModal({
     </div>
   );
 }
+

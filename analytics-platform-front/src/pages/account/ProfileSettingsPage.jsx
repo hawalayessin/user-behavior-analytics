@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import AppLayout from "../../components/layout/AppLayout";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../hooks/useToast";
@@ -200,7 +199,7 @@ export default function ProfileSettingsPage() {
   };
 
   return (
-    <AppLayout pageTitle="Profile Settings" hasNotifications={false}>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-100 mb-2">
@@ -417,6 +416,6 @@ export default function ProfileSettingsPage() {
       </div>
 
       {Toast}
-    </AppLayout>
+    </>
   );
 }

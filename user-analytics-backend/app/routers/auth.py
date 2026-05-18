@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta, timezone
+﻿from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request, Response
 from sqlalchemy.orm import Session
 import secrets
 import os
@@ -12,12 +12,16 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.core.security import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
     create_access_token,
+    create_refresh_token,
+    hash_token,
     hash_password,
     verify_password,
 )
 from app.models.platform_user_invites import PlatformUserInvite
 from app.models.platform_users import PlatformUser
+from app.models.refresh_tokens import RefreshToken
 from app.schemas.auth import (
     InviteUserRequest,
     LoginRequest,
@@ -36,6 +40,35 @@ from app.utils.email import send_password_reset_email, send_invite_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 _invite_claims: dict[str, str] = {}
+REFRESH_COOKIE_NAME = "refreshToken"
+
+
+def _is_cookie_secure() -> bool:
+    return os.getenv("REFRESH_COOKIE_SECURE", "false").lower() == "true"
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    max_age = REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=_is_cookie_secure(),
+        samesite="strict",
+        max_age=max_age,
+        expires=max_age,
+        path="/",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=_is_cookie_secure(),
+        samesite="strict",
+    )
 
 
 def _invite_fingerprint(request: Request) -> str:
@@ -44,7 +77,7 @@ def _invite_fingerprint(request: Request) -> str:
     return f"{ua}|{lang}"
 
 
-# ─── POST /auth/register ──────────────────────────────────
+# â”€â”€â”€ POST /auth/register â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -57,7 +90,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     )
 
 
-# ─── GET /auth/me ───────────────────────────────────────────
+# â”€â”€â”€ GET /auth/me â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.get(
     "/me",
     response_model=UserResponse,
@@ -67,7 +100,7 @@ def get_profile(current_user: PlatformUser = Depends(get_current_user)):
     return current_user
 
 
-# ─── PATCH /auth/profile ────────────────────────────────────
+# â”€â”€â”€ PATCH /auth/profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.patch(
     "/profile",
     response_model=UserResponse,
@@ -127,7 +160,7 @@ def _resolve_avatar_extension(filename: str, content_type: str) -> str:
     return ".png"
 
 
-# ─── POST /auth/profile/avatar ─────────────────────────────
+# â”€â”€â”€ POST /auth/profile/avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/profile/avatar",
     response_model=UserResponse,
@@ -159,7 +192,7 @@ def upload_avatar(
     return current_user
 
 
-# ─── DELETE /auth/profile/avatar ───────────────────────────
+# â”€â”€â”€ DELETE /auth/profile/avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.delete(
     "/profile/avatar",
     response_model=UserResponse,
@@ -181,7 +214,7 @@ def delete_avatar(
     return current_user
 
 
-# ─── POST /auth/invite ─────────────────────────────────────
+# â”€â”€â”€ POST /auth/invite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/invite",
     response_model=MessageResponse,
@@ -196,7 +229,7 @@ def invite_user(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Un compte avec cet email existe déjà.",
+            detail="Un compte avec cet email existe dÃ©jÃ .",
         )
 
     token = secrets.token_urlsafe(32)
@@ -240,7 +273,7 @@ def invite_user(
     return MessageResponse(message="Invitation sent.")
 
 
-# ─── POST /auth/register-invite ────────────────────────────
+# â”€â”€â”€ POST /auth/register-invite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/register-invite",
     response_model=UserResponse,
@@ -263,13 +296,13 @@ def register_invite(
     if not invite:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invitation invalide ou déjà utilisée.",
+            detail="Invitation invalide ou dÃ©jÃ  utilisÃ©e.",
         )
 
     if datetime.now(timezone.utc) > invite.expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invitation expirée.",
+            detail="Invitation expirÃ©e.",
         )
 
     fingerprint = _invite_fingerprint(request)
@@ -283,7 +316,7 @@ def register_invite(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Un compte avec cet email existe déjà.",
+            detail="Un compte avec cet email existe dÃ©jÃ .",
         )
 
     new_user = PlatformUser(
@@ -304,7 +337,7 @@ def register_invite(
     return new_user
 
 
-# ─── POST /auth/login ─────────────────────────────────────
+# â”€â”€â”€ POST /auth/login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post(
     "/register-invite/verify",
@@ -350,9 +383,8 @@ def verify_register_invite_token(
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
 
-    # 1️⃣ Chercher user
     user = (
         db.query(PlatformUser)
         .filter(PlatformUser.email == payload.email)
@@ -366,7 +398,6 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 2️⃣ Vérifier password
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -374,22 +405,29 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 3️⃣ Vérifier actif
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Compte désactivé.",
+            detail="Compte desactive.",
         )
 
-    # 4️⃣ update last login
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
 
-    # 5️⃣ JWT
     token = create_access_token(
         data={"sub": str(user.id), "role": user.role},
         expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
+    refresh_raw = create_refresh_token()
+    refresh_row = RefreshToken(
+        token_hash=hash_token(refresh_raw),
+        user_id=user.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        revoked=False,
+    )
+    db.add(refresh_row)
+    db.commit()
+    _set_refresh_cookie(response, refresh_raw)
 
     return TokenResponse(
         access_token=token,
@@ -400,7 +438,58 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     )
 
 
-# ─── POST /auth/forgot-password ──────────────────────────────────
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_token(response: Response, request: Request, db: Session = Depends(get_db)):
+    raw = request.cookies.get(REFRESH_COOKIE_NAME)
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token.")
+
+    record = db.query(RefreshToken).filter(RefreshToken.token_hash == hash_token(raw)).first()
+    now = datetime.now(timezone.utc)
+    if not record or record.revoked or record.expires_at <= now:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token.")
+
+    user = db.query(PlatformUser).filter(PlatformUser.id == record.user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive.")
+
+    record.revoked = True
+    new_raw = create_refresh_token()
+    new_record = RefreshToken(
+        token_hash=hash_token(new_raw),
+        user_id=user.id,
+        expires_at=now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        revoked=False,
+    )
+    db.add(new_record)
+    db.commit()
+    _set_refresh_cookie(response, new_raw)
+
+    access_token = create_access_token(
+        data={"sub": str(user.id), "role": user.role},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user_id=user.id,
+        role=user.role,
+        full_name=user.full_name,
+    )
+
+
+@router.post("/logout", response_model=MessageResponse)
+def logout(response: Response, request: Request, db: Session = Depends(get_db)):
+    raw = request.cookies.get(REFRESH_COOKIE_NAME)
+    if raw:
+        record = db.query(RefreshToken).filter(RefreshToken.token_hash == hash_token(raw)).first()
+        if record and not record.revoked:
+            record.revoked = True
+            db.commit()
+    _clear_refresh_cookie(response)
+    return MessageResponse(message="Logged out successfully.")
+
+# â”€â”€â”€ POST /auth/forgot-password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/forgot-password",
     response_model=MessageResponse,
@@ -428,10 +517,10 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         send_password_reset_email(payload.email, reset_token)
 
     # Always return same message (don't reveal if email exists)
-    return MessageResponse(message="Si cet email existe, un code a été envoyé.")
+    return MessageResponse(message="Si cet email existe, un code a Ã©tÃ© envoyÃ©.")
 
 
-# ─── POST /auth/verify-reset-token ───────────────────────────────
+# â”€â”€â”€ POST /auth/verify-reset-token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/verify-reset-token",
     response_model=TokenValidationResponse,
@@ -451,7 +540,7 @@ def verify_reset_token(payload: VerifyResetTokenRequest, db: Session = Depends(g
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Code de réinitialisation invalide.",
+            detail="Code de rÃ©initialisation invalide.",
         )
 
     # Check if token is expired
@@ -462,13 +551,13 @@ def verify_reset_token(payload: VerifyResetTokenRequest, db: Session = Depends(g
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Code de réinitialisation expiré.",
+            detail="Code de rÃ©initialisation expirÃ©.",
         )
 
     return TokenValidationResponse(valid=True)
 
 
-# ─── POST /auth/reset-password ───────────────────────────────────
+# â”€â”€â”€ POST /auth/reset-password â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @router.post(
     "/reset-password",
     response_model=MessageResponse,
@@ -488,7 +577,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Code de réinitialisation invalide.",
+            detail="Code de rÃ©initialisation invalide.",
         )
 
     # Check if token is expired
@@ -499,7 +588,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Code de réinitialisation expiré.",
+            detail="Code de rÃ©initialisation expirÃ©.",
         )
 
     # Update password
@@ -508,6 +597,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     user.reset_token_expires_at = None
     db.commit()
 
-    return MessageResponse(message="Mot de passe modifié avec succès.")
+    return MessageResponse(message="Mot de passe modifiÃ© avec succÃ¨s.")
+
 
 

@@ -42,6 +42,8 @@ from app.routers import reports as reports_router
 
 from app.core.security import hash_password
 from app.models.platform_users import PlatformUser
+from app.models.refresh_tokens import RefreshToken
+from sqlalchemy.exc import ProgrammingError
 
 app = FastAPI(
     title="User Analytics Platform",
@@ -49,6 +51,7 @@ app = FastAPI(
 )
 
 logger = logging.getLogger(__name__)
+_refresh_cleanup_task: asyncio.Task | None = None
 
 static_root = os.path.join(os.path.dirname(__file__), "..", "uploads")
 avatars_dir = os.path.join(static_root, "avatars")
@@ -83,7 +86,10 @@ async def latency_logger(request: Request, call_next):
 
 @app.on_event("startup")
 async def on_startup():
+    global _refresh_cleanup_task
     logger.info("Application started. Use 'alembic upgrade head' for migrations.")
+    if _refresh_cleanup_task is None or _refresh_cleanup_task.done():
+        _refresh_cleanup_task = asyncio.create_task(_refresh_token_cleanup_loop())
 
     # Optional: create an initial admin user for dev/demo environments.
     admin_email = os.getenv("ADMIN_EMAIL")
@@ -113,6 +119,13 @@ async def on_startup():
         finally:
             db.close()
 
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    global _refresh_cleanup_task
+    if _refresh_cleanup_task and not _refresh_cleanup_task.done():
+        _refresh_cleanup_task.cancel()
+
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(analyticsOverview.router)
@@ -136,3 +149,32 @@ app.include_router(reports_router.router)
 @app.get("/")
 def root():
     return {"message": "API running"}
+async def _refresh_token_cleanup_loop() -> None:
+    while True:
+        db = SessionLocal()
+        try:
+            now = datetime.now(timezone.utc)
+            stale_revoked_before = now.timestamp() - 24 * 60 * 60
+            stale_revoked_dt = datetime.fromtimestamp(stale_revoked_before, timezone.utc)
+            (
+                db.query(RefreshToken)
+                .filter(
+                    (RefreshToken.expires_at < now)
+                    | ((RefreshToken.revoked.is_(True)) & (RefreshToken.created_at < stale_revoked_dt))
+                )
+                .delete(synchronize_session=False)
+            )
+            db.commit()
+        except ProgrammingError as exc:
+            db.rollback()
+            # Before migrations are applied, refresh_tokens may not exist yet.
+            if "refresh_tokens" in str(exc).lower() and "does not exist" in str(exc).lower():
+                logger.info("Skipping refresh-token cleanup: table refresh_tokens not found yet.")
+            else:
+                logger.exception("Refresh-token cleanup failed.")
+        except Exception:
+            db.rollback()
+            logger.exception("Refresh-token cleanup failed.")
+        finally:
+            db.close()
+        await asyncio.sleep(60 * 60)

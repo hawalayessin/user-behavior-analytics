@@ -11,6 +11,7 @@ import {
 import * as XLSX from "xlsx";
 import { FixedSizeList as List } from "react-window";
 import { useUsers } from "../../hooks/useUsers";
+import api from "../../services/api";
 
 const STATUT_MAP = {
   subscribed: {
@@ -194,9 +195,8 @@ export default function UserListSection({
       if (serviceFilter) params.append("service_id", serviceFilter);
       params.append("export", "true");
 
-      const res = await fetch(`/api/users?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      const res = await api.get("/users", { params });
+      const json = res.data;
       return json.data ?? [];
     } catch (err) {
       showToast("❌ Export failed: " + err.message);

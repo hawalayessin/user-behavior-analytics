@@ -1,7 +1,14 @@
 ﻿import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import api, { setAccessToken as setApiAccessToken } from "../services/api";
+/* eslint-disable react-refresh/only-export-components */
+import api, {
+  setAccessToken as setApiAccessToken,
+  setAuthFailureHandler,
+  setAuthRefreshHandler,
+} from "../services/api";
 
 const AuthContext = createContext();
+const ACCESS_TOKEN_STORAGE_KEY = "digmaco_access_token";
+let refreshRequest = null;
 
 export const AuthProvider = ({ children }) => {
   const [access_token, setAccessToken] = useState(null);
@@ -11,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const clearLocalAuth = useCallback(() => {
+    sessionStorage.removeItem(ACCESS_TOKEN_STORAGE_KEY);
     localStorage.removeItem("role");
     localStorage.removeItem("full_name");
     localStorage.removeItem("user_id");
@@ -21,44 +29,89 @@ export const AuthProvider = ({ children }) => {
     setUserId(null);
   }, []);
 
-  const refreshAccessToken = useCallback(async () => {
-    try {
-      const response = await api.post("/auth/refresh", {});
-      const { access_token: token, role: userRole, full_name: userName, user_id: uid } = response.data;
+  const refreshAccessToken = useCallback(async ({ clearOnUnauthorized = true } = {}) => {
+    if (refreshRequest) return refreshRequest;
 
-      setAccessToken(token);
-      setApiAccessToken(token);
-      if (userRole) {
-        localStorage.setItem("role", userRole);
-        setRole(userRole);
+    refreshRequest = (async () => {
+      try {
+        const response = await api.post(
+          "/auth/refresh",
+          {},
+          { skipAuthRefresh: true },
+        );
+        const {
+          access_token: token,
+          role: userRole,
+          full_name: userName,
+          user_id: uid,
+        } = response.data;
+
+        setAccessToken(token);
+        setApiAccessToken(token);
+        sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
+        if (userRole) {
+          localStorage.setItem("role", userRole);
+          setRole(userRole);
+        }
+        if (userName) {
+          localStorage.setItem("full_name", userName);
+          setFullName(userName);
+        }
+        if (uid) {
+          localStorage.setItem("user_id", uid);
+          setUserId(uid);
+        }
+        return token;
+      } catch (err) {
+        const status = err?.response?.status;
+        if (
+          (status === 401 || status === 403) &&
+          clearOnUnauthorized
+        ) {
+          clearLocalAuth();
+        }
+        return null;
+      } finally {
+        refreshRequest = null;
       }
-      if (userName) {
-        localStorage.setItem("full_name", userName);
-        setFullName(userName);
-      }
-      if (uid) {
-        localStorage.setItem("user_id", uid);
-        setUserId(uid);
-      }
-      return token;
-    } catch {
-      clearLocalAuth();
-      return null;
-    }
+    })();
+
+    return refreshRequest;
   }, [clearLocalAuth]);
+
+  useEffect(() => {
+    setAuthRefreshHandler(() => refreshAccessToken());
+    setAuthFailureHandler(clearLocalAuth);
+
+    return () => {
+      setAuthRefreshHandler(null);
+      setAuthFailureHandler(null);
+    };
+  }, [clearLocalAuth, refreshAccessToken]);
 
   useEffect(() => {
     const userRole = localStorage.getItem("role");
     const userName = localStorage.getItem("full_name");
     const uid = localStorage.getItem("user_id");
+    const storedToken = sessionStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
 
     if (userRole) setRole(userRole);
     if (userName) setFullName(userName);
     if (uid) setUserId(uid);
+    if (storedToken) {
+      setAccessToken(storedToken);
+      setApiAccessToken(storedToken);
+    }
 
     const bootstrap = async () => {
+      if (storedToken) {
+        setIsLoading(false);
+        refreshAccessToken({ clearOnUnauthorized: false });
+        return;
+      }
+
       if (userRole) {
-        await refreshAccessToken();
+        await refreshAccessToken({ clearOnUnauthorized: true });
       }
       setIsLoading(false);
     };
@@ -73,6 +126,7 @@ export const AuthProvider = ({ children }) => {
 
     setAccessToken(token);
     setApiAccessToken(token);
+    sessionStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, token);
     setRole(userRole);
     setFullName(userName);
     setUserId(uid);
@@ -85,7 +139,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await api.post("/auth/logout", {});
+      await api.post("/auth/logout", {}, { skipAuthRefresh: true });
     } catch {
       // best effort logout
     }

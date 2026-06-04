@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
+    balanced_accuracy_score,
     brier_score_loss,
     classification_report,
     confusion_matrix,
@@ -701,6 +702,7 @@ class ChurnPredictor:
                 "confusion_matrix": {"tn": 0, "fp": 0, "fn": 0, "tp": 0},
                 "churn_rate": float(y.mean()) if len(y) else 0.0,
                 "accuracy": 1.0,
+                "balanced_accuracy": 0.0,
                 "report": {
                     "warning": warning,
                     "class_distribution": {
@@ -732,7 +734,7 @@ class ChurnPredictor:
                 "governance": {
                   "protocol": {
                     "version": "churn-governance-v1",
-                    "evaluation_split": "stratified train_test_split(test_size=0.2, random_state=42)",
+                    "evaluation_split": "stratified train/validation/test split (70/15/15, random_state=42)",
                     "default_decision_threshold": 0.4,
                     "recalibration_cadence_days": 30,
                   },
@@ -759,12 +761,18 @@ class ChurnPredictor:
             joblib.dump(metrics, self.metrics_path)
             return metrics
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y if y.nunique() > 1 else None
+        stratify_y = y if y.nunique() > 1 else None
+        X_train, X_temp, y_train, y_temp = train_test_split(
+            X, y, test_size=0.30, random_state=42, stratify=stratify_y
+        )
+        stratify_temp = y_temp if y_temp.nunique() > 1 else None
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_temp, y_temp, test_size=0.50, random_state=42, stratify=stratify_temp
         )
         log_step(
-            "Train/test split done",
+            "Train/validation/test split done",
             train_rows=int(len(X_train)),
+            validation_rows=int(len(X_val)),
             test_rows=int(len(X_test)),
         )
 
@@ -772,17 +780,33 @@ class ChurnPredictor:
         self.model.fit(X_train, y_train)
         log_step("Model fit completed")
 
-        y_proba = self.model.predict_proba(X_test)[:, 1]
-        threshold_policy = self._select_optimal_threshold(y_test, y_proba, beta=1.0)
+        y_val_proba = self.model.predict_proba(X_val)[:, 1]
+        threshold_policy = self._select_optimal_threshold(y_val, y_val_proba, beta=1.0)
         optimal_threshold = float(threshold_policy.get("optimal_threshold", self.default_threshold))
-        y_pred = (y_proba >= optimal_threshold).astype(int)
+        y_val_pred = (y_val_proba >= optimal_threshold).astype(int)
+
+        val_report = classification_report(y_val, y_val_pred, output_dict=True, zero_division=0)
+        val_balanced_accuracy = float(balanced_accuracy_score(y_val, y_val_pred))
+        val_precision, val_recall, val_f1, _ = precision_recall_fscore_support(
+            y_val, y_val_pred, average="binary", zero_division=0
+        )
+        val_cm = confusion_matrix(y_val, y_val_pred, labels=[0, 1])
+        val_tn, val_fp, val_fn, val_tp = [int(x) for x in val_cm.ravel()]
+        val_roc_auc = None
+        if y_val.nunique() > 1:
+            val_roc_auc = float(roc_auc_score(y_val, y_val_proba))
+        val_pr_auc = float(average_precision_score(y_val, y_val_proba))
+
+        y_test_proba = self.model.predict_proba(X_test)[:, 1]
+        y_pred = (y_test_proba >= optimal_threshold).astype(int)
 
         roc_auc = None
         if y_test.nunique() > 1:
-            roc_auc = float(roc_auc_score(y_test, y_proba))
-        pr_auc = float(average_precision_score(y_test, y_proba))
+            roc_auc = float(roc_auc_score(y_test, y_test_proba))
+        pr_auc = float(average_precision_score(y_test, y_test_proba))
 
         report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+        balanced_accuracy = float(balanced_accuracy_score(y_test, y_pred))
         churn_rate = float(y.mean()) if len(y) else 0.0
         precision, recall, f1, _ = precision_recall_fscore_support(
             y_test, y_pred, average="binary", zero_division=0
@@ -790,9 +814,10 @@ class ChurnPredictor:
         cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
         tn, fp, fn, tp = [int(x) for x in cm.ravel()]
         log_step(
-            "Evaluation completed",
+            "Final test evaluation completed",
             roc_auc=roc_auc,
             accuracy=float(report.get("accuracy", 0.0)),
+            balanced_accuracy=balanced_accuracy,
             churn_rate=churn_rate,
             pr_auc=pr_auc,
             optimal_threshold=optimal_threshold,
@@ -833,10 +858,27 @@ class ChurnPredictor:
             "confusion_matrix": {"tn": tn, "fp": fp, "fn": fn, "tp": tp},
             "churn_rate": churn_rate,
             "accuracy": float(report.get("accuracy", 0.0)),
+            "balanced_accuracy": balanced_accuracy,
+            "validation_metrics": {
+                "roc_auc": val_roc_auc,
+                "pr_auc": val_pr_auc,
+                "accuracy": float(val_report.get("accuracy", 0.0)),
+                "balanced_accuracy": val_balanced_accuracy,
+                "precision": float(val_precision),
+                "recall": float(val_recall),
+                "f1_score": float(val_f1),
+                "confusion_matrix": {"tn": val_tn, "fp": val_fp, "fn": val_fn, "tp": val_tp},
+            },
           "report": {
             **report,
             "label_distribution": label_distribution,
             "data_quality": dq,
+            "validation": {
+                "roc_auc": val_roc_auc,
+                "accuracy": float(val_report.get("accuracy", 0.0)),
+                "f1_score": float(val_f1),
+                "confusion_matrix": {"tn": val_tn, "fp": val_fp, "fn": val_fn, "tp": val_tp},
+            },
           },
             "coefficients": coeffs_sorted,
             "coefficients_sorted": [
@@ -849,7 +891,7 @@ class ChurnPredictor:
             "warning": None,
             "dq_report": dq_report,
             "feature_signal": feature_signal,
-            "calibration": self._calibration_summary(y_test, y_proba),
+            "calibration": self._calibration_summary(y_test, y_test_proba),
             "learning_curve": self.compute_learning_curve(X_train, y_train),
             "drift": {
                 "average_z_shift": 0.0,
@@ -860,12 +902,32 @@ class ChurnPredictor:
             "governance": {
               "protocol": {
                 "version": "churn-governance-v1",
-                "evaluation_split": "stratified train_test_split(test_size=0.2, random_state=42)",
+                "evaluation_split": "stratified train/validation/test split (70/15/15, random_state=42)",
                 "default_decision_threshold": self.default_threshold,
                 "optimal_threshold": optimal_threshold,
                 "recalibration_cadence_days": 30,
               },
-              "calibration": self._calibration_summary(y_test, y_proba),
+              "validation_metrics": {
+                  "roc_auc": val_roc_auc,
+                  "pr_auc": val_pr_auc,
+                  "accuracy": float(val_report.get("accuracy", 0.0)),
+                  "balanced_accuracy": val_balanced_accuracy,
+                  "precision": float(val_precision),
+                  "recall": float(val_recall),
+                  "f1_score": float(val_f1),
+                  "confusion_matrix": {"tn": val_tn, "fp": val_fp, "fn": val_fn, "tp": val_tp},
+              },
+              "test_metrics": {
+                  "roc_auc": roc_auc,
+                  "pr_auc": pr_auc,
+                  "accuracy": float(report.get("accuracy", 0.0)),
+                  "balanced_accuracy": balanced_accuracy,
+                  "precision": float(precision),
+                  "recall": float(recall),
+                  "f1_score": float(f1),
+                  "confusion_matrix": {"tn": tn, "fp": fp, "fn": fn, "tp": tp},
+              },
+              "calibration": self._calibration_summary(y_test, y_test_proba),
               "risk_policy": threshold_policy,
               "drift": {
                   "average_z_shift": 0.0,
@@ -889,7 +951,10 @@ class ChurnPredictor:
     def load(self) -> bool:
         if not self.model_path.exists():
             return False
-        self.model = joblib.load(self.model_path)
+        try:
+            self.model = joblib.load(self.model_path)
+        except Exception:
+            return False
         return True
 
     def load_metrics(self) -> dict[str, Any] | None:
@@ -1071,4 +1136,3 @@ class ChurnPredictor:
                 "Run monthly stable evaluation protocol and archive governance snapshots for auditability.",
             ],
         }
-

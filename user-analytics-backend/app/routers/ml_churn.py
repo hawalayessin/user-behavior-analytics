@@ -296,7 +296,7 @@ def get_churn_scores(
         "ml:churn:scores",
         {
             "top": int(top),
-            "threshold": float(threshold),
+            "threshold": float(threshold) if threshold is not None else "auto",
             "store": bool(store),
             "use_cached": bool(use_cached),
             "service_id": service_id or "all",
@@ -305,21 +305,33 @@ def get_churn_scores(
         },
     )
 
+    resolved_threshold = (
+        float(threshold)
+        if threshold is not None
+        else ChurnPredictor()._resolve_threshold(None)
+    )
+
+    def compute_scores() -> ChurnScoresResponse:
+        kwargs: dict[str, Any] = {
+            "top": top,
+            "threshold": resolved_threshold,
+            "store": store,
+            "use_cached": use_cached and not has_filters,
+        }
+        if has_filters:
+            kwargs.update(
+                {
+                    "service_id": service_id,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                }
+            )
+        return _compute_churn_scores(db, **kwargs)
+
     return cache_or_compute(
         cache_key,
         settings.ML_SCORES_CACHE_TTL_SECONDS,
-        compute_function=lambda: jsonable_encoder(
-            _compute_churn_scores(
-                db,
-                top=top,
-                threshold=threshold,
-                store=store,
-                use_cached=(use_cached and not has_filters),
-                service_id=service_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        ),
+        compute_function=lambda: jsonable_encoder(compute_scores()),
     )
 
 

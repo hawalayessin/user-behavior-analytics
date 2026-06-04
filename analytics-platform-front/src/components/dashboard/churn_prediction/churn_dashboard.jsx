@@ -187,18 +187,18 @@ export default function ChurnPredictionDashboard() {
         trendLabel="imbalance-aware"
       />
       <KPICard
-        title="Accuracy"
+        title="Balanced accuracy"
         value={
-          metrics.data?.accuracy != null
-            ? Number(metrics.data.accuracy * 100).toFixed(1) + "%"
+          metrics.data?.balanced_accuracy != null
+            ? Number(metrics.data.balanced_accuracy * 100).toFixed(1) + "%"
             : "N/A"
         }
-        subtitle="Classification performance"
+        subtitle="Class-balanced performance"
         icon={RotateCcw}
         iconColor="#22C55E"
         iconBg="bg-emerald-500/10"
         trend={0}
-        trendLabel="baseline"
+        trendLabel="imbalance-aware"
       />
       <KPICard
         title="Churn rate"

@@ -328,6 +328,90 @@ html.light .hover\:text-white:hover {
   scrollbar-width: thin;
 }
 
+.import-observatory {
+  --import-bg: #0b1326;
+  --import-page-gradient: linear-gradient(
+    180deg,
+    #0b1326 0%,
+    #0b1326 42%,
+    #060e20 100%
+  );
+  --import-surface-lowest: #060e20;
+  --import-surface-low: #131b2e;
+  --import-surface: #171f33;
+  --import-surface-high: #222a3d;
+  --import-surface-highest: #2d3449;
+  --import-primary: #adc6ff;
+  --import-primary-strong: #4d8eff;
+  --import-primary-soft: rgba(173, 198, 255, 0.12);
+  --import-primary-border: rgba(173, 198, 255, 0.32);
+  --import-primary-gradient: linear-gradient(135deg, #adc6ff 0%, #4d8eff 100%);
+  --import-cta-text: #002e6a;
+  --import-text: #dae2fd;
+  --import-muted: #8c909f;
+  --import-subtle: #c2c6d6;
+  --import-divider: rgba(255, 255, 255, 0.1);
+  --import-border-soft: inset 0 0 0 1px rgba(140, 144, 159, 0.1);
+  --import-panel-faint: rgba(6, 14, 32, 0.42);
+  --import-panel-muted: rgba(45, 52, 73, 0.66);
+  --import-row-stripe: rgba(45, 52, 73, 0.28);
+  --import-success: #86efac;
+  --import-success-bg: rgba(34, 197, 94, 0.12);
+  --import-success-border: rgba(34, 197, 94, 0.3);
+  --import-warning: #fcd34d;
+  --import-warning-bg: rgba(245, 158, 11, 0.13);
+  --import-warning-border: rgba(245, 158, 11, 0.32);
+  --import-danger: #fca5a5;
+  --import-danger-bg: rgba(239, 68, 68, 0.11);
+  --import-danger-border: rgba(239, 68, 68, 0.22);
+  --import-code-bg: #020617;
+  --import-code-text: #cbd5e1;
+}
+
+html.light .import-observatory {
+  --import-bg: var(--color-bg-primary);
+  --import-page-gradient: linear-gradient(
+    180deg,
+    #f8fafc 0%,
+    #eef4ff 46%,
+    #ffffff 100%
+  );
+  --import-surface-lowest: #ffffff;
+  --import-surface-low: #f8fafc;
+  --import-surface: #f1f5f9;
+  --import-surface-high: #ffffff;
+  --import-surface-highest: #e8eef7;
+  --import-primary: #1d4ed8;
+  --import-primary-strong: #2563eb;
+  --import-primary-soft: rgba(37, 99, 235, 0.08);
+  --import-primary-border: rgba(37, 99, 235, 0.22);
+  --import-primary-gradient: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  --import-cta-text: #ffffff;
+  --import-text: var(--color-text-primary);
+  --import-muted: var(--color-text-muted);
+  --import-subtle: var(--color-text-secondary);
+  --import-divider: rgba(15, 23, 42, 0.1);
+  --import-border-soft: inset 0 0 0 1px rgba(148, 163, 184, 0.28);
+  --import-panel-faint: rgba(241, 245, 249, 0.86);
+  --import-panel-muted: rgba(226, 232, 240, 0.72);
+  --import-row-stripe: rgba(241, 245, 249, 0.78);
+  --import-success: #15803d;
+  --import-success-bg: rgba(22, 163, 74, 0.08);
+  --import-success-border: rgba(22, 163, 74, 0.2);
+  --import-warning: #b45309;
+  --import-warning-bg: rgba(217, 119, 6, 0.08);
+  --import-warning-border: rgba(217, 119, 6, 0.22);
+  --import-danger: #b91c1c;
+  --import-danger-bg: rgba(220, 38, 38, 0.08);
+  --import-danger-border: rgba(220, 38, 38, 0.2);
+  --import-code-bg: #0f172a;
+  --import-code-text: #e2e8f0;
+}
+
+.import-observatory .import-step-rail::before {
+  background-color: var(--import-divider);
+}
+
 .nrr-bar-track {
   position: relative;
   display: flex;
@@ -381,5 +465,25 @@ html.light .hover\:text-white:hover {
   }
   50% {
     opacity: 0.4;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }

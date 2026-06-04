@@ -7,7 +7,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
-                background: "var(--chart-tooltip-bg)",
   Brush,
 } from "recharts"
 
@@ -19,8 +18,8 @@ export default function CampaignVsOrganicChart({ data }) {
         <p className="text-sm text-slate-400">Monthly subscriptions (campaign-linked vs organic)</p>
       </div>
 
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-80 min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <AreaChart data={data ?? []} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
             <XAxis dataKey="month" tick={{ fill: "#94A3B8", fontSize: 11 }} />
@@ -67,4 +66,3 @@ CampaignVsOrganicChart.propTypes = {
     })
   ),
 }
-

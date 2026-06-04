@@ -1,7 +1,12 @@
-﻿"""Google Gemini AI service.
-Generates analytical text insights from DigMaco Analytics KPI data.
-Supports FR/EN output, optional custom prompt instructions,
-and a comprehensive enterprise report mode that returns structured JSON.
+﻿"""
+GeminiReportService — Legacy direct calls.
+
+NOTE: As of the MCP integration, the primary
+report generation flow uses mcp_agent_service.py
+which implements an agentic tool-calling loop.
+
+This module is kept as a fallback utility
+and for direct single-section generation.
 """
 from __future__ import annotations
 

@@ -17,6 +17,8 @@ services:
     depends_on:
       analytics_redis:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./user-analytics-backend:/app
     ports:

@@ -39,6 +39,7 @@ from ml_models import anomalies
 from app.routers import nrr
 from app.routers import notes
 from app.routers import reports as reports_router
+from app.routers import notifications
 
 from app.core.security import hash_password
 from app.models.platform_users import PlatformUser
@@ -146,6 +147,7 @@ app.include_router(anomalies.router)
 app.include_router(nrr.router, prefix="/analytics", tags=["NRR"])
 app.include_router(notes.router)
 app.include_router(reports_router.router)
+app.include_router(notifications.router)
 @app.get("/")
 def root():
     return {"message": "API running"}

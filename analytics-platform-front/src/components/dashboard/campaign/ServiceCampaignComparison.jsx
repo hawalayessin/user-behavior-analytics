@@ -2,11 +2,11 @@ import PropTypes from "prop-types"
 import {
   BarChart,
   Bar,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-                background: "var(--chart-tooltip-bg)",
 } from "recharts"
 
 export default function ServiceCampaignComparison({ data }) {
@@ -22,8 +22,8 @@ export default function ServiceCampaignComparison({ data }) {
         <p className="text-sm text-slate-400">Average conversion rate by service</p>
       </div>
 
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-80 min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart
             data={chartData}
             layout="vertical"
@@ -82,4 +82,3 @@ ServiceCampaignComparison.propTypes = {
     })
   ),
 }
-

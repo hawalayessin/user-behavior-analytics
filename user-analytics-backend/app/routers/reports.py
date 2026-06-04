@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ from app.services.report_data_service import (
 )
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+logger = logging.getLogger("uvicorn.error")
 
 # In-memory active runs store (report_id -> runtime status)
 _active_runs: dict[str, dict[str, Any]] = {}
@@ -58,6 +60,7 @@ class ReportRequest(BaseModel):
     include_cover_page: bool = True
     anonymize_data: bool = False
     language: str = "fr"
+    report_theme: str = "dark"
     gemini_prompt_template: str = ""
 
 
@@ -239,6 +242,14 @@ async def _background_generate(report_id: str, request: dict[str, Any]) -> None:
             segments=segments,
             anomalies=anomalies,
             campaign_data=campaign_data,
+            db=db,
+        )
+        logger.info(
+            "REPORT_GENERATION_DONE id=%s filename=%s ai_source=%s ai_sections=%s",
+            report_id,
+            result.get("filename"),
+            result.get("ai_source"),
+            result.get("ai_used"),
         )
 
         _update(5, 100)
@@ -249,6 +260,7 @@ async def _background_generate(report_id: str, request: dict[str, Any]) -> None:
                 "filename": result["filename"],
                 "file_size_kb": result["file_size_kb"],
                 "ai_used": result["ai_used"],
+                "ai_source": result.get("ai_source"),
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }
         )

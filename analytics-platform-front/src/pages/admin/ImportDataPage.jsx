@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Activity,
   BarChart3,
   ClipboardList,
   CreditCard,
@@ -11,12 +12,19 @@ import {
   Tag,
   Target,
   FileText,
+  FileUp,
   Upload,
   X,
   CheckCircle2,
   Download,
   Eye,
   Info,
+  Layers,
+  PlayCircle,
+  RefreshCw,
+  ShieldCheck,
+  Table2,
+  Terminal,
   Users,
 } from "lucide-react";
 import useImportData from "../../hooks/useImportData";
@@ -28,9 +36,111 @@ const MAX_CSV_MB = 20;
 const MAX_SQL_MB = 50;
 const ACCEPT_CSV = ".csv";
 const ACCEPT_SQL = ".sql";
+const TABLE_OPTIONS = [
+  "service_types",
+  "services",
+  "users",
+  "campaigns",
+  "subscriptions",
+  "billing_events",
+  "unsubscriptions",
+  "sms_events",
+  "user_activities",
+];
+
+const OBS = {
+  background: "var(--import-bg)",
+  pageGradient: "var(--import-page-gradient)",
+  surfaceLowest: "var(--import-surface-lowest)",
+  surfaceLow: "var(--import-surface-low)",
+  surface: "var(--import-surface)",
+  surfaceHigh: "var(--import-surface-high)",
+  surfaceHighest: "var(--import-surface-highest)",
+  primary: "var(--import-primary)",
+  primaryStrong: "var(--import-primary-strong)",
+  primarySoft: "var(--import-primary-soft)",
+  primaryBorder: "var(--import-primary-border)",
+  primaryGradient: "var(--import-primary-gradient)",
+  ctaText: "var(--import-cta-text)",
+  text: "var(--import-text)",
+  muted: "var(--import-muted)",
+  subtle: "var(--import-subtle)",
+  divider: "var(--import-divider)",
+  borderSoft: "var(--import-border-soft)",
+  panelFaint: "var(--import-panel-faint)",
+  panelMuted: "var(--import-panel-muted)",
+  rowStripe: "var(--import-row-stripe)",
+  success: "var(--import-success)",
+  successBg: "var(--import-success-bg)",
+  successBorder: "var(--import-success-border)",
+  warning: "var(--import-warning)",
+  warningBg: "var(--import-warning-bg)",
+  warningBorder: "var(--import-warning-border)",
+  danger: "var(--import-danger)",
+  dangerBg: "var(--import-danger-bg)",
+  dangerBorder: "var(--import-danger-border)",
+  codeBg: "var(--import-code-bg)",
+  codeText: "var(--import-code-text)",
+};
 
 function bytesToMb(bytes) {
   return Math.round((bytes / (1024 * 1024)) * 10) / 10;
+}
+
+function SectionShell({ eyebrow, title, icon, action, children }) {
+  const SectionIcon = icon;
+  return (
+    <section className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-lg"
+            style={{
+              backgroundColor: OBS.surfaceHigh,
+              color: OBS.primary,
+            }}
+          >
+            <SectionIcon size={18} />
+          </div>
+          <div>
+            <p
+              className="text-[11px] font-bold uppercase tracking-[0.22em]"
+              style={{ color: OBS.muted }}
+            >
+              {eyebrow}
+            </p>
+            <h2
+              className="mt-1 text-xl font-extrabold"
+              style={{ color: OBS.text, letterSpacing: 0 }}
+            >
+              {title}
+            </h2>
+          </div>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function StatusPill({ tone = "default", children }) {
+  const tones = {
+    default: { bg: OBS.surfaceHighest, color: OBS.subtle },
+    success: { bg: OBS.successBg, color: OBS.success },
+    warning: { bg: OBS.warningBg, color: OBS.warning },
+    danger: { bg: OBS.dangerBg, color: OBS.danger },
+    info: { bg: OBS.primarySoft, color: OBS.primary },
+  };
+  const t = tones[tone] ?? tones.default;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em]"
+      style={{ backgroundColor: t.bg, color: t.color }}
+    >
+      {children}
+    </span>
+  );
 }
 
 function ResultBox({ result }) {
@@ -38,12 +148,13 @@ function ResultBox({ result }) {
   const ok = result.success;
   return (
     <div
-      className={[
-        "border rounded-xl p-4",
-        ok
-          ? "bg-emerald-500/10 border-emerald-500/30"
-          : "bg-red-500/10 border-red-500/30",
-      ].join(" ")}
+      className="rounded-xl p-5"
+      style={{
+        backgroundColor: ok ? OBS.successBg : OBS.dangerBg,
+        boxShadow: ok
+          ? `inset 0 0 0 1px ${OBS.successBorder}`
+          : `inset 0 0 0 1px ${OBS.dangerBorder}`,
+      }}
     >
       <div className="flex items-start gap-3">
         {ok ? (
@@ -52,11 +163,16 @@ function ResultBox({ result }) {
           <AlertCircle className="text-red-400 mt-0.5" size={18} />
         )}
         <div className="flex-1">
-          <p className="text-sm font-semibold text-slate-100">
+          <p className="text-sm font-bold" style={{ color: OBS.text }}>
             {ok ? "Import succeeded" : "Import failed"}
           </p>
+          {result.detail && (
+            <p className="mt-1 text-xs" style={{ color: OBS.subtle }}>
+              {result.detail}
+            </p>
+          )}
           {ok && (
-            <p className="text-xs text-slate-300 mt-1">
+            <p className="text-xs mt-2" style={{ color: OBS.subtle }}>
               Rows inserted:{" "}
               <span className="font-semibold">
                 {result.rows_inserted ?? "—"}
@@ -255,341 +371,306 @@ function ETLConfigPanel({
   canStop,
   error,
 }) {
+  const launchLabel = isLaunching
+    ? "Starting..."
+    : isRunning
+      ? isStopping
+        ? "Stopping..."
+        : "Pipeline is running..."
+      : "Trigger Manual Run";
+
   return (
     <div
-      className="relative overflow-hidden"
+      className="overflow-hidden rounded-lg"
       style={{
-        background:
-          "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-bg-card)) 0%, var(--color-bg-card) 55%, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 100%)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "20px",
-        padding: "28px",
-        boxShadow: "var(--color-card-shadow)",
+        backgroundColor: OBS.surfaceHigh,
+        boxShadow: OBS.borderSoft,
       }}
     >
-      <div
-        className="pointer-events-none absolute -top-14 -right-10 h-44 w-44 rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 28%, transparent) 0%, transparent 70%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-16 -left-12 h-52 w-52 rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, color-mix(in srgb, var(--color-info) 24%, transparent) 0%, transparent 72%)",
-        }}
-      />
-      <p
-        className="relative mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-        style={{
-          borderColor: "var(--color-border)",
-          color: "var(--color-text-secondary)",
-          backgroundColor:
-            "color-mix(in srgb, var(--color-bg-elevated) 75%, transparent)",
-        }}
-      >
-        <Database size={14} />
-        Pipeline Orchestration
-      </p>
-      <div
-        className="relative"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          marginBottom: "24px",
-        }}
-      >
-        <div
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "10px",
-            backgroundColor: "var(--color-primary-bg)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-primary)"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <ellipse cx="12" cy="5" rx="9" ry="3" />
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-          </svg>
-        </div>
+      <div className="flex flex-col gap-5 p-6 md:flex-row md:items-center md:justify-between">
         <div>
-          <h3
-            style={{
-              color: "var(--color-text-primary)",
-              fontSize: "20px",
-              fontWeight: 700,
-              margin: 0,
-            }}
-          >
-            ETL Pipeline — Control
-          </h3>
           <p
-            style={{
-              color: "var(--color-text-muted)",
-              fontSize: "13px",
-              margin: 0,
-            }}
+            className="text-[10px] font-black uppercase tracking-[0.22em]"
+            style={{ color: OBS.muted }}
           >
-            Sync hawala_db → analytics_db
+            Current Task
           </p>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: "20px" }}>
-        <label
-          style={{
-            display: "block",
-            color: "var(--color-text-secondary)",
-            fontSize: "13px",
-            fontWeight: 500,
-            marginBottom: "10px",
-          }}
-        >
-          Execution mode
-        </label>
-        <div style={{ display: "flex", gap: "12px" }}>
-          {[
-            {
-              value: "demo",
-              label: "Demo Mode",
-              desc: "Stratified sample",
-              color: "var(--color-info)",
-              icon: (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-              ),
-            },
-            {
-              value: "prod",
-              label: "Production Mode",
-              desc: "Full dataset",
-              color: "var(--color-warning)",
-              icon: (
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                >
-                  <ellipse cx="12" cy="5" rx="9" ry="3" />
-                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                </svg>
-              ),
-            },
-          ].map((opt) => (
-            <div
-              key={opt.value}
-              onClick={() => setMode(opt.value)}
-              style={{
-                flex: 1,
-                padding: "14px 16px",
-                borderRadius: "10px",
-                cursor: "pointer",
-                border: `2px solid ${
-                  mode === opt.value ? opt.color : "var(--color-border)"
-                }`,
-                backgroundColor:
-                  mode === opt.value
-                    ? `color-mix(in srgb, ${opt.color} 10%, transparent)`
-                    : "var(--color-bg-elevated)",
-                transition: "all 0.15s ease",
-              }}
-            >
-              <div
-                style={{
-                  marginBottom: "8px",
-                  color:
-                    mode === opt.value ? opt.color : "var(--color-text-muted)",
-                  display: "flex",
-                  alignItems: "center",
-                }}
+          <h3
+            className="mt-2 text-xl font-black"
+            style={{ color: OBS.text, letterSpacing: 0 }}
+          >
+            {mode === "prod"
+              ? "Production Cluster - TN_S1"
+              : "Demo Validation Cluster"}
+          </h3>
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            <div>
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.14em]"
+                style={{ color: OBS.muted }}
               >
-                {opt.icon}
-              </div>
-
-              <div
-                style={{
-                  color:
-                    mode === opt.value
-                      ? opt.color
-                      : "var(--color-text-primary)",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
-              >
-                {opt.label}
-              </div>
-
-              <div
-                style={{
-                  color: "var(--color-text-muted)",
-                  fontSize: "12px",
-                }}
-              >
-                {opt.desc}
-              </div>
+                Source
+              </p>
+              <p className="font-mono text-xs" style={{ color: OBS.subtle }}>
+                hawala_db
+              </p>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {mode === "demo" && (
-        <div style={{ marginBottom: "20px" }}>
-          <label
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              color: "var(--color-text-secondary)",
-              fontSize: "13px",
-              fontWeight: 500,
-              marginBottom: "8px",
-            }}
-          >
-            <span>Number of users (demo)</span>
-            <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>
-              {demoUsers.toLocaleString("fr-FR")}
-            </span>
-          </label>
-          <input
-            type="range"
-            min={5000}
-            max={100000}
-            step={5000}
-            value={demoUsers}
-            onChange={(e) => setDemoUsers(Number(e.target.value))}
-            style={{ width: "100%", accentColor: "var(--color-primary)" }}
-          />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              color: "var(--color-text-disabled)",
-              fontSize: "11px",
-              marginTop: "4px",
-            }}
-          >
-            <span>5 000</span>
-            <span>50 000</span>
-            <span>100 000</span>
+            <div
+              className="h-7 w-px"
+              style={{ backgroundColor: OBS.divider }}
+            />
+            <div>
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.14em]"
+                style={{ color: OBS.muted }}
+              >
+                Target
+              </p>
+              <p className="font-mono text-xs" style={{ color: OBS.primary }}>
+                analytics_db
+              </p>
+            </div>
           </div>
         </div>
-      )}
 
-      <div
-        className="relative"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          marginBottom: "24px",
-          padding: "12px 14px",
-          backgroundColor: "var(--color-bg-elevated)",
-          borderRadius: "8px",
-          border: "1px solid var(--color-border)",
-        }}
-      >
-        <input
-          type="checkbox"
-          id="truncate-chk"
-          checked={truncate}
-          onChange={(e) => setTruncate(e.target.checked)}
-          disabled={dryRun}
+        <button
+          onClick={onLaunch}
+          disabled={isLaunching || isRunning}
+          className="inline-flex min-h-12 items-center justify-center gap-3 rounded-lg px-7 text-sm font-black uppercase tracking-[0.12em] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           style={{
-            width: "16px",
-            height: "16px",
-            accentColor: "var(--color-primary)",
-            cursor: "pointer",
-          }}
-        />
-        <label
-          htmlFor="truncate-chk"
-          style={{
-            cursor: dryRun ? "not-allowed" : "pointer",
-            color: "var(--color-text-secondary)",
-            fontSize: "13px",
-            opacity: dryRun ? 0.6 : 1,
+            background:
+              isLaunching || isRunning
+                ? OBS.surfaceHighest
+                : OBS.primaryGradient,
+            color: isLaunching || isRunning ? OBS.muted : OBS.ctaText,
+            boxShadow:
+              isLaunching || isRunning
+                ? "none"
+                : `0 0 24px ${OBS.primarySoft}`,
           }}
         >
-          Truncate analytics_db before import
-          <span
-            style={{
-              color: "var(--color-text-muted)",
-              fontSize: "12px",
-              marginLeft: "8px",
-            }}
+          {isLaunching ? (
+            <span
+              className="inline-block h-4 w-4 rounded-full"
+              style={{
+                border: `2px solid ${OBS.primaryBorder}`,
+                borderTopColor: OBS.ctaText,
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+          ) : (
+            <PlayCircle size={18} />
+          )}
+          {launchLabel}
+        </button>
+      </div>
+
+      <div className="grid gap-8 p-6 pt-0 lg:grid-cols-[minmax(220px,0.9fr)_minmax(300px,1.6fr)]">
+        <div className="space-y-4">
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.18em]"
+            style={{ color: OBS.muted }}
           >
-            {dryRun
-              ? "(disabled in dry-run)"
-              : "(recommended for a full reload)"}
-          </span>
-        </label>
+            Ingestion Strategy
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              {
+                value: "prod",
+                label: "Full",
+                desc: "Full dataset",
+                icon: Database,
+                tone: OBS.primaryStrong,
+              },
+              {
+                value: "demo",
+                label: "Demo",
+                desc: "Stratified sample",
+                icon: Settings,
+                tone: OBS.muted,
+              },
+            ].map((opt) => {
+              const StrategyIcon = opt.icon;
+              const active = mode === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setMode(opt.value)}
+                  className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-lg text-xs font-black uppercase tracking-[0.10em] transition"
+                  style={{
+                    backgroundColor: active
+                      ? OBS.primarySoft
+                      : OBS.panelFaint,
+                    color: active ? OBS.primary : OBS.muted,
+                    boxShadow: active
+                      ? `inset 0 0 0 1px ${OBS.primaryBorder}`
+                      : OBS.borderSoft,
+                  }}
+                >
+                  <StrategyIcon size={18} />
+                  <span>{opt.label}</span>
+                  <span
+                    className="normal-case tracking-normal"
+                    style={{ color: active ? OBS.subtle : OBS.muted }}
+                  >
+                    {opt.desc}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.18em]"
+            style={{ color: OBS.muted }}
+          >
+            Pipeline Visualization
+          </p>
+          <div
+            className="flex items-center rounded-lg p-5"
+            style={{ backgroundColor: OBS.panelFaint }}
+          >
+            {[
+              { label: "SFTP", icon: Download, done: true },
+              { label: "Transform", icon: Settings, done: mode === "demo" },
+              { label: "Database", icon: Database, done: !dryRun },
+            ].map((node, idx, arr) => {
+              const NodeIcon = node.icon;
+              return (
+                <div
+                  key={node.label}
+                  className="flex flex-1 items-center last:flex-none"
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div
+                      className="flex h-9 w-9 items-center justify-center rounded"
+                      style={{
+                        backgroundColor: node.done
+                          ? OBS.successBg
+                          : OBS.panelMuted,
+                        color: node.done ? OBS.success : OBS.muted,
+                        boxShadow: node.done
+                          ? `inset 0 0 0 1px ${OBS.successBorder}`
+                          : OBS.borderSoft,
+                      }}
+                    >
+                      <NodeIcon size={15} />
+                    </div>
+                    <span
+                      className="text-[9px] font-black uppercase tracking-[0.12em]"
+                      style={{ color: OBS.muted }}
+                    >
+                      {node.label}
+                    </span>
+                  </div>
+                  {idx < arr.length - 1 && (
+                    <div
+                      className="mx-3 h-px flex-1"
+                      style={{ backgroundColor: OBS.divider }}
+                    >
+                      <div
+                        className="h-px"
+                        style={{
+                          width: node.done ? "100%" : "40%",
+                          backgroundColor: node.done ? OBS.success : OBS.primary,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <div
-        className="relative"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          marginBottom: "24px",
-          padding: "12px 14px",
-          backgroundColor: "var(--color-info-bg)",
-          borderRadius: "8px",
-          border: "1px solid var(--color-info)",
-        }}
-      >
-        <input
-          type="checkbox"
-          id="dry-run-chk"
-          checked={dryRun}
-          onChange={(e) => setDryRun(e.target.checked)}
+      <div className="space-y-5 px-6 pb-6">
+        {mode === "demo" && (
+          <div>
+            <label
+              className="mb-3 flex justify-between text-xs font-bold"
+              style={{ color: OBS.text }}
+            >
+              <span>Number of users (demo)</span>
+              <span style={{ color: OBS.primaryStrong }}>
+                {demoUsers.toLocaleString("fr-FR")}
+              </span>
+            </label>
+            <input
+              type="range"
+              min={5000}
+              max={100000}
+              step={5000}
+              value={demoUsers}
+              onChange={(e) => setDemoUsers(Number(e.target.value))}
+              className="w-full"
+              style={{ accentColor: OBS.primaryStrong }}
+            />
+            <div
+              className="mt-2 flex justify-between text-[11px]"
+              style={{ color: OBS.muted }}
+            >
+              <span>5 000</span>
+              <span>50 000</span>
+              <span>100 000</span>
+            </div>
+          </div>
+        )}
+
+        <div
+          className="flex items-center gap-3 rounded-lg px-4 py-3"
           style={{
-            width: "16px",
-            height: "16px",
-            accentColor: "var(--color-primary)",
-            cursor: "pointer",
-          }}
-        />
-        <label
-          htmlFor="dry-run-chk"
-          style={{
-            cursor: "pointer",
-            color: "var(--color-text-secondary)",
-            fontSize: "13px",
+            backgroundColor: dryRun
+              ? OBS.panelMuted
+              : OBS.panelFaint,
+            color: dryRun ? OBS.muted : OBS.subtle,
           }}
         >
-          Test mode (dry-run): no write into analytics_db
-        </label>
-      </div>
+          <input
+            type="checkbox"
+            id="truncate-chk"
+            checked={truncate}
+            onChange={(e) => setTruncate(e.target.checked)}
+            disabled={dryRun}
+            style={{ accentColor: OBS.primaryStrong }}
+          />
+          <label
+            htmlFor="truncate-chk"
+            className="cursor-pointer text-sm font-semibold"
+            style={{ cursor: dryRun ? "not-allowed" : "pointer" }}
+          >
+            Truncate analytics_db before import{" "}
+            <span className="ml-1 text-xs">
+              {dryRun ? "(disabled in dry-run)" : "(full reload)"}
+            </span>
+          </label>
+        </div>
+
+        <div
+          className="flex items-center gap-3 rounded-lg px-4 py-3"
+          style={{
+            backgroundColor: OBS.primarySoft,
+            color: OBS.text,
+            boxShadow: `inset 0 0 0 1px ${OBS.primaryBorder}`,
+          }}
+        >
+          <input
+            type="checkbox"
+            id="dry-run-chk"
+            checked={dryRun}
+            onChange={(e) => setDryRun(e.target.checked)}
+            style={{ accentColor: OBS.primaryStrong }}
+          />
+          <label
+            htmlFor="dry-run-chk"
+            className="cursor-pointer text-sm font-bold"
+          >
+            Test mode (dry-run): no write into analytics_db
+          </label>
+        </div>
 
       {error && (
         <div
@@ -606,52 +687,6 @@ function ETLConfigPanel({
           {error}
         </div>
       )}
-
-      <button
-        onClick={onLaunch}
-        disabled={isLaunching || isRunning}
-        style={{
-          width: "100%",
-          padding: "14px",
-          borderRadius: "10px",
-          border: "none",
-          cursor: isLaunching || isRunning ? "not-allowed" : "pointer",
-          backgroundColor:
-            isLaunching || isRunning
-              ? "var(--color-border)"
-              : "var(--color-primary)",
-          color:
-            isLaunching || isRunning ? "var(--color-text-disabled)" : "#ffffff",
-          fontSize: "15px",
-          fontWeight: 600,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "10px",
-          transition: "all 0.15s ease",
-        }}
-      >
-        {isLaunching ? (
-          <>
-            <span
-              style={{
-                display: "inline-block",
-                width: "16px",
-                height: "16px",
-                border: "2px solid #ffffff40",
-                borderTopColor: "#ffffff",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
-            Starting...
-          </>
-        ) : isRunning ? (
-          <>{isStopping ? "Stopping..." : "Pipeline is running..."}</>
-        ) : (
-          <>Run ETL pipeline</>
-        )}
-      </button>
 
       {canStop && (
         <button
@@ -675,18 +710,20 @@ function ETLConfigPanel({
           {isStopping ? "Stopping..." : "Stop ETL pipeline"}
         </button>
       )}
+      </div>
     </div>
   );
 }
 
 function ETLProgressPanel({ run, ETL_STEPS }) {
-  if (!run) return null;
-  const isRunning = run.status === "running";
-  const isSuccess = run.status === "success";
-  const isFailed = run.status === "failed";
-  const isStopping = run.status === "stopping";
-  const isStopped = run.status === "stopped";
+  const isRunning = run?.status === "running";
+  const isSuccess = run?.status === "success";
+  const isFailed = run?.status === "failed";
+  const isStopping = run?.status === "stopping";
+  const isStopped = run?.status === "stopped";
   const isActive = isRunning || isStopping;
+  const currentStep = run?.current_step ?? ETL_STEPS[0]?.key;
+  const progress = run?.progress_pct ?? 0;
 
   const formatDuration = (sec) => {
     if (!sec) return "0s";
@@ -695,14 +732,14 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
   };
 
   const statusColor = isSuccess
-    ? "var(--color-success)"
-    : isFailed
-      ? "var(--color-danger)"
-      : isStopped
-        ? "var(--color-danger)"
-        : isStopping
-          ? "var(--color-warning)"
-          : "var(--color-primary)";
+    ? OBS.success
+    : isFailed || isStopped
+      ? OBS.danger
+      : isStopping
+        ? OBS.warning
+        : isRunning
+          ? OBS.primaryStrong
+          : OBS.muted;
 
   const iconByStep = {
     settings: Settings,
@@ -715,256 +752,164 @@ function ETLProgressPanel({ run, ETL_STEPS }) {
     smartphone: Smartphone,
     target: Target,
   };
-  const stepLabelMap = Object.fromEntries(
-    ETL_STEPS.map((step) => [step.key, step.label]),
-  );
 
   return (
     <div
+      className="rounded-lg p-6"
       style={{
-        backgroundColor: "var(--color-bg-card)",
-        border: `1px solid ${statusColor}`,
-        borderRadius: "12px",
-        padding: "28px",
+        backgroundColor: OBS.surfaceHigh,
+        boxShadow: OBS.borderSoft,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "20px",
-        }}
-      >
+      <div className="mb-7 flex items-start justify-between gap-4">
         <div>
           <h3
-            style={{
-              color: "var(--color-text-primary)",
-              fontSize: "16px",
-              fontWeight: 600,
-              margin: 0,
-            }}
+            className="text-sm font-black uppercase tracking-[0.16em]"
+            style={{ color: OBS.subtle, letterSpacing: "0.16em" }}
           >
-            {isRunning && "Pipeline in progress..."}
-            {isStopping && "Stopping pipeline..."}
-            {isSuccess && "Pipeline completed successfully"}
-            {isFailed && "Pipeline failed"}
-            {isStopped && "Pipeline stopped"}
+            Detailed Status
           </h3>
-          <p
-            style={{
-              color: "var(--color-text-muted)",
-              fontSize: "13px",
-              margin: "4px 0 0 0",
-            }}
-          >
-            Mode{" "}
-            {run.mode === "demo"
-              ? `demo (${(run.demo_users || 50000).toLocaleString("en-US")} users)`
-              : "full production"}{" "}
-            {" · "}
-            {run.dry_run ? "dry-run (safe)" : "write enabled"} {" · "}Duration:{" "}
-            {formatDuration(run.duration_sec)}
+          <p className="mt-2 text-xs" style={{ color: OBS.muted }}>
+            {run?.log_id ? `JOB_ID: ${run.log_id.slice(0, 8)}` : "JOB_ID: idle"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: "16px" }}>
-          {[
-            {
-              label: "Inserted rows",
-              value: (run.rows_inserted || 0).toLocaleString("en-US"),
-              color: "var(--color-success)",
-            },
-            {
-              label: "Skipped rows",
-              value: (run.rows_skipped || 0).toLocaleString("en-US"),
-              color: "var(--color-text-muted)",
-            },
-          ].map((stat) => (
-            <div key={stat.label} style={{ textAlign: "right" }}>
-              <div
-                style={{ color: stat.color, fontSize: "18px", fontWeight: 700 }}
-              >
-                {stat.value}
-              </div>
-              <div
-                style={{ color: "var(--color-text-muted)", fontSize: "11px" }}
-              >
-                {stat.label}
-              </div>
-            </div>
-          ))}
-        </div>
+        <StatusPill tone={isRunning ? "info" : isSuccess ? "success" : isFailed ? "danger" : "default"}>
+          {run?.status ?? "Idle"}
+        </StatusPill>
       </div>
 
-      <div style={{ marginBottom: "24px" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: "6px",
-          }}
-        >
-          <span
-            style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        {[
+          {
+            label: "Inserted",
+            value: (run?.rows_inserted || 0).toLocaleString("en-US"),
+            color: OBS.success,
+          },
+          {
+            label: "Duration",
+            value: formatDuration(run?.duration_sec),
+            color: OBS.subtle,
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-lg p-3"
+            style={{ backgroundColor: OBS.panelFaint }}
           >
-            {isRunning
-              ? `Step ${run.current_step_num} / ${run.total_steps} — ${stepLabelMap[run.current_step] || run.current_step_label || ""}`
-              : isStopping
-                ? `Stopping at step ${run.current_step_num}`
-                : isSuccess
-                  ? "All steps completed"
-                  : isStopped
-                    ? "Pipeline stopped"
-                    : `Failed at step ${run.current_step_num}`}
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.14em]"
+              style={{ color: OBS.muted }}
+            >
+              {stat.label}
+            </p>
+            <p className="mt-1 text-sm font-black" style={{ color: stat.color }}>
+              {stat.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-7">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold">
+          <span style={{ color: OBS.subtle }}>
+            {run
+              ? `Step ${run.current_step_num ?? 1} / ${run.total_steps ?? ETL_STEPS.length}`
+              : "Waiting for next run"}
           </span>
-          <span
-            style={{ color: statusColor, fontSize: "13px", fontWeight: 600 }}
-          >
-            {run.progress_pct}%
-          </span>
+          <span style={{ color: statusColor }}>{progress}%</span>
         </div>
         <div
-          style={{
-            height: "10px",
-            borderRadius: "5px",
-            backgroundColor: "var(--color-bg-elevated)",
-            overflow: "hidden",
-          }}
+          className="h-1.5 overflow-hidden rounded-full"
+          style={{ backgroundColor: OBS.panelMuted }}
         >
           <div
+            className="h-full rounded-full transition-all"
             style={{
-              height: "100%",
-              width: `${run.progress_pct}%`,
+              width: `${progress}%`,
               backgroundColor: statusColor,
-              borderRadius: "5px",
-              transition: "width 0.5s ease",
             }}
           />
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <div className="import-step-rail relative space-y-5 before:absolute before:left-3 before:top-3 before:bottom-3 before:w-px">
         {ETL_STEPS.map((step, idx) => {
-          const isDone = (run.steps_done || []).includes(step.key);
-          const isCurr = isActive && run.current_step === step.key;
-          let dotColor = "var(--color-text-disabled)";
-          let textColor = "var(--color-text-disabled)";
-          if (isDone) {
-            dotColor = "var(--color-success)";
-            textColor = "var(--color-text-secondary)";
-          }
-          if (isCurr) {
-            dotColor = isStopping
-              ? "var(--color-warning)"
-              : "var(--color-primary)";
-            textColor = "var(--color-text-primary)";
-          }
-          if (isFailed && isCurr) dotColor = "var(--color-danger)";
+          const isDone = !!run && (run.steps_done || []).includes(step.key);
+          const isCurr = !!run && isActive && currentStep === step.key;
+          const isFailedHere = isFailed && currentStep === step.key;
+          const StepIcon = iconByStep[step.icon] ?? Database;
+          const dotColor = isDone
+            ? OBS.success
+            : isFailedHere
+              ? OBS.danger
+              : isCurr
+                ? OBS.primaryStrong
+                : OBS.muted;
 
           return (
-            <div
-              key={step.key}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                padding: "8px 12px",
-                borderRadius: "8px",
-                backgroundColor: isCurr
-                  ? "var(--color-primary-bg)"
-                  : "transparent",
-              }}
-            >
+            <div key={step.key} className="relative flex gap-4 pl-10">
               <div
+                className="absolute left-0 top-0 z-10 flex h-6 w-6 items-center justify-center rounded-full"
                 style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "13px",
-                  flexShrink: 0,
                   backgroundColor: isDone
-                    ? "var(--color-success-bg)"
+                    ? OBS.successBg
                     : isCurr
-                      ? "var(--color-primary-bg)"
-                      : "var(--color-bg-elevated)",
-                  border: `1px solid ${dotColor}`,
+                      ? OBS.primarySoft
+                      : OBS.panelMuted,
                   color: dotColor,
+                  boxShadow: isDone || isCurr || isFailedHere
+                    ? `inset 0 0 0 1px ${dotColor}`
+                    : OBS.borderSoft,
                 }}
               >
-                {isDone
-                  ? "✓"
-                  : (() => {
-                      const Icon = iconByStep[step.icon];
-                      if (!Icon) return isCurr ? "..." : idx + 1;
-                      return <Icon size={14} />;
-                    })()}
+                {isDone ? <CheckCircle2 size={13} /> : <StepIcon size={12} />}
               </div>
-              <span
-                style={{
-                  color: textColor,
-                  fontSize: "13px",
-                  fontWeight: isCurr ? 500 : 400,
-                }}
-              >
-                {step.label}
-              </span>
-              {isDone && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    color: "var(--color-success)",
-                    fontSize: "11px",
-                  }}
-                >
-                  Done
-                </span>
-              )}
-              {isCurr && isRunning && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    color: "var(--color-primary)",
-                    fontSize: "11px",
-                    animation: "pulse 1.5s infinite",
-                  }}
-                >
-                  Running...
-                </span>
-              )}
-              {isCurr && isStopping && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    color: "var(--color-warning)",
-                    fontSize: "11px",
-                  }}
-                >
-                  Stopping...
-                </span>
-              )}
+              <div className={isCurr ? "" : !run && idx > 1 ? "opacity-45" : ""}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p
+                    className="text-sm font-bold"
+                    style={{
+                      color: isCurr ? OBS.primary : isDone ? OBS.text : OBS.subtle,
+                    }}
+                  >
+                    {step.label}
+                  </p>
+                  {isCurr && (
+                    <span
+                      className="text-[10px] font-black uppercase tracking-[0.12em]"
+                      style={{ color: statusColor }}
+                    >
+                      {isStopping ? "Stopping" : "Running"}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs" style={{ color: OBS.muted }}>
+                  {isDone
+                    ? "Completed"
+                    : isCurr
+                      ? "Normalizing and loading this stage..."
+                      : run
+                        ? "Pending"
+                        : idx === 0
+                          ? "Ready to extract"
+                          : "Awaiting pipeline trigger"}
+                </p>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {isFailed && run.error && (
-        <div
+      {isFailed && run?.error && (
+        <pre
+          className="mt-5 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg p-3 text-xs"
           style={{
-            marginTop: "16px",
-            padding: "12px 14px",
-            borderRadius: "8px",
-            backgroundColor: "var(--color-danger-bg)",
-            border: "1px solid var(--color-danger)",
-            color: "var(--color-danger)",
-            fontSize: "12px",
-            fontFamily: "monospace",
+            backgroundColor: OBS.dangerBg,
+            color: OBS.danger,
           }}
         >
           {run.error}
-        </div>
+        </pre>
       )}
     </div>
   );
@@ -1005,9 +950,9 @@ function ETLLiveLogPanel({ log, isRunning }) {
       <pre
         className="text-xs rounded-xl p-4 max-h-[320px] overflow-auto whitespace-pre-wrap"
         style={{
-          backgroundColor: "#020617",
+          backgroundColor: OBS.codeBg,
           border: "1px solid var(--color-border)",
-          color: "#cbd5e1",
+          color: OBS.codeText,
         }}
       >
         {log || "No runtime logs yet. Start an ETL run to stream logs here."}
@@ -1153,6 +1098,7 @@ function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
             gap: "6px",
           }}
         >
+          <RefreshCw size={14} />
           {loading ? "Refreshing..." : "Refresh"}
         </button>
       </div>
@@ -1622,37 +1568,120 @@ export default function ImportDataPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div style={{ marginBottom: "32px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: activeRun ? "1fr 1fr" : "1fr",
-            gap: "24px",
-            marginBottom: "24px",
-          }}
+    <div
+      className="import-observatory min-h-full rounded-2xl p-4 md:p-6"
+      style={{
+        background: OBS.pageGradient,
+      }}
+    >
+      <div className="mx-auto max-w-[1600px] space-y-10">
+        <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div
+              className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em]"
+              style={{
+                backgroundColor: OBS.primarySoft,
+                color: OBS.primary,
+              }}
+            >
+              <Database size={14} />
+              Infrastructure Control
+            </div>
+            <h1
+              className="max-w-3xl text-3xl font-black md:text-4xl"
+              style={{ color: OBS.text, letterSpacing: 0 }}
+            >
+              Import Data Control Center
+            </h1>
+            <p
+              className="mt-3 max-w-3xl text-sm md:text-base"
+              style={{ color: OBS.subtle }}
+            >
+              Monitor automated ETL pipelines and validate manual telecom data
+              uploads from a dense, safe administration workspace.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[520px]">
+            {[
+              {
+                label: "Default safety",
+                value: dryRun ? "Dry-run" : "Writes on",
+                tone: dryRun ? "success" : "warning",
+                icon: ShieldCheck,
+              },
+              {
+                label: "Active stream",
+                value: isStreaming ? "Running" : "Idle",
+                tone: isStreaming ? "info" : "default",
+                icon: Activity,
+              },
+              {
+                label: "ETL steps",
+                value: String(ETL_STEPS.length),
+                tone: "default",
+                icon: Layers,
+              },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div
+                  key={item.label}
+                  className="rounded-xl p-4"
+                  style={{
+                    backgroundColor: OBS.surfaceLow,
+                    boxShadow: OBS.borderSoft,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                      style={{ color: OBS.muted }}
+                    >
+                      {item.label}
+                    </p>
+                    <Icon size={16} style={{ color: OBS.primary }} />
+                  </div>
+                  <div className="mt-3">
+                    <StatusPill tone={item.tone}>{item.value}</StatusPill>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </header>
+
+        <SectionShell
+          eyebrow="Automated ETL"
+          title="Pipeline Orchestration"
+          icon={Database}
+          action={
+            <StatusPill tone={dryRun ? "success" : "warning"}>
+              {dryRun ? "No DB write by default" : "Write mode visible"}
+            </StatusPill>
+          }
         >
-          <ETLConfigPanel
-            mode={etlMode}
-            setMode={setEtlMode}
-            demoUsers={demoUsers}
-            setDemoUsers={setDemoUsers}
-            truncate={truncate}
-            setTruncate={setTruncate}
-            dryRun={dryRun}
-            setDryRun={setDryRun}
-            onLaunch={launchETL}
-            onStop={stopETL}
-            isLaunching={isLaunching}
-            isRunning={isStreaming}
-            isStopping={isStopping || isRunStopping}
-            canStop={!!activeRun && isStreaming}
-            error={etlError}
-          />
-          {activeRun && (
+          <div>
+            <div className="mb-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+              <ETLConfigPanel
+                mode={etlMode}
+                setMode={setEtlMode}
+                demoUsers={demoUsers}
+                setDemoUsers={setDemoUsers}
+                truncate={truncate}
+                setTruncate={setTruncate}
+                dryRun={dryRun}
+                setDryRun={setDryRun}
+                onLaunch={launchETL}
+                onStop={stopETL}
+                isLaunching={isLaunching}
+                isRunning={isStreaming}
+                isStopping={isStopping || isRunStopping}
+                canStop={!!activeRun && isStreaming}
+                error={etlError}
+              />
             <ETLProgressPanel run={activeRun} ETL_STEPS={ETL_STEPS} />
-          )}
-        </div>
+            </div>
 
         {activeRun && (
           <div style={{ marginBottom: "24px" }}>
@@ -1667,56 +1696,45 @@ export default function ImportDataPage() {
           onViewLog={handleViewEtlLog}
         />
       </div>
+        </SectionShell>
 
       <div
-        className="relative overflow-hidden rounded-3xl border p-6 md:p-8"
+        className="rounded-xl p-6 md:p-7"
         style={{
-          borderColor: "var(--color-border)",
-          background:
-            "linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, var(--color-bg-card)) 0%, var(--color-bg-card) 55%, color-mix(in srgb, var(--color-info) 12%, var(--color-bg-card)) 100%)",
-          boxShadow: "var(--color-card-shadow)",
+          backgroundColor: OBS.surfaceLow,
+          boxShadow: OBS.borderSoft,
         }}
       >
-        <div
-          className="pointer-events-none absolute -top-14 -right-10 h-44 w-44 rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, color-mix(in srgb, var(--color-primary) 28%, transparent) 0%, transparent 70%)",
-          }}
-        />
         <p
-          className="relative mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
+          className="mb-2 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em]"
           style={{
-            borderColor: "var(--color-border)",
-            color: "var(--color-text-secondary)",
-            backgroundColor:
-              "color-mix(in srgb, var(--color-bg-elevated) 75%, transparent)",
+            color: OBS.primary,
           }}
         >
-          <Database size={14} />
-          Administration Pipeline & Imports
+          <FileUp size={14} />
+          Manual Data Entry
         </p>
         <h1
-          className="relative text-3xl font-bold tracking-tight md:text-4xl"
-          style={{ color: "var(--color-text-primary)" }}
+          className="text-2xl font-extrabold"
+          style={{ color: OBS.text, letterSpacing: 0 }}
         >
-          Import Data Control Center
+          Controlled CSV and SQL uploads
         </h1>
         <p
-          className="relative mt-2 max-w-3xl text-sm md:text-base"
-          style={{ color: "var(--color-text-muted)" }}
+          className="mt-2 max-w-3xl text-sm"
+          style={{ color: OBS.subtle }}
         >
-          Manage CSV/SQL imports and ETL pipeline control from one unified
-          interface. All actions are logged and restricted to administrators.
+          Select the file type, inspect schema requirements, preview local data,
+          then validate before any import confirmation flow.
         </p>
       </div>
 
       {/* Tabs */}
       <div
-        className="inline-flex gap-2 rounded-2xl border p-1.5"
+        className="inline-flex gap-1 rounded-lg p-1"
         style={{
-          borderColor: "var(--color-border)",
-          backgroundColor: "var(--color-bg-card)",
+          backgroundColor: OBS.surfaceLowest,
+          boxShadow: OBS.borderSoft,
         }}
       >
         <button
@@ -1726,22 +1744,21 @@ export default function ImportDataPage() {
             resetStateForNewFile();
           }}
           className={[
-            "px-4 py-2 rounded-xl text-sm font-semibold border transition",
+            "inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition",
           ].join(" ")}
           style={
             activeTab === "csv"
               ? {
-                  backgroundColor: "var(--color-primary)",
-                  color: "#fff",
-                  borderColor: "var(--color-primary)",
+                  background: OBS.primaryGradient,
+                  color: OBS.ctaText,
                 }
               : {
-                  backgroundColor: "var(--color-bg-elevated)",
-                  color: "var(--color-text-secondary)",
-                  borderColor: "var(--color-border)",
+                  backgroundColor: "transparent",
+                  color: OBS.subtle,
                 }
           }
         >
+          <Table2 size={16} />
           CSV Import
         </button>
         <button
@@ -1751,33 +1768,31 @@ export default function ImportDataPage() {
             resetStateForNewFile();
           }}
           className={[
-            "px-4 py-2 rounded-xl text-sm font-semibold border transition",
+            "inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold transition",
           ].join(" ")}
           style={
             activeTab === "sql"
               ? {
-                  backgroundColor: "var(--color-primary)",
-                  color: "#fff",
-                  borderColor: "var(--color-primary)",
+                  background: OBS.primaryGradient,
+                  color: OBS.ctaText,
                 }
               : {
-                  backgroundColor: "var(--color-bg-elevated)",
-                  color: "var(--color-text-secondary)",
-                  borderColor: "var(--color-border)",
+                  backgroundColor: "transparent",
+                  color: OBS.subtle,
                 }
           }
         >
+          <Terminal size={16} />
           SQL Import
         </button>
       </div>
 
       {/* Main card */}
       <div
-        className="rounded-3xl border p-6 space-y-6"
+        className="rounded-xl p-6 space-y-6"
         style={{
-          backgroundColor: "var(--color-bg-card)",
-          borderColor: "var(--color-border)",
-          boxShadow: "var(--color-card-shadow)",
+          backgroundColor: OBS.surfaceHigh,
+          boxShadow: OBS.borderSoft,
         }}
       >
         {activeTab === "csv" ? (
@@ -1785,8 +1800,8 @@ export default function ImportDataPage() {
             {/* Table select */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Database size={16} className="text-slate-400" /> Target
+                <p className="text-sm font-bold flex items-center gap-2" style={{ color: OBS.text }}>
+                  <Database size={16} style={{ color: OBS.primary }} /> Target
                   table
                 </p>
                 <div className="group relative">
@@ -1893,19 +1908,15 @@ export default function ImportDataPage() {
                 <select
                   value={targetTable}
                   onChange={(e) => setTargetTable(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-200 focus:outline-none focus:border-violet-500"
+                  className="px-4 py-3 rounded-lg text-sm font-semibold focus:outline-none"
+                  style={{
+                    backgroundColor: OBS.surfaceLowest,
+                    color: OBS.text,
+                    border: "0",
+                    boxShadow: `inset 0 -2px 0 ${OBS.primaryBorder}`,
+                  }}
                 >
-                  {[
-                    "service_types",
-                    "services",
-                    "users",
-                    "campaigns",
-                    "subscriptions",
-                    "billing_events",
-                    "unsubscriptions",
-                    "sms_events",
-                    "user_activities",
-                  ].map((t) => (
+                  {TABLE_OPTIONS.map((t) => (
                     <option key={t} value={t}>
                       {t}
                     </option>
@@ -1913,8 +1924,12 @@ export default function ImportDataPage() {
                 </select>
                 <button
                   onClick={() => downloadTemplate(targetTable)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700/60"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-bold"
                   type="button"
+                  style={{
+                    backgroundColor: OBS.surfaceHighest,
+                    color: OBS.subtle,
+                  }}
                 >
                   <Download size={16} /> Template
                 </button>
@@ -1923,11 +1938,22 @@ export default function ImportDataPage() {
 
             {/* Mode */}
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                <Upload size={16} className="text-slate-400" /> Import mode
+              <p className="text-sm font-bold flex items-center gap-2" style={{ color: OBS.text }}>
+                <Upload size={16} style={{ color: OBS.primary }} /> Import mode
               </p>
-              <div className="flex items-center gap-6 text-sm text-slate-300">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="grid gap-3 text-sm md:grid-cols-3">
+                <label
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3"
+                  style={{
+                    backgroundColor:
+                      mode === "append" ? OBS.primarySoft : OBS.surface,
+                    color: mode === "append" ? OBS.primary : OBS.subtle,
+                    boxShadow:
+                      mode === "append"
+                        ? `inset 0 0 0 1px ${OBS.primaryBorder}`
+                        : OBS.borderSoft,
+                  }}
+                >
                   <input
                     type="radio"
                     name="mode"
@@ -1936,7 +1962,18 @@ export default function ImportDataPage() {
                   />
                   Append
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3"
+                  style={{
+                    backgroundColor:
+                      mode === "replace" ? OBS.warningBg : OBS.surface,
+                    color: mode === "replace" ? OBS.warning : OBS.subtle,
+                    boxShadow:
+                      mode === "replace"
+                        ? `inset 0 0 0 1px ${OBS.warningBorder}`
+                        : OBS.borderSoft,
+                  }}
+                >
                   <input
                     type="radio"
                     name="mode"
@@ -1945,7 +1982,18 @@ export default function ImportDataPage() {
                   />
                   Replace
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label
+                  className="flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3"
+                  style={{
+                    backgroundColor:
+                      mode === "demo" ? OBS.successBg : OBS.surface,
+                    color: mode === "demo" ? OBS.success : OBS.subtle,
+                    boxShadow:
+                      mode === "demo"
+                        ? `inset 0 0 0 1px ${OBS.successBorder}`
+                        : OBS.borderSoft,
+                  }}
+                >
                   <input
                     type="radio"
                     name="mode"
@@ -1956,18 +2004,18 @@ export default function ImportDataPage() {
                 </label>
               </div>
               {mode === "demo" && (
-                <p className="text-xs text-amber-300">
-                  Demo mode: validation only.
+                <p className="text-xs font-semibold text-emerald-300">
+                  Demo mode: validation only, no business table write.
                 </p>
               )}
             </div>
           </>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-              <FileText size={16} className="text-slate-400" /> SQL file
+            <p className="text-sm font-bold flex items-center gap-2" style={{ color: OBS.text }}>
+              <FileText size={16} style={{ color: OBS.primary }} /> SQL file
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs" style={{ color: OBS.subtle }}>
               Only INSERT/COPY allowed.
               DROP/DELETE/TRUNCATE/ALTER/CREATE/UPDATE will be rejected.
             </p>
@@ -1979,47 +2027,44 @@ export default function ImportDataPage() {
           onDrop={onDrop}
           onDragOver={(e) => e.preventDefault()}
           onClick={() => inputRef.current?.click()}
-          className="border-dashed border-2 rounded-2xl p-6 transition cursor-pointer"
+          className="rounded-xl p-8 transition cursor-pointer"
           style={{
-            borderColor:
-              "color-mix(in srgb, var(--color-primary) 40%, var(--color-border))",
-            background:
-              "linear-gradient(180deg, color-mix(in srgb, var(--color-primary-bg) 60%, transparent) 0%, color-mix(in srgb, var(--color-bg-elevated) 55%, transparent) 100%)",
+            backgroundColor: OBS.surfaceLow,
+            boxShadow:
+              `inset 0 0 0 2px ${OBS.primaryBorder}, inset 0 -80px 120px ${OBS.primarySoft}`,
           }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center">
             <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl border"
+              className="flex h-14 w-14 items-center justify-center rounded-full"
               style={{
-                borderColor: "var(--color-border)",
-                backgroundColor: "var(--color-bg-elevated)",
-                color: "var(--color-primary)",
+                backgroundColor: OBS.primarySoft,
+                color: OBS.primary,
               }}
             >
-              <Upload size={18} />
+              <Upload size={24} />
             </div>
             <div className="flex-1">
               <p
-                className="text-sm font-semibold"
-                style={{ color: "var(--color-text-primary)" }}
+                className="text-lg font-extrabold"
+                style={{ color: OBS.text, letterSpacing: 0 }}
               >
                 Drag and drop your {activeTab === "csv" ? "CSV" : "SQL"} file
                 here
               </p>
               <p
-                className="text-xs"
-                style={{ color: "var(--color-text-muted)" }}
+                className="mt-1 text-sm"
+                style={{ color: OBS.subtle }}
               >
                 or click to select (max {maxMb}MB)
               </p>
             </div>
             {file && (
               <span
-                className="text-xs px-2 py-1 rounded-lg"
+                className="max-w-full truncate rounded-lg px-3 py-2 text-xs font-semibold md:max-w-[360px]"
                 style={{
-                  color: "var(--color-text-secondary)",
-                  backgroundColor: "var(--color-bg-elevated)",
-                  border: "1px solid var(--color-border)",
+                  color: OBS.subtle,
+                  backgroundColor: OBS.surfaceHighest,
                 }}
               >
                 {file.name} ({bytesToMb(file.size)}MB)
@@ -2039,29 +2084,46 @@ export default function ImportDataPage() {
         {/* Preview */}
         {activeTab === "csv" && columns.length > 0 && (
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-200">
+            <p className="text-sm font-bold" style={{ color: OBS.text }}>
               Preview (first 5 rows)
             </p>
-            <div className="border border-slate-800 rounded-xl overflow-hidden">
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{
+                backgroundColor: OBS.surfaceLow,
+                boxShadow: OBS.borderSoft,
+              }}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-slate-800 border-b border-slate-700">
+                  <thead style={{ backgroundColor: OBS.surfaceHighest }}>
                     <tr>
                       {columns.map((c) => (
                         <th
                           key={c}
-                          className="px-4 py-2 text-left text-slate-300 font-semibold"
+                          className="px-4 py-3 text-left font-bold uppercase tracking-[0.12em]"
+                          style={{ color: OBS.muted }}
                         >
                           {c}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody>
                     {preview.map((r, idx) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
+                      <tr
+                        key={idx}
+                        style={{
+                          backgroundColor:
+                            idx % 2 ? OBS.rowStripe : "transparent",
+                        }}
+                      >
                         {columns.map((_, i) => (
-                          <td key={i} className="px-4 py-2 text-slate-300">
+                          <td
+                            key={i}
+                            className="px-4 py-3"
+                            style={{ color: OBS.subtle }}
+                          >
                             {r[i] ?? ""}
                           </td>
                         ))}
@@ -2077,12 +2139,11 @@ export default function ImportDataPage() {
         <button
           disabled={!canSubmit || loading}
           onClick={handleSubmit}
-          className="w-full px-4 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="w-full rounded-lg px-4 py-4 text-sm font-black uppercase tracking-[0.14em] disabled:opacity-50 disabled:cursor-not-allowed transition"
           style={{
-            background:
-              "linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 75%, var(--color-info)) 100%)",
-            boxShadow:
-              "0 10px 30px color-mix(in srgb, var(--color-primary) 30%, transparent)",
+            background: OBS.primaryGradient,
+            color: OBS.ctaText,
+            boxShadow: `0 0 32px ${OBS.primarySoft}`,
           }}
         >
           {loading
@@ -2106,27 +2167,34 @@ export default function ImportDataPage() {
 
       {/* History */}
       <div
-        className="rounded-2xl border p-6 space-y-3"
+        className="rounded-xl p-6 space-y-4"
         style={{
-          backgroundColor: "var(--color-bg-card)",
-          borderColor: "var(--color-border)",
-          boxShadow: "var(--color-card-shadow)",
+          backgroundColor: OBS.surfaceHigh,
+          boxShadow: OBS.borderSoft,
         }}
       >
-        <h3
-          className="text-sm font-semibold"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          Import history
-        </h3>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p
+              className="text-[11px] font-bold uppercase tracking-[0.20em]"
+              style={{ color: OBS.muted }}
+            >
+              Manual Activity
+            </p>
+            <h3 className="mt-1 text-lg font-extrabold" style={{ color: OBS.text, letterSpacing: 0 }}>
+              Import History
+            </h3>
+          </div>
+          <StatusPill tone="default">{history?.length ?? 0} rows</StatusPill>
+        </div>
         {historyLoading && (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-xs" style={{ color: OBS.subtle }}>
             Loading…
           </p>
         )}
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead className="bg-slate-800 border-b border-slate-700">
+            <thead style={{ backgroundColor: OBS.surfaceHighest }}>
               <tr>
                 {[
                   "Date",
@@ -2142,40 +2210,47 @@ export default function ImportDataPage() {
                 ].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-2 text-left text-slate-300 font-semibold"
+                    className="px-4 py-3 text-left font-bold uppercase tracking-[0.14em]"
+                    style={{ color: OBS.muted }}
                   >
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
-              {(history ?? []).map((h) => (
-                <tr key={h.id} className="hover:bg-slate-800/30">
-                  <td className="px-4 py-2 text-slate-300">
+            <tbody>
+              {(history ?? []).map((h, idx) => (
+                <tr
+                  key={h.id}
+                  style={{
+                    backgroundColor:
+                      idx % 2 ? OBS.rowStripe : "transparent",
+                  }}
+                >
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.imported_at
                       ? new Date(h.imported_at).toLocaleString("fr-FR")
                       : "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.admin_name ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.file_name ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.file_type ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.scope ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.target_table ?? h.table ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {h.mode ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-slate-300">
+                  <td className="px-4 py-3" style={{ color: OBS.subtle }}>
                     {(h.rows_inserted ?? 0).toLocaleString()} /{" "}
                     {(h.rows_skipped ?? 0).toLocaleString()}
                   </td>
@@ -2197,7 +2272,11 @@ export default function ImportDataPage() {
                     <button
                       type="button"
                       onClick={() => openImportLogDetails(h)}
-                      className="px-2 py-1 rounded border border-slate-600 text-slate-200 hover:bg-slate-800 text-[11px]"
+                      className="rounded-md px-3 py-1.5 text-[11px] font-bold"
+                      style={{
+                        backgroundColor: OBS.surfaceHighest,
+                        color: OBS.subtle,
+                      }}
                     >
                       View
                     </button>
@@ -2279,6 +2358,7 @@ export default function ImportDataPage() {
         subtitle="Showing full import diagnostic payload (validation, errors, and runtime context)."
         onClose={() => setImportLogOpen(false)}
       />
+      </div>
     </div>
   );
 }
@@ -2328,4 +2408,3 @@ function ETLLogModal({
     </div>
   );
 }
-

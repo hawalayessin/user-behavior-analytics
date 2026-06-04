@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Home, ChevronRight, Search, Bell, LogOut } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Home,
+  LogOut,
+  Search,
+  UserCog,
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { ThemeToggle } from "./ThemeToggle";
 import { navigationConfig } from "./navConfig";
+import AnomalyNotifications from "./AnomalyNotifications";
 
 const KPI_SEARCH_INDEX = [
   {
@@ -78,8 +86,7 @@ const KPI_SEARCH_INDEX = [
   },
 ];
 
-export default function Topbar({ pageTitle, hasNotifications = false }) {
-  const [showNotifications, setShowNotifications] = useState(false);
+export default function Topbar({ pageTitle }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,7 +94,6 @@ export default function Topbar({ pageTitle, hasNotifications = false }) {
   const navigate = useNavigate();
   const menuRef = useRef(null);
   const searchRef = useRef(null);
-  const notifications = [];
 
   const searchableRoutes = useMemo(() => {
     const navItems = navigationConfig
@@ -274,72 +280,7 @@ export default function Topbar({ pageTitle, hasNotifications = false }) {
       <div className="flex items-center gap-4 flex-shrink-0">
         <ThemeToggle />
 
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className="relative p-2 rounded-lg transition-colors duration-200"
-            style={{ color: "var(--color-text-muted)" }}
-            aria-label="Notifications"
-          >
-            <Bell className="w-5 h-5" />
-            {hasNotifications && (
-              <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            )}
-          </button>
-
-          {showNotifications && (
-            <div
-              className="absolute right-0 mt-2 w-80 rounded-lg shadow-xl z-50 overflow-hidden"
-              style={{
-                backgroundColor: "var(--color-bg-card)",
-                border: "1px solid var(--color-border)",
-              }}
-            >
-              <div
-                className="px-4 py-3"
-                style={{ borderBottom: "1px solid var(--color-border)" }}
-              >
-                <h3
-                  className="text-sm font-semibold"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  Notifications
-                </h3>
-              </div>
-              <div className="max-h-64 overflow-y-auto scrollbar-modern">
-                {notifications.length === 0 ? (
-                  <div
-                    className="px-4 py-6 text-sm text-center"
-                    style={{ color: "var(--color-text-muted)" }}
-                  >
-                    No notifications.
-                  </div>
-                ) : (
-                  notifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      className="px-4 py-3 transition-colors duration-200 cursor-pointer"
-                      style={{ borderBottom: "1px solid var(--color-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--color-text-secondary)" }}
-                      >
-                        {notif.title}
-                      </p>
-                      <p
-                        className="text-xs mt-1"
-                        style={{ color: "var(--color-text-muted)" }}
-                      >
-                        {notif.time}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <AnomalyNotifications />
 
         <div
           className="w-px h-6"
@@ -349,52 +290,137 @@ export default function Topbar({ pageTitle, hasNotifications = false }) {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setShowUserMenu((prev) => !prev)}
-            className="flex items-center gap-3 rounded-lg px-2 py-1 transition"
-            style={{ color: "var(--color-text-secondary)" }}
+            className="group flex items-center gap-3 rounded-xl px-2.5 py-1.5 transition"
+            style={{
+              color: "var(--color-text-secondary)",
+              backgroundColor: showUserMenu
+                ? "var(--color-bg-elevated)"
+                : "transparent",
+              boxShadow: showUserMenu
+                ? "inset 0 0 0 1px var(--color-border)"
+                : "none",
+            }}
             aria-label="Open user menu"
+            aria-expanded={showUserMenu}
           >
             <div
-              className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white"
+              className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-extrabold text-white shadow-lg shadow-indigo-950/20"
               title={full_name || "User"}
             >
               {getInitials()}
             </div>
-            <div className="text-sm font-medium">{full_name}</div>
+            <div className="hidden min-w-0 text-left md:block">
+              <div
+                className="max-w-40 truncate text-sm font-bold"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                {full_name}
+              </div>
+            </div>
             <span
-              className={`text-xs font-medium px-2 py-1 rounded ${getRoleBadgeStyle()}`}
+              className={`hidden text-xs font-bold px-2.5 py-1 rounded-lg md:inline-flex ${getRoleBadgeStyle()}`}
             >
               {getRoleLabel()}
             </span>
+            <ChevronDown
+              size={15}
+              className="transition-transform"
+              style={{
+                color: "var(--color-text-muted)",
+                transform: showUserMenu ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
           </button>
 
           {showUserMenu && (
             <div
-              className="absolute right-0 mt-2 w-52 rounded-lg shadow-xl z-50 overflow-hidden"
+              className="absolute right-0 mt-3 w-72 rounded-xl shadow-2xl z-50 overflow-hidden"
               style={{
                 backgroundColor: "var(--color-bg-card)",
                 border: "1px solid var(--color-border)",
+                boxShadow:
+                  "0 20px 50px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)",
               }}
             >
+              <div
+                className="absolute -top-1 right-8 h-3 w-3 rotate-45"
+                style={{
+                  backgroundColor: "var(--color-bg-card)",
+                  borderLeft: "1px solid var(--color-border)",
+                  borderTop: "1px solid var(--color-border)",
+                }}
+              />
+              <div
+                className="px-4 py-4"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(59,130,246,0.10), transparent 62%)",
+                  borderBottom: "1px solid var(--color-border-subtle)",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-600 text-sm font-extrabold text-white">
+                    {getInitials()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-sm font-extrabold"
+                      style={{ color: "var(--color-text-primary)" }}
+                    >
+                      {full_name}
+                    </p>
+                    <span
+                      className={`mt-1 inline-flex text-xs font-bold px-2.5 py-1 rounded-lg ${getRoleBadgeStyle()}`}
+                    >
+                      {getRoleLabel()}
+                    </span>
+                  </div>
+                </div>
+              </div>
               <button
                 onClick={() => {
                   setShowUserMenu(false);
                   navigate("/account/profile");
                 }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-800/60 transition"
+                className="group flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-slate-800/60"
                 style={{ color: "var(--color-text-primary)" }}
               >
-                Profile Settings
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg"
+                  style={{
+                    backgroundColor: "var(--color-primary-bg)",
+                    color: "var(--color-primary)",
+                  }}
+                >
+                  <UserCog size={17} />
+                </span>
+                <span className="flex-1 font-bold">Profile Settings</span>
+                <ChevronRight
+                  size={15}
+                  style={{ color: "var(--color-text-muted)" }}
+                />
               </button>
               <button
                 onClick={() => {
                   setShowUserMenu(false);
                   logout();
                 }}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-slate-800/60 transition flex items-center gap-2"
-                style={{ color: "var(--color-text-muted)" }}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-slate-800/60"
+                style={{
+                  color: "var(--color-text-muted)",
+                  borderTop: "1px solid var(--color-border-subtle)",
+                }}
               >
-                <LogOut className="w-4 h-4" />
-                Logout
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg"
+                  style={{
+                    backgroundColor: "var(--color-danger-bg)",
+                    color: "var(--color-danger)",
+                  }}
+                >
+                  <LogOut size={17} />
+                </span>
+                <span className="flex-1 font-bold">Logout</span>
               </button>
             </div>
           )}

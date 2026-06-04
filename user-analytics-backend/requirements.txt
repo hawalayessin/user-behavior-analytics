@@ -16,9 +16,13 @@ python-multipart==0.0.9
 pandas==2.2.3
 scikit-learn
 joblib
+matplotlib
+xgboost
+imbalanced-learn
 tqdm>=4.66.0
 redis>=5.2.0
 google-genai>=1.0.0
+google-generativeai>=0.7.0
 reportlab>=4.0.0
 jinja2>=3.1.0
 weasyprint>=62.0

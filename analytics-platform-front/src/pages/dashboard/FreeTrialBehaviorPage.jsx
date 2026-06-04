@@ -17,6 +17,7 @@ import { useTrialUsers } from "../../hooks/useTrialUsers";
 import { useTrialDropoffByDay } from "../../hooks/useTrialDropoffByDay";
 import { useTrialDropoffCauses } from "../../hooks/useTrialDropoffCauses";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
+import api from "../../services/api";
 import {
   TrendingDown,
   TrendingUp,
@@ -157,7 +158,7 @@ export default function FreeTrialBehaviorPage() {
     };
   }, [kpiData]);
 
-  const trialUsers = trialUsersData?.data ?? [];
+  const trialUsers = useMemo(() => trialUsersData?.data ?? [], [trialUsersData]);
   const totalCount = trialUsersData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 
@@ -263,9 +264,8 @@ export default function FreeTrialBehaviorPage() {
       if (filters.service_id) params.append("service_id", filters.service_id);
       params.append("export", "true");
 
-      const res = await fetch(`/api/users/trial?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      const res = await api.get("/users/trial", { params });
+      const json = res.data;
       return json.data ?? [];
     } catch (err) {
       showToast("❌ Export failed: " + err.message);
@@ -374,9 +374,9 @@ export default function FreeTrialBehaviorPage() {
             ) : kpis ? (
               <>
                 <KPICard
-                  title="Total Trials Started"
+                  title="Total Trial Users"
                   value={kpis.total_trials.toLocaleString()}
-                  subtitle="Active and past trials"
+                  subtitle="Unique users in selected period"
                   icon={TrendingUp}
                   iconColor="#3B82F6"
                   iconBg="bg-blue-500/10"

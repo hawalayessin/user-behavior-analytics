@@ -3,620 +3,616 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-      Rapport Complet - DIGMACO
-    </title>
+    <title>Rapport Complet - DIGMACO</title>
 
     <style>
       /* ============================================================
          GOOGLE FONTS & RESET
          ============================================================ */
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
 
       * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
 
       /* ============================================================
          PAGE SETUP (WeasyPrint)
          ============================================================ */
       @page {
-          size: A4;
-          margin: 15mm 15mm 20mm 15mm;
+        size: A4;
+        margin: 15mm 15mm 20mm 15mm;
       }
 
       @page :first {
-          margin: 0;
+        margin: 0;
       }
 
       @page :not(:first) {
-          @bottom-center {
-              content: "© 2026 DIGMACO PRECISION OBSERVATORY | Page " counter(page) " / " counter(pages);
-              font-family: Inter, Arial, sans-serif;
-              font-size: 8pt;
-              color: #94A3B8;
-              border-top: 0.5pt solid #E2E8F0;
-              padding-top: 5mm;
-          }
+        @bottom-center {
+          content: "© 2026 DIGMACO PRECISION OBSERVATORY | Page " counter(page)
+            " / " counter(pages);
+          font-family: Inter, Arial, sans-serif;
+          font-size: 8pt;
+          color: #94a3b8;
+          border-top: 0.5pt solid #e2e8f0;
+          padding-top: 5mm;
+        }
       }
 
       /* ============================================================
          GLOBAL STYLES
          ============================================================ */
-      html, body {
-          font-family: Inter, Arial, sans-serif;
-          font-size: 10pt;
-          line-height: 1.6;
-          color: #1E293B;
-          background: white;
+      html,
+      body {
+        font-family: Inter, Arial, sans-serif;
+        font-size: 10pt;
+        line-height: 1.6;
+        color: #1e293b;
+        background: white;
       }
 
       h1 {
-          font-size: 28pt;
-          font-weight: 700;
-          line-height: 1.2;
-          margin-bottom: 12pt;
-          color: #0B1628;
+        font-size: 28pt;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 12pt;
+        color: #0b1628;
       }
 
       h2 {
-          font-size: 14pt;
-          font-weight: 700;
-          color: #0B1628;
-          margin-top: 8pt;
-          margin-bottom: 6pt;
-          border-bottom: 2pt solid #4F46E5;
-          padding-bottom: 4pt;
+        font-size: 14pt;
+        font-weight: 700;
+        color: #0b1628;
+        margin-top: 8pt;
+        margin-bottom: 6pt;
+        border-bottom: 2pt solid #4f46e5;
+        padding-bottom: 4pt;
       }
 
       h3 {
-          font-size: 11pt;
-          font-weight: 600;
-          color: #1E293B;
-          margin-top: 6pt;
-          margin-bottom: 4pt;
+        font-size: 11pt;
+        font-weight: 600;
+        color: #1e293b;
+        margin-top: 6pt;
+        margin-bottom: 4pt;
       }
 
       p {
-          margin-bottom: 8pt;
-          line-height: 1.6;
+        margin-bottom: 8pt;
+        line-height: 1.6;
       }
 
       strong {
-          font-weight: 600;
-          color: #0B1628;
+        font-weight: 600;
+        color: #0b1628;
       }
 
       /* ============================================================
          PAGE BREAKS & LAYOUT
          ============================================================ */
       .page-break {
-          page-break-after: always;
-          break-after: page;
+        page-break-after: always;
+        break-after: page;
       }
 
       .no-break {
-          page-break-inside: avoid;
-          break-inside: avoid;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
 
       /* ============================================================
          COVER PAGE (adaptée au report_type)
          ============================================================ */
       .cover-page {
-          background: linear-gradient(135deg, #0B1628 0%, #1A2F50 100%);
-          color: white;
-          min-height: 277mm;
-          padding: 25mm;
-          display: table;
-          width: 100%;
-          position: relative;
-          overflow: hidden;
+        background: linear-gradient(135deg, #0b1628 0%, #1a2f50 100%);
+        color: white;
+        min-height: 277mm;
+        padding: 25mm;
+        display: table;
+        width: 100%;
+        position: relative;
+        overflow: hidden;
       }
 
       .cover-page::before {
-          content: '';
-          position: absolute;
-          top: -50%;
-          right: -50%;
-          width: 150%;
-          height: 150%;
-          background: radial-gradient(circle, rgba(79, 70, 229, 0.1) 0%, transparent 70%);
-          pointer-events: none;
+        content: "";
+        position: absolute;
+        top: -50%;
+        right: -50%;
+        width: 150%;
+        height: 150%;
+        background: radial-gradient(
+          circle,
+          rgba(79, 70, 229, 0.1) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
       }
 
       .cover-content {
-          position: relative;
-          z-index: 1;
-          display: table-cell;
-          vertical-align: middle;
-          text-align: left;
+        position: relative;
+        z-index: 1;
+        display: table-cell;
+        vertical-align: middle;
+        text-align: left;
       }
 
       .cover-header {
-          display: table;
-          width: 100%;
-          margin-bottom: 30mm;
+        display: table;
+        width: 100%;
+        margin-bottom: 30mm;
       }
 
       .cover-logo {
-          display: table-cell;
-          width: 20%;
-          vertical-align: top;
+        display: table-cell;
+        width: 20%;
+        vertical-align: top;
       }
 
       .cover-logo svg {
-          width: 35mm;
-          height: auto;
+        width: 35mm;
+        height: auto;
       }
 
       .cover-badge {
-          display: table-cell;
-          width: 80%;
-          text-align: right;
-          vertical-align: top;
+        display: table-cell;
+        width: 80%;
+        text-align: right;
+        vertical-align: top;
       }
 
       .badge-cover {
-          display: inline-block;
-          padding: 4pt 10pt;
-          border-radius: 4px;
-          font-size: 8pt;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          margin-bottom: 8pt;
+        display: inline-block;
+        padding: 4pt 10pt;
+        border-radius: 4px;
+        font-size: 8pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 8pt;
       }
 
-      
-      .cover-page { background: linear-gradient(135deg, #0B1628 0%, #1A2F50 100%); }
-      .badge-cover { background: rgba(107, 114, 128, 0.2); color: #D1D5DB; }
-      
+      .cover-page {
+        background: linear-gradient(135deg, #0b1628 0%, #1a2f50 100%);
+      }
+      .badge-cover {
+        background: rgba(107, 114, 128, 0.2);
+        color: #d1d5db;
+      }
 
       .cover-title {
-          font-size: 36pt;
-          font-weight: 800;
-          line-height: 1.1;
-          margin: 20mm 0 8mm 0;
-          color: white;
-          letter-spacing: -0.02em;
+        font-size: 36pt;
+        font-weight: 800;
+        line-height: 1.1;
+        margin: 20mm 0 8mm 0;
+        color: white;
+        letter-spacing: -0.02em;
       }
 
       .cover-subtitle {
-          font-size: 16pt;
-          font-weight: 400;
-          line-height: 1.3;
-          color: #06B6D4;
-          margin-bottom: 15mm;
+        font-size: 16pt;
+        font-weight: 400;
+        line-height: 1.3;
+        color: #06b6d4;
+        margin-bottom: 15mm;
       }
 
       .cover-divider {
-          width: 40mm;
-          height: 2pt;
-          background: linear-gradient(90deg, #4F46E5, #06B6D4);
-          margin-bottom: 12mm;
+        width: 40mm;
+        height: 2pt;
+        background: linear-gradient(90deg, #4f46e5, #06b6d4);
+        margin-bottom: 12mm;
       }
 
       .cover-meta {
-          font-size: 9pt;
-          color: #CBD5E1;
-          margin-bottom: 20mm;
-          line-height: 1.8;
+        font-size: 9pt;
+        color: #cbd5e1;
+        margin-bottom: 20mm;
+        line-height: 1.8;
       }
 
       .cover-kpis {
-          display: table;
-          width: 100%;
-          margin-bottom: 20mm;
-          border-spacing: 6mm;
-          border-collapse: separate;
+        display: table;
+        width: 100%;
+        margin-bottom: 20mm;
+        border-spacing: 6mm;
+        border-collapse: separate;
       }
 
       .cover-kpi-row {
-          display: table-row;
+        display: table-row;
       }
 
       .cover-kpi {
-          display: table-cell;
-          width: 33%;
-          background: rgba(30, 58, 95, 0.6);
-          border: 1pt solid rgba(107, 114, 128, 0.3);
-          border-radius: 6px;
-          padding: 8pt 10pt;
-          text-align: center;
-          vertical-align: middle;
+        display: table-cell;
+        width: 33%;
+        background: rgba(30, 58, 95, 0.6);
+        border: 1pt solid rgba(107, 114, 128, 0.3);
+        border-radius: 6px;
+        padding: 8pt 10pt;
+        text-align: center;
+        vertical-align: middle;
       }
 
       .cover-kpi-value {
-          font-size: 20pt;
-          font-weight: 800;
-          color: #06B6D4;
-          display: block;
-          line-height: 1.1;
-          margin-bottom: 3pt;
+        font-size: 20pt;
+        font-weight: 800;
+        color: #06b6d4;
+        display: block;
+        line-height: 1.1;
+        margin-bottom: 3pt;
       }
 
       .cover-kpi-label {
-          font-size: 8pt;
-          color: #94A3B8;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 600;
+        font-size: 8pt;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
       }
 
       .cover-health {
-          display: table;
-          width: 100%;
-          margin-top: 20mm;
-          border-collapse: collapse;
+        display: table;
+        width: 100%;
+        margin-top: 20mm;
+        border-collapse: collapse;
       }
 
       .cover-health-row {
-          display: table-row;
+        display: table-row;
       }
 
       .cover-health-cell {
-          display: table-cell;
-          padding: 6pt 0;
-          font-size: 9pt;
+        display: table-cell;
+        padding: 6pt 0;
+        font-size: 9pt;
       }
 
       .cover-health-label {
-          color: #94A3B8;
-          width: 25%;
+        color: #94a3b8;
+        width: 25%;
       }
 
       .cover-health-value {
-          color: white;
-          font-weight: 600;
+        color: white;
+        font-weight: 600;
       }
 
       .progress-bar-container {
-          display: inline-block;
-          width: 40mm;
-          height: 3pt;
-          background: rgba(148, 163, 184, 0.2);
-          border-radius: 2pt;
-          margin-left: 6pt;
-          vertical-align: middle;
-          overflow: hidden;
+        display: inline-block;
+        width: 40mm;
+        height: 3pt;
+        background: rgba(148, 163, 184, 0.2);
+        border-radius: 2pt;
+        margin-left: 6pt;
+        vertical-align: middle;
+        overflow: hidden;
       }
 
       .progress-bar-fill {
-          display: block;
-          height: 100%;
-          background: linear-gradient(90deg, #06B6D4, #4F46E5);
-          width: 86%;
-          border-radius: 2pt;
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #06b6d4, #4f46e5);
+        width: 86%;
+        border-radius: 2pt;
       }
 
       .cover-footer {
-          position: absolute;
-          bottom: 15mm;
-          left: 25mm;
-          right: 25mm;
-          border-top: 0.5pt solid rgba(107, 114, 128, 0.2);
-          padding-top: 8pt;
-          font-size: 8pt;
-          color: #94A3B8;
-          display: table;
-          width: calc(100% - 50mm);
+        position: absolute;
+        bottom: 15mm;
+        left: 25mm;
+        right: 25mm;
+        border-top: 0.5pt solid rgba(107, 114, 128, 0.2);
+        padding-top: 8pt;
+        font-size: 8pt;
+        color: #94a3b8;
+        display: table;
+        width: calc(100% - 50mm);
       }
 
       .cover-footer-left {
-          display: table-cell;
-          text-align: left;
+        display: table-cell;
+        text-align: left;
       }
 
       .cover-footer-right {
-          display: table-cell;
-          text-align: right;
+        display: table-cell;
+        text-align: right;
       }
 
       /* ============================================================
          CONTENT PAGES
          ============================================================ */
       .content-page {
-          page-break-after: always;
-          break-after: page;
-          padding-top: 15mm;
+        page-break-after: always;
+        break-after: page;
+        padding-top: 15mm;
       }
 
       .page-header-bar {
-          background: linear-gradient(90deg, #4F46E5, #06B6D4);
-          height: 6mm;
-          margin: -15mm -15mm 12mm -15mm;
-          margin-bottom: 12mm;
+        background: linear-gradient(90deg, #4f46e5, #06b6d4);
+        height: 6mm;
+        margin: -15mm -15mm 12mm -15mm;
+        margin-bottom: 12mm;
       }
-
-      
 
       .section-header {
-          background: #4F46E5;
-          color: white;
-          padding: 5pt 8pt;
-          border-radius: 4px;
-          margin-bottom: 6pt;
-          font-size: 11pt;
-          font-weight: 700;
-          letter-spacing: 0.03em;
-          display: inline-block;
+        background: #4f46e5;
+        color: white;
+        padding: 5pt 8pt;
+        border-radius: 4px;
+        margin-bottom: 6pt;
+        font-size: 11pt;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        display: inline-block;
       }
 
-      
-
       .section-number {
-          display: inline-block;
-          background: rgba(255, 255, 255, 0.25);
-          border-radius: 3px;
-          padding: 0 3pt;
-          margin-right: 3pt;
-          font-size: 8pt;
-          font-weight: 700;
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.25);
+        border-radius: 3px;
+        padding: 0 3pt;
+        margin-right: 3pt;
+        font-size: 8pt;
+        font-weight: 700;
       }
 
       /* ============================================================
          KPI GRIDS & CARDS
          ============================================================ */
       .kpi-grid {
-          display: table;
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 6mm;
-          margin-bottom: 10mm;
+        display: table;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 6mm;
+        margin-bottom: 10mm;
       }
 
       .kpi-row {
-          display: table-row;
+        display: table-row;
       }
 
       .kpi-card {
-          display: table-cell;
-          width: 33%;
-          background: #F8FAFC;
-          border: 1pt solid #E2E8F0;
-          border-radius: 6px;
-          padding: 8pt;
-          text-align: center;
-          vertical-align: middle;
+        display: table-cell;
+        width: 33%;
+        background: #f8fafc;
+        border: 1pt solid #e2e8f0;
+        border-radius: 6px;
+        padding: 8pt;
+        text-align: center;
+        vertical-align: middle;
       }
 
       .kpi-card.highlight-success {
-          background: #ECFDF5;
-          border-color: #10B981;
+        background: #ecfdf5;
+        border-color: #10b981;
       }
 
       .kpi-card.highlight-danger {
-          background: #FEF2F2;
-          border-color: #EF4444;
+        background: #fef2f2;
+        border-color: #ef4444;
       }
 
       .kpi-value {
-          font-size: 20pt;
-          font-weight: 800;
-          color: #4F46E5;
-          display: block;
-          line-height: 1.1;
-          margin-bottom: 3pt;
+        font-size: 20pt;
+        font-weight: 800;
+        color: #4f46e5;
+        display: block;
+        line-height: 1.1;
+        margin-bottom: 3pt;
       }
 
       .kpi-label {
-          font-size: 8pt;
-          color: #64748B;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 600;
-          display: block;
-          margin-bottom: 3pt;
+        font-size: 8pt;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        display: block;
+        margin-bottom: 3pt;
       }
 
       .kpi-delta {
-          font-size: 8pt;
-          font-weight: 600;
-          display: block;
+        font-size: 8pt;
+        font-weight: 600;
+        display: block;
       }
 
       .kpi-delta.positive {
-          color: #10B981;
+        color: #10b981;
       }
 
       .kpi-delta.negative {
-          color: #EF4444;
+        color: #ef4444;
       }
 
       /* ============================================================
          AI BLOCKS
          ============================================================ */
       .ai-block {
-          background: #F0F4FF;
-          border-left: 3pt solid #4F46E5;
-          padding: 6pt 8pt;
-          margin: 6mm 0;
-          border-radius: 0 6px 6px 0;
-          font-size: 9pt;
-          line-height: 1.6;
-          color: #1E293B;
-          page-break-inside: avoid;
+        background: #f0f4ff;
+        border-left: 3pt solid #4f46e5;
+        padding: 6pt 8pt;
+        margin: 6mm 0;
+        border-radius: 0 6px 6px 0;
+        font-size: 9pt;
+        line-height: 1.6;
+        color: #1e293b;
+        page-break-inside: avoid;
       }
-
-      
 
       .ai-block-label {
-          font-size: 7pt;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: #4F46E5;
-          margin-bottom: 3pt;
-          display: block;
+        font-size: 7pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #4f46e5;
+        margin-bottom: 3pt;
+        display: block;
       }
-
-      
 
       /* ============================================================
          DATA TABLES
          ============================================================ */
       .data-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 9pt;
-          margin: 6mm 0;
-          page-break-inside: avoid;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9pt;
+        margin: 6mm 0;
+        page-break-inside: avoid;
       }
 
       .data-table th {
-          background: #4F46E5;
-          color: white;
-          padding: 4pt 5pt;
-          text-align: left;
-          font-weight: 600;
-          font-size: 8pt;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
+        background: #4f46e5;
+        color: white;
+        padding: 4pt 5pt;
+        text-align: left;
+        font-weight: 600;
+        font-size: 8pt;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
       }
 
-      
-
       .data-table td {
-          padding: 4pt 5pt;
-          border-bottom: 0.5pt solid #E2E8F0;
+        padding: 4pt 5pt;
+        border-bottom: 0.5pt solid #e2e8f0;
       }
 
       .data-table tr:nth-child(even) td {
-          background: #F8FAFC;
+        background: #f8fafc;
       }
 
       .data-table tr.best td {
-          background: #ECFDF5;
-          color: #065F46;
-          font-weight: 600;
+        background: #ecfdf5;
+        color: #065f46;
+        font-weight: 600;
       }
 
       .data-table tr.worst td {
-          background: #FEF2F2;
-          color: #991B1B;
-          font-weight: 600;
+        background: #fef2f2;
+        color: #991b1b;
+        font-weight: 600;
       }
 
       /* ============================================================
          BADGES & LABELS
          ============================================================ */
       .badge {
-          display: inline-block;
-          padding: 2pt 4pt;
-          border-radius: 3px;
-          font-size: 7pt;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+        display: inline-block;
+        padding: 2pt 4pt;
+        border-radius: 3px;
+        font-size: 7pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
       }
 
       .badge-success {
-          background: #ECFDF5;
-          color: #065F46;
+        background: #ecfdf5;
+        color: #065f46;
       }
 
       .badge-danger {
-          background: #FEF2F2;
-          color: #991B1B;
+        background: #fef2f2;
+        color: #991b1b;
       }
 
       .badge-warning {
-          background: #FFFBEB;
-          color: #92400E;
+        background: #fffbeb;
+        color: #92400e;
       }
 
       .badge-info {
-          background: #EFF6FF;
-          color: #1E40AF;
+        background: #eff6ff;
+        color: #1e40af;
       }
 
       /* ============================================================
          CHARTS & GRAPHICS
          ============================================================ */
       .chart-container {
-          margin: 8mm 0;
-          text-align: center;
-          page-break-inside: avoid;
+        margin: 8mm 0;
+        text-align: center;
+        page-break-inside: avoid;
       }
 
       .chart-title {
-          font-size: 9pt;
-          font-weight: 600;
-          color: #64748B;
-          margin-bottom: 4mm;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
+        font-size: 9pt;
+        font-weight: 600;
+        color: #64748b;
+        margin-bottom: 4mm;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
       }
 
       svg.inline-chart {
-          max-width: 100%;
-          height: auto;
-          border-radius: 4px;
-          background: #F8FAFC;
-          border: 0.5pt solid #E2E8F0;
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+        background: #f8fafc;
+        border: 0.5pt solid #e2e8f0;
       }
 
       /* ============================================================
          MISC UTILITIES
          ============================================================ */
       .divider {
-          border: none;
-          border-top: 0.5pt solid #E2E8F0;
-          margin: 6mm 0;
+        border: none;
+        border-top: 0.5pt solid #e2e8f0;
+        margin: 6mm 0;
       }
 
       .text-muted {
-          color: #64748B;
-          font-size: 9pt;
+        color: #64748b;
+        font-size: 9pt;
       }
 
       .text-danger {
-          color: #EF4444;
-          font-weight: 600;
+        color: #ef4444;
+        font-weight: 600;
       }
 
       .text-success {
-          color: #10B981;
-          font-weight: 600;
+        color: #10b981;
+        font-weight: 600;
       }
 
       .highlight {
-          background: #FFFBEB;
-          padding: 1pt 2pt;
-          border-radius: 2px;
+        background: #fffbeb;
+        padding: 1pt 2pt;
+        border-radius: 2px;
       }
 
       .two-col {
-          display: table;
-          width: 100%;
-          border-collapse: separate;
-          border-spacing: 6mm;
+        display: table;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 6mm;
       }
 
       .col {
-          display: table-cell;
-          width: 50%;
-          vertical-align: top;
+        display: table-cell;
+        width: 50%;
+        vertical-align: top;
       }
 
       pre {
-          font-family: monospace;
-          font-size: 7pt;
-          background: #F8FAFC;
-          padding: 6pt;
-          border-radius: 4px;
-          overflow-x: auto;
-          line-height: 1.3;
-          white-space: pre-wrap;
-          word-wrap: break-word;
+        font-family: monospace;
+        font-size: 7pt;
+        background: #f8fafc;
+        padding: 6pt;
+        border-radius: 4px;
+        overflow-x: auto;
+        line-height: 1.3;
+        white-space: pre-wrap;
+        word-wrap: break-word;
       }
     </style>
   </head>
   <body>
-      
     <div class="cover-page">
       <div class="cover-content">
         <div class="cover-header">
@@ -652,19 +648,14 @@
             </svg>
           </div>
           <div class="cover-badge">
-            
             <div class="badge-cover">COMPREHENSIVE</div>
-            
           </div>
         </div>
 
-        <h1 class="cover-title">
-           RAPPORT COMPLET 
-        </h1>
+        <h1 class="cover-title">RAPPORT COMPLET</h1>
 
         <p class="cover-subtitle">
-           Analyse complète tous modules · Intelligence
-          analytique 
+          Analyse complète tous modules · Intelligence analytique
         </p>
 
         <div class="cover-divider"></div>
@@ -673,7 +664,10 @@
           Période :
           <strong>2025-09-01 — 2025-10-31</strong><br />
           Services :
-          <strong>ElJournal By TT, Esports By TT, LiveHeathy, Mou7a9e9 By TT, Rafi9ni, Rafi9ni+, Smarttoons, Tawer, test, TToons</strong><br />
+          <strong
+            >ElJournal By TT, Esports By TT, LiveHeathy, Mou7a9e9 By TT,
+            Rafi9ni, Rafi9ni+, Smarttoons, Tawer, test, TToons</strong
+          ><br />
           Généré par :
           <strong>Admin Principal</strong>
         </div>
@@ -682,30 +676,22 @@
           <tr class="cover-kpi-row">
             <td class="cover-kpi">
               <span class="cover-kpi-value">945,580</span>
-              <span class="cover-kpi-label"
-                >Abonnés</span
-              >
+              <span class="cover-kpi-label">Abonnés</span>
             </td>
             <td class="cover-kpi">
               <span class="cover-kpi-value">3.7%</span>
-              <span class="cover-kpi-label"
-                >Taux Churn</span
-              >
+              <span class="cover-kpi-label">Taux Churn</span>
             </td>
             <td class="cover-kpi">
               <span class="cover-kpi-value">12.4 TND</span>
-              <span class="cover-kpi-label"
-                >ARPU Moyen</span
-              >
+              <span class="cover-kpi-label">ARPU Moyen</span>
             </td>
           </tr>
         </table>
 
         <table class="cover-health">
           <tr class="cover-health-row">
-            <td class="cover-health-cell cover-health-label">
-              Score Santé :
-            </td>
+            <td class="cover-health-cell cover-health-label">Score Santé :</td>
             <td class="cover-health-cell cover-health-value">
               <strong>A</strong>
               <div class="progress-bar-container">
@@ -714,27 +700,18 @@
             </td>
           </tr>
           <tr class="cover-health-row">
-            <td class="cover-health-cell cover-health-label">
-              Confiance IA :
-            </td>
+            <td class="cover-health-cell cover-health-label">Confiance IA :</td>
             <td class="cover-health-cell cover-health-value">
               <strong>72%</strong>
               <div class="progress-bar-container">
-                <div
-                  class="progress-bar-fill"
-                  style="width: 72%;"
-                ></div>
+                <div class="progress-bar-fill" style="width: 72%"></div>
               </div>
             </td>
           </tr>
           <tr class="cover-health-row">
-            <td class="cover-health-cell cover-health-label">
-              Source IA :
-            </td>
+            <td class="cover-health-cell cover-health-label">Source IA :</td>
             <td class="cover-health-cell cover-health-value">
-              <strong
-                >Rule-based Fallback</strong
-              >
+              <strong>Rule-based Fallback</strong>
             </td>
           </tr>
         </table>
@@ -750,106 +727,81 @@
       </div>
     </div>
 
-       
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
-      <h2>
-        <span class="section-number">01</span>Résumé Exécutif
-      </h2>
+      <h2><span class="section-number">01</span>Résumé Exécutif</h2>
 
       <p>
-        <strong>La base active est de 43,214 utilisateurs avec un churn de 3.7%. La retention D30 est de 62.1%, ce qui indique une pression de retention necessitant des actions lifecycle immediates. Le taux de conversion est de 6.8%.</strong>
+        <strong
+          >La base active est de 43,214 utilisateurs avec un churn de 3.7%. La
+          retention D30 est de 62.1%, ce qui indique une pression de retention
+          necessitant des actions lifecycle immediates. Le taux de conversion
+          est de 6.8%.</strong
+        >
       </p>
 
-      <h3>
-        Indicateurs
-        Clés de Performance
-      </h3>
+      <h3>Indicateurs Clés de Performance</h3>
       <table class="kpi-grid">
         <tr class="kpi-row">
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Abonnés
-              Totaux</span
-            >
+            <span class="kpi-label">Abonnés Totaux</span>
             <span class="kpi-value">945,580</span>
             <span class="kpi-delta positive">↑ 12%</span>
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Taux de Churn</span
-            >
+            <span class="kpi-label">Taux de Churn</span>
             <span class="kpi-value">3.7%</span>
             <span class="kpi-delta positive">↓ -0.4%</span>
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >ARPU Moyen</span
-            >
+            <span class="kpi-label">ARPU Moyen</span>
             <span class="kpi-value">12.4 TND</span>
             <span class="kpi-delta positive">+0.3 TND</span>
           </td>
         </tr>
         <tr class="kpi-row">
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Taux de
-              Conversion</span
-            >
+            <span class="kpi-label">Taux de Conversion</span>
             <span class="kpi-value">6.8%</span>
             <span class="kpi-delta positive">++1.2%</span>
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Rétention D30</span
-            >
+            <span class="kpi-label">Rétention D30</span>
             <span class="kpi-value">62.1</span>
-            <span class="kpi-delta positive"
-              >Stable</span
-            >
+            <span class="kpi-delta positive">Stable</span>
           </td>
           <td class="kpi-card highlight-danger">
-            <span class="kpi-label"
-              >Utilisateurs à
-              Risque</span
-            >
+            <span class="kpi-label">Utilisateurs à Risque</span>
             <span class="kpi-value">302</span>
-            <span class="kpi-delta negative"
-              >⚠️ À surveiller</span
-            >
+            <span class="kpi-delta negative">⚠️ À surveiller</span>
           </td>
         </tr>
       </table>
 
-      <h3>
-        Insights Alimentés
-        par l'IA
-      </h3>
+      <h3>Insights Alimentés par l'IA</h3>
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Priorités
-          Stratégiques</span
-        >
-        1. Reduce trial churn from 63.5% via personalized onboarding nudges at J+1 and J+3. 2. Expand premium catalog on high-ARPU services to capture value-seeking segments. 3. Deploy automated re-engagement campaigns targeting the 302 high-risk subscribers identified.
+        <span class="ai-block-label">Priorités Stratégiques</span>
+        1. Reduce trial churn from 63.5% via personalized onboarding nudges at
+        J+1 and J+3. 2. Expand premium catalog on high-ARPU services to capture
+        value-seeking segments. 3. Deploy automated re-engagement campaigns
+        targeting the 302 high-risk subscribers identified.
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Prévision
-          Prédictive</span
-        >
-        Les modeles predictifs estiment le maintien d'environ 43,214 utilisateurs actifs au prochain trimestre avec une variance de churn de ±0.3%. Croissance revenue projetee: 4-7% QoQ.
+        <span class="ai-block-label">Prévision Prédictive</span>
+        Les modeles predictifs estiment le maintien d'environ 43,214
+        utilisateurs actifs au prochain trimestre avec une variance de churn de
+        ±0.3%. Croissance revenue projetee: 4-7% QoQ.
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Améliorations KPI Attendues</span
-        >
-        Projection apres execution du plan: churn 3.7% -> ~2.5%, conversion 6.8% -> ~9.3%, ROI 3.5x -> ~4.3x.
+        <span class="ai-block-label">Améliorations KPI Attendues</span>
+        Projection apres execution du plan: churn 3.7% -> ~2.5%, conversion 6.8%
+        -> ~9.3%, ROI 3.5x -> ~4.3x.
       </div>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
@@ -857,9 +809,7 @@
         <span class="section-number">02</span>Analyse du Churn & de la Rétention
       </h2>
 
-      <h3>
-        Évolution Mensuelle du Churn (3 derniers mois)
-      </h3>
+      <h3>Évolution Mensuelle du Churn (3 derniers mois)</h3>
       <div class="chart-container">
         <svg
           class="inline-chart"
@@ -1036,27 +986,23 @@
         </svg>
       </div>
 
-      <h3>
-        Analyse &
-        Insights Churn
-      </h3>
+      <h3>Analyse & Insights Churn</h3>
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Analyse des
-          Causes Racines</span
-        >
-        Le risque de churn est a 3.7% globalement, principalement porte par le churn trial (63.5%). La retention D7 a 45.2% suggere des frictions d'activation precoce.
+        <span class="ai-block-label">Analyse des Causes Racines</span>
+        Le risque de churn est a 3.7% globalement, principalement porte par le
+        churn trial (63.5%). La retention D7 a 45.2% suggere des frictions
+        d'activation precoce.
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Prévision
-          Prédictive</span
-        >
-        Churn is projected to remain between 3.2% and 4.2% over the next 90 days. Early re-engagement interventions at D+1 could reduce trial churn by an estimated 8-12 percentage points. Without intervention, the 302 high-risk users are projected to churn within 30 days.
+        <span class="ai-block-label">Prévision Prédictive</span>
+        Churn is projected to remain between 3.2% and 4.2% over the next 90
+        days. Early re-engagement interventions at D+1 could reduce trial churn
+        by an estimated 8-12 percentage points. Without intervention, the 302
+        high-risk users are projected to churn within 30 days.
       </div>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
@@ -1065,25 +1011,17 @@
       </h2>
 
       <p class="text-muted">
-        Taux de rétention D7, D30, D90 mesurés depuis la première
-        souscription. Meilleurs et pires performers surlignés.
+        Taux de rétention D7, D30, D90 mesurés depuis la première souscription.
+        Meilleurs et pires performers surlignés.
       </p>
 
       <table class="data-table">
         <thead>
           <tr>
-            <th>
-              Service
-            </th>
-            <th>
-              Rétention D7
-            </th>
-            <th>
-              Rétention D30
-            </th>
-            <th>
-              Rétention D90
-            </th>
+            <th>Service</th>
+            <th>Rétention D7</th>
+            <th>Rétention D30</th>
+            <th>Rétention D90</th>
           </tr>
         </thead>
         <tbody>
@@ -1119,18 +1057,16 @@
         Tawer nécessite une attention immédiate avec une rétention D90 < 25%.
       </p>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
       <h2>
-        <span class="section-number">04</span>Comportement Essai Gratuit & Funnel
+        <span class="section-number">04</span>Comportement Essai Gratuit &
+        Funnel
       </h2>
 
-      <h3>
-        Funnel
-        Essai → Payant
-      </h3>
+      <h3>Funnel Essai → Payant</h3>
       <div class="chart-container">
         <svg
           class="inline-chart"
@@ -1215,21 +1151,18 @@
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Activité des
-          Sessions</span
-        >
-        Les sessions culminent entre 19h et 22h. Les abonnes actifs ont une duree de session moyenne superieure aux trial users.
+        <span class="ai-block-label">Activité des Sessions</span>
+        Les sessions culminent entre 19h et 22h. Les abonnes actifs ont une
+        duree de session moyenne superieure aux trial users.
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Recommandations d'Optimisation</span
-        >
-        Deployer des nudges personnalises a J+1 et J+3 pour reduire le churn trial (63.5% -> ~54%).
+        <span class="ai-block-label">Recommandations d'Optimisation</span>
+        Deployer des nudges personnalises a J+1 et J+3 pour reduire le churn
+        trial (63.5% -> ~54%).
       </div>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
@@ -1239,38 +1172,40 @@
       </h2>
 
       <p class="text-muted">
-        Clustering K-means avec k=4 identifie des segments
-        distincts. Score de silhouette: 0.72 (excellente
-        séparation).
+        Clustering K-means avec k=4 identifie des segments distincts. Score de
+        silhouette: 0.72 (excellente séparation).
       </p>
 
-      <h3>
-        Profils de Segments
-      </h3>
-      <p>Power Users: 2.2% of base, ARPU 24.5 TND, Churn 23.6% | Loyaux Réguliers: 2.4% of base, ARPU 8.3 TND, Churn 23.2% | Occasionnels: 3.4% of base, ARPU 3.5 TND, Churn 21.8% | Trial Only: 92.1% of base, ARPU 0.0 TND, Churn 63.5%</p>
+      <h3>Profils de Segments</h3>
+      <p>
+        Power Users: 2.2% of base, ARPU 24.5 TND, Churn 23.6% | Loyaux
+        Réguliers: 2.4% of base, ARPU 8.3 TND, Churn 23.2% | Occasionnels: 3.4%
+        of base, ARPU 3.5 TND, Churn 21.8% | Trial Only: 92.1% of base, ARPU 0.0
+        TND, Churn 63.5%
+      </p>
 
-      <h3>
-        Matrice de
-        Comparaison
-      </h3>
-      <p>Power Users: ARPU=24.5 TND, Retention=76% | Loyaux Réguliers: ARPU=8.3 TND, Retention=77% | Occasionnels: ARPU=3.5 TND, Retention=78% | Trial Only: ARPU=0.0 TND, Retention=36%</p>
+      <h3>Matrice de Comparaison</h3>
+      <p>
+        Power Users: ARPU=24.5 TND, Retention=76% | Loyaux Réguliers: ARPU=8.3
+        TND, Retention=77% | Occasionnels: ARPU=3.5 TND, Retention=78% | Trial
+        Only: ARPU=0.0 TND, Retention=36%
+      </p>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Analyse
-          de Migration</span
-        >
-        Les migrations montrent un flux majoritaire Trial-only vers Occasional, avec une part reduite vers Power User.
+        <span class="ai-block-label">Analyse de Migration</span>
+        Les migrations montrent un flux majoritaire Trial-only vers Occasional,
+        avec une part reduite vers Power User.
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Matrice Rentabilité & Croissance</span
-        >
-        Segment profitability ranks: Premium (highest ARPU, lowest churn) > Loyal Regulars > Occasional > Trial-only. Focusing retention investments on the Loyal-to-Premium transition offers the highest marginal ROI per user.
+        <span class="ai-block-label">Matrice Rentabilité & Croissance</span>
+        Segment profitability ranks: Premium (highest ARPU, lowest churn) >
+        Loyal Regulars > Occasional > Trial-only. Focusing retention investments
+        on the Loyal-to-Premium transition offers the highest marginal ROI per
+        user.
       </div>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
@@ -1278,64 +1213,45 @@
         <span class="section-number">06</span>Performance des Campagnes & ROI
       </h2>
 
-      <h3>
-        Métriques
-        d'Efficacité
-      </h3>
+      <h3>Métriques d'Efficacité</h3>
       <table class="kpi-grid">
         <tr class="kpi-row">
           <td class="kpi-card">
-            <span class="kpi-label"
-              >ROI Moyen</span
-            >
+            <span class="kpi-label">ROI Moyen</span>
             <span class="kpi-value">3.5x</span>
-            <span class="kpi-delta"
-              >par TND dépensé</span
-            >
+            <span class="kpi-delta">par TND dépensé</span>
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Efficacité
-              SMS</span
-            >
+            <span class="kpi-label">Efficacité SMS</span>
             <span class="kpi-value">67%</span>
-            <span class="kpi-delta positive"
-              >Taux de clic</span
-            >
+            <span class="kpi-delta positive">Taux de clic</span>
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Hausse
-              d'Engagement</span
-            >
+            <span class="kpi-label">Hausse d'Engagement</span>
             <span class="kpi-value">+23%</span>
-            <span class="kpi-delta positive"
-              >vs baseline</span
-            >
+            <span class="kpi-delta positive">vs baseline</span>
           </td>
         </tr>
       </table>
 
-      <h3>
-        Conversion par Canal
-      </h3>
-      <p class="text-muted">Impression → Click: 12.4% | Click → Trial: 34.2% | Trial → Paid: 6.8%</p>
+      <h3>Conversion par Canal</h3>
+      <p class="text-muted">
+        Impression → Click: 12.4% | Click → Trial: 34.2% | Trial → Paid: 6.8%
+      </p>
 
-      <h3>
-        Attribution
-        Revenu
-      </h3>
-      <p class="text-muted">Organic: 45% | SMS Campaign: 28% | Push Notification: 18% | Referral: 9%</p>
+      <h3>Attribution Revenu</h3>
+      <p class="text-muted">
+        Organic: 45% | SMS Campaign: 28% | Push Notification: 18% | Referral: 9%
+      </p>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Stratégie
-          Campagnes</span
-        >
-        Le ROI campagne (3.50x) suggere d'intensifier les campagnes segmentees sur les plages horaires soir/weekend et d'optimiser le reciblage des utilisateurs inactifs sous 48h.
+        <span class="ai-block-label">Stratégie Campagnes</span>
+        Le ROI campagne (3.50x) suggere d'intensifier les campagnes segmentees
+        sur les plages horaires soir/weekend et d'optimiser le reciblage des
+        utilisateurs inactifs sous 48h.
       </div>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
@@ -1343,10 +1259,7 @@
         <span class="section-number">07</span>Activité Utilisateur & Patterns
       </h2>
 
-      <h3>
-        Tendances
-        d'Activité
-      </h3>
+      <h3>Tendances d'Activité</h3>
       <div class="chart-container">
         <svg
           class="inline-chart"
@@ -1400,14 +1313,12 @@
       </div>
 
       <div class="ai-block">
-        <span class="ai-block-label"
-          >Analyse des
-          Sessions</span
-        >
-        Les sessions culminent entre 19h et 22h. Les abonnes actifs ont une duree de session moyenne superieure aux trial users.
+        <span class="ai-block-label">Analyse des Sessions</span>
+        Les sessions culminent entre 19h et 22h. Les abonnes actifs ont une
+        duree de session moyenne superieure aux trial users.
       </div>
     </div>
-        
+
     <div class="page-break"></div>
     <div class="content-page">
       <div class="page-header-bar"></div>
@@ -1415,61 +1326,45 @@
         <span class="section-number">08</span>Annexe Technique & Données Brutes
       </h2>
 
-      <h3>
-        Métriques de
-        Performance
-      </h3>
+      <h3>Métriques de Performance</h3>
       <table class="kpi-grid">
         <tr class="kpi-row">
           <td class="kpi-card">
             <span class="kpi-label">ROC-AUC</span>
             <span class="kpi-value">0.84</span>
-            <span class="kpi-delta"
-              >Excellent</span
-            >
+            <span class="kpi-delta">Excellent</span>
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Intervalles</span
-            >
+            <span class="kpi-label">Intervalles</span>
             <span class="kpi-value" style="font-size: 11pt"
               >95% CI: [0.81, 0.87]</span
             >
           </td>
           <td class="kpi-card">
-            <span class="kpi-label"
-              >Confiance du
-              Modèle</span
-            >
+            <span class="kpi-label">Confiance du Modèle</span>
             <span class="kpi-value">84%</span>
           </td>
         </tr>
       </table>
 
-      <h3>
-        Importance des
-        Features
-      </h3>
-      <p class="text-muted">tenure (0.32), session_count (0.24), service_count (0.18), payment_failures (0.14)</p>
-
-      <h3>
-        Métriques Backend
-      </h3>
-      <p class="text-muted">active_users=43214, conversion=6.8%, churn=3.7%</p>
-
-      <h3>
-        Métadonnées
-        Techniques
-      </h3>
-      <p class="text-muted" style="font-size: 8pt">
-        Engine v2.1 | Model: gemini-1.5-flash | Generated: 2026-05-16T14:02:16.566277 | AI source: fallback
+      <h3>Importance des Features</h3>
+      <p class="text-muted">
+        tenure (0.32), session_count (0.24), service_count (0.18),
+        payment_failures (0.14)
       </p>
 
-      <h3>
-        Export JSON
-        Complet
-      </h3>
-      <pre>{
+      <h3>Métriques Backend</h3>
+      <p class="text-muted">active_users=43214, conversion=6.8%, churn=3.7%</p>
+
+      <h3>Métadonnées Techniques</h3>
+      <p class="text-muted" style="font-size: 8pt">
+        Engine v2.1 | Model: gemini-2.5-flash | Generated:
+        2026-05-16T14:02:16.566277 | AI source: fallback
+      </p>
+
+      <h3>Export JSON Complet</h3>
+      <pre>
+{
   "active_users": 43214,
   "total_subs": 1172575,
   "paying_users": 75044,
@@ -1515,8 +1410,8 @@
   "campaign_roi": 3.5,
   "anomaly_score": 0.0,
   "anomaly_count": 0
-}</pre>
+}</pre
+      >
     </div>
-    
   </body>
 </html>

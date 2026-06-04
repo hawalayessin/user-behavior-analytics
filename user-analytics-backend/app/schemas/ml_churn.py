@@ -20,11 +20,13 @@ class ChurnTrainMetricsResponse(BaseModel):
     churn_recall: Optional[float] = None
     churn_f1: Optional[float] = None
     pr_auc_lift: Optional[float] = None
+    validation_metrics: Optional[dict[str, Any]] = None
     feature_signal: Optional[dict[str, Any]] = None
     coefficients_sorted: Optional[list[dict[str, Any]]] = None
     calibration: Optional[dict[str, Any]] = None
     drift: Optional[dict[str, Any]] = None
     accuracy: float = Field(..., ge=0, le=1)
+    balanced_accuracy: Optional[float] = Field(default=None, ge=0, le=1)
     churn_rate: float = Field(..., ge=0, le=1)
     n_samples: int = Field(..., ge=0)
     n_positive: int = Field(..., ge=0)

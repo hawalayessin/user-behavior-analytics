@@ -12,8 +12,26 @@ def _running_in_docker() -> bool:
     return os.path.exists("/.dockerenv")
 
 
-def _normalize_host_for_local_run(url: str) -> str:
-    """When running on host OS, map Docker-internal hostnames to localhost."""
+def _normalize_host_for_runtime(url: str) -> str:
+    """Map Docker-only and host-only names so the same env works locally and in containers."""
+    parsed = urlparse(url)
+    if parsed.hostname == "host.docker.internal" and not _running_in_docker():
+        netloc = parsed.netloc.replace("host.docker.internal", "localhost", 1)
+        return urlunparse(parsed._replace(netloc=netloc))
+
+    if parsed.hostname == "analytics_redis" and not _running_in_docker():
+        netloc = parsed.netloc.replace("analytics_redis", "localhost", 1)
+        return urlunparse(parsed._replace(netloc=netloc))
+
+    if parsed.hostname == "localhost" and _running_in_docker():
+        netloc = parsed.netloc.replace("localhost", "host.docker.internal", 1)
+        return urlunparse(parsed._replace(netloc=netloc))
+
+    return url
+
+
+def _normalize_db_host_for_runtime(url: str) -> str:
+    """When running on host OS, map Docker-internal DB hostnames to localhost."""
     parsed = urlparse(url)
     if parsed.hostname != "host.docker.internal" or _running_in_docker():
         return url
@@ -84,7 +102,8 @@ class Settings(BaseSettings):
             self.DATABASE_URL = self.ANALYTICS_CONN or self.analytics_conn
         if not self.DATABASE_URL:
             raise ValueError("DATABASE_URL (or ANALYTICS_CONN) is required")
-        self.DATABASE_URL = _normalize_host_for_local_run(self.DATABASE_URL)
+        self.DATABASE_URL = _normalize_db_host_for_runtime(self.DATABASE_URL)
+        self.REDIS_URL = _normalize_host_for_runtime(self.REDIS_URL)
         return self
 
 

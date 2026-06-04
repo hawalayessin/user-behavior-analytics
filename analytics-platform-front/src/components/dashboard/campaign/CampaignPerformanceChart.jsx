@@ -63,8 +63,8 @@ export default function CampaignPerformanceChart({ data }) {
         </div>
       </div>
 
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-80 min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart
             data={visible}
             margin={{ top: 10, right: 20, left: 0, bottom: 10 }}

@@ -16,6 +16,7 @@ from ml_models.segmentation_trainer import run_segmentation_training
 
 _DASHBOARD_CACHE_TTL_SECONDS = 30
 _MAX_CLUSTER_POINTS = 600
+_SEGMENTATION_SERVICE_CACHE_VERSION = "2026-06-04-v7-behavioral-segments"
 
 _kpis_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
 _clusters_cache: dict[tuple[str, str, str], tuple[float, dict]] = {}
@@ -37,8 +38,9 @@ def _cache_key(
     start_date: Optional[datetime],
     end_date: Optional[datetime],
     service_id: Optional[str],
-) -> tuple[str, str, str]:
+) -> tuple[str, str, str, str]:
     return (
+        _SEGMENTATION_SERVICE_CACHE_VERSION,
         start_date.isoformat() if start_date else "",
         end_date.isoformat() if end_date else "",
         service_id or "",

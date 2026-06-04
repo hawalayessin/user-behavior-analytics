@@ -11,10 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.services.enterprise_report_ai import generate_rule_based_insights, resolve_ai_insights
-from app.services.gemini_service import GeminiReportService
+from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
+from app.services.enterprise_report_ai import generate_rule_based_insights, resolve_ai_insights
+
+logger = logging.getLogger("uvicorn.error")
 
 # Jinja2 is always available (in requirements.txt)
 try:
@@ -34,14 +35,48 @@ REPORT_TYPE_SECTIONS = {
     "premium_enterprise": ["summary", "activity", "churn", "retention", "trial", "campaigns", "ai_segmentation", "raw_data"],
 }
 
+REPORT_TYPE_LABELS = {
+    "executive": "Executive Summary",
+    "churn": "Churn & Retention Analysis",
+    "ai_segmentation": "AI Insights & Segmentation",
+    "full": "Complete Report",
+    "complete": "Complete Report",
+    "premium_enterprise": "Complete Report",
+}
+
+SECTION_LABELS = {
+    "summary": "Executive Summary",
+    "activity": "User Activity",
+    "churn": "Churn Analysis",
+    "retention": "Retention & Cohorts",
+    "trial": "Free Trial Behavior",
+    "campaigns": "Campaign Impact (SMS)",
+    "ai_segmentation": "AI & Segmentation",
+    "raw_data": "Raw Data Export",
+}
+
 
 class PDFReportService:
     REPORTS_DIR = Path(os.getenv("REPORTS_OUTPUT_DIR", "reports/generated"))
 
     def __init__(self) -> None:
         self.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-        self.gemini: GeminiReportService | None = None
-        self._ai_ok = False
+        try:
+            from app.services.mcp_agent_service import (
+                generate_insights_mcp,
+            )
+            self._generate_insights = generate_insights_mcp
+            self._ai_ok = True
+            logger.info(
+                "MCP agent service loaded successfully"
+            )
+        except ImportError as exc:
+            self._generate_insights = None
+            self._ai_ok = False
+            logger.warning(
+                "MCP agent service not available: %s",
+                exc,
+            )
 
         # Jinja2 template env
         template_dir = Path(__file__).resolve().parents[1] / "templates"
@@ -65,6 +100,7 @@ class PDFReportService:
         segments: dict[str, Any],
         anomalies: list[dict[str, Any]],
         campaign_data: dict[str, Any],
+        db: Session | None = None,
     ) -> dict[str, Any]:
         """Generate the premium enterprise PDF report.
 
@@ -85,6 +121,9 @@ class PDFReportService:
         # Config
         language = (report_config.get("language") or "fr").strip().lower()
         report_type = (report_config.get("report_type") or "full").strip().lower()
+        report_theme = (report_config.get("report_theme") or "dark").strip().lower()
+        if report_theme not in {"dark", "light"}:
+            report_theme = "dark"
         custom_prompt = report_config.get("gemini_prompt_template", "")
         generated_by = report_config.get("generated_by_name", "Admin Principal")
         period_start = report_config.get("period_start", "2025-09-01")
@@ -96,34 +135,92 @@ class PDFReportService:
         # ----- Step 1: Gather all metrics into one dict -----
         metrics = self._build_metrics_dict(kpis, churn_data, segments, campaign_data, anomalies)
 
-        # ----- Step 2: AI Insights (Gemini + fallback) -----
-        gemini_response: dict[str, str] | None = None
+        # ----- Step 2: AI Insights (MCP agent + fallback) -----
         ai_source = "fallback"
+        # ── MCP agentic insight collection ──────────
+        ai: dict[str, str] = {}
+        ai_count = 0
 
-        if use_ai:
+        if (
+            use_ai
+            and self._ai_ok
+            and self._generate_insights is not None
+            and db is not None
+        ):
             try:
-                self.gemini = GeminiReportService(language=language, custom_prompt_template=custom_prompt)
-                self._ai_ok = True
-            except ValueError as e:
-                logger.warning("Gemini init failed: %s", e)
-                self.gemini = None
-                self._ai_ok = False
-
-            if self.gemini:
-                gemini_response = self.gemini.generate_full_report_insights(
-                    metrics=metrics,
-                    period=period,
-                    services=services,
+                logger.info(
+                    "Starting MCP agentic loop — "
+                    "report_type=%s",
+                    report_config.get(
+                        "report_type", "full"
+                    ),
                 )
-                if gemini_response:
-                    ai_source = "gemini"
-                    logger.info("Gemini insights received successfully")
-                else:
-                    logger.warning("Gemini returned None — using fallback")
+                ai = self._generate_insights(
+                    report_type=report_config.get(
+                        "report_type", "full"
+                    ),
+                    services=services,
+                    period=period,
+                    db=db,
+                    custom_prompt=custom_prompt,
+                    include_recommendations=report_config.get(
+                        "include_recommendations", True
+                    ),
+                )
+                mcp_source = ai.pop("__source", "gemini")
+                ai_count = sum(
+                    1 for v in ai.values()
+                    if v and len(v) > 20
+                )
+                ai_source = (
+                    "gemini"
+                    if mcp_source in {"gemini", "cache"}
+                    else "fallback"
+                )
+                logger.info(
+                    "REPORT_AI_RESULT source=%s pdf_ai_source=%s sections=%d report_type=%s",
+                    mcp_source,
+                    ai_source,
+                    ai_count,
+                    report_type,
+                )
+            except Exception as exc:
+                logger.error(
+                    "MCP agent failed: %s — "
+                    "using fallback",
+                    exc,
+                )
+                from app.services.mcp_agent_service \
+                    import _fallback_insights
+                ai = _fallback_insights()
+                ai_count = 0
 
-        # Merge with fallback (always fills missing keys)
-        ai_insights = resolve_ai_insights(gemini_response, metrics, language=language)
-        ai_count = sum(1 for v in ai_insights.values() if v and str(v).strip())
+        if not ai:
+            logger.info(
+                "REPORT_AI_RESULT source=%s sections=%d report_type=%s reason=no_ai_response",
+                ai_source,
+                ai_count,
+                report_type,
+            )
+
+        ai_insights = resolve_ai_insights(ai, metrics, language=language)
+        if ai:
+            ai_insights.update(
+                {
+                    "ai_summary": ai.get("summary") or ai_insights.get("ai_summary", ""),
+                    "ai_churn_explanations": ai.get("churn") or ai_insights.get("ai_churn_explanations", ""),
+                    "segment_migration_analysis": ai.get("segments") or ai_insights.get("segment_migration_analysis", ""),
+                    "ai_anomaly_explanations": ai.get("anomalies") or ai_insights.get("ai_anomaly_explanations", ""),
+                    "ai_campaign_recommendations": ai.get("campaigns") or ai_insights.get("ai_campaign_recommendations", ""),
+                    "high_priority_recommendations": ai.get("recommendations") or ai_insights.get("high_priority_recommendations", ""),
+                    "mcp_summary": ai.get("summary", ""),
+                    "mcp_churn": ai.get("churn", ""),
+                    "mcp_segments": ai.get("segments", ""),
+                    "mcp_anomalies": ai.get("anomalies", ""),
+                    "mcp_campaigns": ai.get("campaigns", ""),
+                    "mcp_recommendations": ai.get("recommendations", ""),
+                }
+            )
 
         # ----- Step 3: Build template context -----
         context = self._build_template_context(
@@ -139,6 +236,7 @@ class PDFReportService:
             services=services,
             ai_source=ai_source,
             report_type=report_type,
+            report_theme=report_theme,
         )
         # Map report_type to sections_included
         sections_included = report_config.get("sections_included")
@@ -148,6 +246,10 @@ class PDFReportService:
             sections_included = REPORT_TYPE_SECTIONS.get(report_type, REPORT_TYPE_SECTIONS["full"])
             logger.info("sections_included fallback (report_type=%s): %s", report_type, sections_included)
         context["sections_included"] = sections_included
+        context["sections_selected_text"] = ", ".join(
+            SECTION_LABELS.get(section, section)
+            for section in sections_included
+        )
         logger.info("Final sections_included in context: %s", context["sections_included"])
 
         # ----- Step 4 & 5: Render HTML → PDF via Playwright -----
@@ -156,6 +258,13 @@ class PDFReportService:
 
         file_size_kb = round(filepath.stat().st_size / 1024)
         elapsed = int((datetime.now(timezone.utc) - start_time).total_seconds())
+        logger.info(
+            "REPORT_PDF_DONE filename=%s ai_source=%s ai_sections=%d generation_sec=%d",
+            filename,
+            ai_source,
+            ai_count,
+            elapsed,
+        )
 
         return {
             "file_path": str(filepath),
@@ -221,6 +330,7 @@ class PDFReportService:
         services: list[str],
         ai_source: str,
         report_type: str,
+        report_theme: str,
     ) -> dict[str, Any]:
         """Build the complete template context dict with ~50 keys."""
         now = datetime.now()
@@ -245,12 +355,21 @@ class PDFReportService:
             # Cover page
             "generated_timestamp": now.strftime("%Y-%m-%d %H:%M UTC"),
             "date_range": period,
+            "report_type_label": REPORT_TYPE_LABELS.get(
+                report_type,
+                report_type.replace("_", " ").title(),
+            ),
+            "sections_selected_text": ", ".join(
+                SECTION_LABELS.get(section, section)
+                for section in REPORT_TYPE_SECTIONS.get(report_type, [])
+            ),
             "ai_confidence_score": 86 if ai_source == "gemini" else 72,
             "executive_health_score": "A" if churn_rate < 4 else "B" if churn_rate < 6 else "C",
             "generated_by": generated_by,
             "language": language,
             "ai_source": ai_source,
             "report_type": report_type,
+            "report_theme": report_theme,
 
             # Executive summary KPIs
             "active_users": f"{total_users:,}",
@@ -329,7 +448,8 @@ class PDFReportService:
                     page.set_content(html_content, wait_until="networkidle")
                     pdf_bytes = page.pdf(
                         format="A4",
-                        margin={"top": "15mm", "bottom": "20mm", "left": "15mm", "right": "15mm"},
+                        margin={"top": "0", "bottom": "0", "left": "0", "right": "0"},
+                        print_background=True,
                     )
                     filepath.write_bytes(pdf_bytes)
                 finally:

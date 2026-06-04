@@ -48,6 +48,20 @@ const SEGMENT_FALLBACK_POSITIONS = {
   "Trial Only": { x: 0.2, y: 0.3 },
 };
 
+const SEGMENT_LABEL_OFFSETS = {
+  "Power Users": { dx: 36, dy: -38 },
+  "Regular Loyals": { dx: 34, dy: 8 },
+  "Occasional Users": { dx: 30, dy: -36 },
+  "Trial Only": { dx: 34, dy: 40 },
+};
+
+const formatCompactNumber = (value) => {
+  const number = Number(value || 0);
+  if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1)}M`;
+  if (number >= 1_000) return `${Math.round(number / 1_000)}K`;
+  return number.toLocaleString();
+};
+
 const KPISkeleton = () => (
   <div
     className="w-full h-28 animate-pulse rounded-xl"
@@ -191,8 +205,14 @@ export default function UserSegmentationPage() {
       maxY: 310,
     };
 
-    const distributionMap = Object.fromEntries(
-      distribution.map((d) => [d.name, Number(d.percentage || 0)]),
+    const distributionBySegment = Object.fromEntries(
+      distribution.map((d) => [
+        d.name,
+        {
+          count: Number(d.count || 0),
+          percentage: Number(d.percentage || 0),
+        },
+      ]),
     );
 
     return Object.keys(SEGMENT_COLORS).map((segment) => {
@@ -216,11 +236,18 @@ export default function UserSegmentationPage() {
       const cy =
         area.maxY - Math.max(0, Math.min(1, meanY)) * (area.maxY - area.minY);
 
-      const pct = Number(distributionMap[segment] || 0);
+      const metrics = distributionBySegment[segment] || {
+        count: 0,
+        percentage: 0,
+      };
+      const pct = Number(metrics.percentage || 0);
       const rx = Math.max(46, Math.min(108, 42 + pct * 1.1));
       const ry = Math.max(30, Math.min(72, 26 + pct * 0.65));
+      const labelOffset = SEGMENT_LABEL_OFFSETS[segment] || { dx: 32, dy: -32 };
+      const labelX = Math.max(98, Math.min(548, cx + labelOffset.dx));
+      const labelY = Math.max(42, Math.min(292, cy + labelOffset.dy));
 
-      const sample = points.slice(0, 4);
+      const sample = points.slice(0, 10);
       const dots =
         sample.length > 0
           ? sample.map((p, idx) => {
@@ -228,8 +255,8 @@ export default function UserSegmentationPage() {
               const dy = (Number(p.y || meanY) - meanY) * 90;
               return {
                 key: `${segment}-dot-${idx}`,
-                x: cx + dx,
-                y: cy - dy,
+                x: Math.max(area.minX + 6, Math.min(area.maxX - 6, cx + dx)),
+                y: Math.max(area.minY + 6, Math.min(area.maxY - 6, cy - dy)),
               };
             })
           : pct > 0
@@ -247,6 +274,10 @@ export default function UserSegmentationPage() {
         cy,
         rx,
         ry,
+        pct,
+        count: metrics.count,
+        labelX,
+        labelY,
         dots,
       };
     });
@@ -427,26 +458,182 @@ export default function UserSegmentationPage() {
               ))}
             </div>
 
-            <div className="h-[380px] w-full">
-              <svg viewBox="0 0 680 360" className="h-full w-full">
+            <div className="h-[420px] w-full">
+              <svg
+                viewBox="0 0 680 400"
+                className="h-full w-full"
+                role="img"
+                aria-label="Segment mapping by activity and customer lifetime value"
+              >
+                <defs>
+                  <clipPath id="segment-map-clip">
+                    <rect x="66" y="24" width="578" height="322" rx="6" />
+                  </clipPath>
+                  <filter id="segment-soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow
+                      dx="0"
+                      dy="8"
+                      stdDeviation="8"
+                      floodColor="#020617"
+                      floodOpacity="0.22"
+                    />
+                  </filter>
+                </defs>
+
+                <rect
+                  x="66"
+                  y="24"
+                  width="578"
+                  height="322"
+                  rx="6"
+                  fill="var(--color-bg-elevated)"
+                  opacity="0.42"
+                />
+
+                {[0, 1, 2, 3, 4].map((step) => {
+                  const x = 66 + step * 144.5;
+                  return (
+                    <line
+                      key={`grid-x-${step}`}
+                      x1={x}
+                      y1="24"
+                      x2={x}
+                      y2="346"
+                      stroke="var(--chart-grid)"
+                      strokeDasharray={step === 0 ? "0" : "4 6"}
+                      strokeOpacity={step === 0 ? 0.9 : 0.55}
+                    />
+                  );
+                })}
+                {[0, 1, 2, 3, 4].map((step) => {
+                  const y = 24 + step * 80.5;
+                  return (
+                    <line
+                      key={`grid-y-${step}`}
+                      x1="66"
+                      y1={y}
+                      x2="644"
+                      y2={y}
+                      stroke="var(--chart-grid)"
+                      strokeDasharray={step === 4 ? "0" : "4 6"}
+                      strokeOpacity={step === 4 ? 0.9 : 0.55}
+                    />
+                  );
+                })}
+
                 <line
-                  x1="66"
+                  x1="355"
                   y1="24"
-                  x2="66"
-                  y2="322"
+                  x2="355"
+                  y2="346"
                   stroke="var(--chart-grid)"
+                  strokeDasharray="8 8"
+                  strokeOpacity="0.9"
                 />
                 <line
                   x1="66"
-                  y1="322"
+                  y1="185"
                   x2="644"
-                  y2="322"
+                  y2="185"
                   stroke="var(--chart-grid)"
+                  strokeDasharray="8 8"
+                  strokeOpacity="0.9"
                 />
+
+                <text x="84" y="44" fontSize="10" fill="var(--chart-axis-text)">
+                  High value
+                </text>
+                <text x="84" y="204" fontSize="10" fill="var(--chart-axis-text)">
+                  Low value
+                </text>
+                <text x="530" y="333" fontSize="10" fill="var(--chart-axis-text)">
+                  High activity
+                </text>
+                <text x="80" y="333" fontSize="10" fill="var(--chart-axis-text)">
+                  Low activity
+                </text>
+
+                <g clipPath="url(#segment-map-clip)">
+                  {segmentMappingModel.map((cluster) => (
+                    <g key={cluster.segment} filter="url(#segment-soft-shadow)">
+                      <ellipse
+                        cx={cluster.cx}
+                        cy={cluster.cy}
+                        rx={cluster.rx}
+                        ry={cluster.ry}
+                        fill={cluster.color}
+                        fillOpacity="0.14"
+                        stroke={cluster.color}
+                        strokeOpacity="0.68"
+                        strokeWidth="2"
+                      />
+                      {cluster.dots.map((dot) => (
+                        <circle
+                          key={dot.key}
+                          cx={dot.x}
+                          cy={dot.y}
+                          r="3.8"
+                          fill={cluster.color}
+                          fillOpacity="0.92"
+                          stroke="#ffffff"
+                          strokeOpacity="0.42"
+                          strokeWidth="1"
+                        />
+                      ))}
+                    </g>
+                  ))}
+                </g>
+
+                {segmentMappingModel.map((cluster) => (
+                  <g key={`${cluster.segment}-label`}>
+                    <line
+                      x1={cluster.cx}
+                      y1={cluster.cy}
+                      x2={cluster.labelX}
+                      y2={cluster.labelY}
+                      stroke={cluster.color}
+                      strokeOpacity="0.38"
+                      strokeWidth="1"
+                    />
+                    <rect
+                      x={cluster.labelX - 4}
+                      y={cluster.labelY - 17}
+                      width="118"
+                      height="39"
+                      rx="6"
+                      fill="var(--color-bg-card)"
+                      stroke={cluster.color}
+                      strokeOpacity="0.38"
+                    />
+                    <circle
+                      cx={cluster.labelX + 8}
+                      cy={cluster.labelY - 4}
+                      r="4"
+                      fill={cluster.color}
+                    />
+                    <text
+                      x={cluster.labelX + 17}
+                      y={cluster.labelY}
+                      fontSize="11"
+                      fontWeight="700"
+                      fill="var(--color-text-primary)"
+                    >
+                      {cluster.segment}
+                    </text>
+                    <text
+                      x={cluster.labelX + 17}
+                      y={cluster.labelY + 15}
+                      fontSize="10"
+                      fill="var(--color-text-muted)"
+                    >
+                      {cluster.pct.toFixed(1)}% - {formatCompactNumber(cluster.count)}
+                    </text>
+                  </g>
+                ))}
 
                 <text
                   x="355"
-                  y="348"
+                  y="386"
                   textAnchor="middle"
                   fontSize="11"
                   fill="var(--chart-axis-text)"
@@ -456,43 +643,15 @@ export default function UserSegmentationPage() {
                 </text>
                 <text
                   x="20"
-                  y="178"
+                  y="185"
                   textAnchor="middle"
-                  transform="rotate(-90, 20, 178)"
+                  transform="rotate(-90, 20, 185)"
                   fontSize="11"
                   fill="var(--chart-axis-text)"
                   style={{ letterSpacing: "0.08em" }}
                 >
                   CUSTOMER LIFETIME VALUE
                 </text>
-
-                {segmentMappingModel.map((cluster) => (
-                  <g key={cluster.segment}>
-                    <ellipse
-                      cx={cluster.cx}
-                      cy={cluster.cy}
-                      rx={cluster.rx}
-                      ry={cluster.ry}
-                      fill={cluster.color}
-                      fillOpacity="0.16"
-                      stroke={cluster.color}
-                      strokeOpacity="0.55"
-                      strokeWidth="2"
-                    />
-                    {cluster.dots.map((dot) => (
-                      <circle
-                        key={dot.key}
-                        cx={dot.x}
-                        cy={dot.y}
-                        r="4.3"
-                        fill={cluster.color}
-                        stroke="#ffffff"
-                        strokeOpacity="0.25"
-                        strokeWidth="1"
-                      />
-                    ))}
-                  </g>
-                ))}
               </svg>
             </div>
           </ChartContainerCard>

@@ -1,64 +1,107 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="{{ language|default('fr') }}" data-report-theme="{{ report_theme|default('dark') }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DIGMACO{% if language == 'en' %} — Complete Analytical Report{% else %} — Rapport Analytique Complet{% endif %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --bg-page:     #0a1628;
-  --bg-sidebar:  #0d1e3a;
-  --bg-card:     #111f38;
-  --bg-card-alt: #0f1d35;
-  --bg-elevated: #152540;
-  --bg-surface:  #1a2d4a;
+  --bg-page:     #0b1326;
+  --bg-sidebar:  #10192b;
+  --bg-card:     #222a3d;
+  --bg-card-alt: #171f33;
+  --bg-elevated: #131b2e;
+  --bg-surface:  #2d3449;
 
-  --border:      #1e3555;
-  --border-mid:  #2a4570;
-  --border-soft: #162d50;
+  --border:      rgba(173, 198, 255, 0.14);
+  --border-mid:  #424754;
+  --border-soft: rgba(66, 71, 84, 0.15);
 
-  --blue:        #3b82f6;
-  --blue-light:  #60a5fa;
-  --blue-dim:    #1e40af;
-  --blue-bg:     #0f2340;
+  --blue:        #4d8eff;
+  --blue-light:  #adc6ff;
+  --blue-dim:    #005ac2;
+  --blue-bg:     rgba(77, 142, 255, 0.14);
 
-  --green:       #10b981;
-  --green-light: #34d399;
-  --green-bg:    #062318;
+  --green:       #22c55e;
+  --green-light: #4ade80;
+  --green-bg:    rgba(34, 197, 94, 0.12);
 
-  --red:         #ef4444;
-  --red-light:   #f87171;
-  --red-bg:      #2a0a0a;
+  --red:         #ffb4ab;
+  --red-light:   #ffb4ab;
+  --red-bg:      rgba(147, 0, 10, 0.22);
 
-  --amber:       #f59e0b;
-  --amber-light: #fcd34d;
-  --amber-bg:    #2a1a00;
+  --amber:       #ffb786;
+  --amber-light: #ffdcc6;
+  --amber-bg:    rgba(223, 116, 18, 0.18);
 
-  --purple:      #8b5cf6;
-  --purple-light:#a78bfa;
-  --purple-bg:   #1a0f35;
+  --purple:      #a78bfa;
+  --purple-light:#c4b5fd;
+  --purple-bg:   rgba(139, 92, 246, 0.14);
 
-  --cyan:        #06b6d4;
-  --cyan-light:  #22d3ee;
-  --cyan-bg:     #061e28;
+  --cyan:        #22d3ee;
+  --cyan-light:  #67e8f9;
+  --cyan-bg:     rgba(6, 182, 212, 0.12);
 
-  --text-primary:   #f0f4ff;
-  --text-secondary: #94a3b8;
-  --text-muted:     #4a6080;
-  --text-disabled:  #2d4060;
+  --text-primary:   #dae2fd;
+  --text-secondary: #c2c6d6;
+  --text-muted:     #8c909f;
+  --text-disabled:  #4a5268;
 
-  --font-display: 'Syne', sans-serif;
-  --font-body:    'DM Sans', sans-serif;
-  --font-mono:    'DM Mono', monospace;
+  --font-display: 'Inter', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-mono:    'Roboto Mono', monospace;
 
   --sidebar-w:    224px;
   --radius-card:  10px;
   --radius-small:  6px;
+}
+
+html[data-report-theme="light"] {
+  --bg-page:     #f8fafc;
+  --bg-sidebar:  #ffffff;
+  --bg-card:     #ffffff;
+  --bg-card-alt: #f1f5f9;
+  --bg-elevated: #e8eef7;
+  --bg-surface:  #eef4ff;
+
+  --border:      #d8e0ec;
+  --border-mid:  #cbd5e1;
+  --border-soft: #e2e8f0;
+
+  --blue:        #2563eb;
+  --blue-light:  #1d4ed8;
+  --blue-dim:    #1e40af;
+  --blue-bg:     rgba(37, 99, 235, 0.09);
+
+  --green:       #16a34a;
+  --green-light: #15803d;
+  --green-bg:    rgba(22, 163, 74, 0.08);
+
+  --red:         #dc2626;
+  --red-light:   #b91c1c;
+  --red-bg:      rgba(220, 38, 38, 0.08);
+
+  --amber:       #d97706;
+  --amber-light: #b45309;
+  --amber-bg:    rgba(217, 119, 6, 0.1);
+
+  --purple:      #7c3aed;
+  --purple-light:#6d28d9;
+  --purple-bg:   rgba(124, 58, 237, 0.08);
+
+  --cyan:        #0891b2;
+  --cyan-light:  #0e7490;
+  --cyan-bg:     rgba(8, 145, 178, 0.08);
+
+  --text-primary:   #0f172a;
+  --text-secondary: #334155;
+  --text-muted:     #64748b;
+  --text-disabled:  #94a3b8;
 }
 
 body {
@@ -68,6 +111,8 @@ body {
   font-size: 14px;
   line-height: 1.6;
   min-height: 100vh;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 body::before {
@@ -323,16 +368,17 @@ body::after { display: none; }
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
+  gap: 14px;
 }
 
 .kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  padding: 18px 16px;
+  padding: 20px 18px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
 }
 .kpi-card::before {
   content: '';
@@ -367,6 +413,10 @@ body::after { display: none; }
   background: var(--amber);
 }
 
+.kpi-grid .kpi-card:nth-child(n + 7) {
+  display: none;
+}
+
 .kpi-label {
   font-size: 10px;
   font-weight: 600;
@@ -378,12 +428,14 @@ body::after { display: none; }
 
 .kpi-value {
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 800;
+  font-size: 26px;
+  font-weight: 900;
   color: var(--text-primary);
   line-height: 1;
   margin-bottom: 8px;
   -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
 }
 
 .kpi-delta {
@@ -763,36 +815,33 @@ body::after { display: none; }
 
 /* ─── PDF / PRINT OVERRIDES ────────────────── */
 @page {
-  margin: 12mm 15mm;
+  margin: 0;
   size: A4 portrait;
 }
 
 @media print {
-  :root {
-    --bg-page:    #ffffff;
-    --bg-sidebar: #f8fafc;
-    --bg-card:    #f1f5f9;
-    --bg-elevated:#e2e8f0;
-    --border:     #cbd5e1;
-    --border-mid: #94a3b8;
-    --text-primary:   #0f172a;
-    --text-secondary: #334155;
-    --text-muted:     #64748b;
-  }
-
   body::before { display: none; }
   body::after  { display: none; }
+
+  html,
+  body,
+  .layout,
+  .main,
+  .page-content {
+    background: var(--bg-page) !important;
+    color: var(--text-primary) !important;
+  }
 
   .sidebar { display: none !important; }
   .main    { margin-left: 0 !important; }
 
   .topbar {
     position: static !important;
-    background: #f8fafc !important;
-    border-bottom: 1px solid #cbd5e1 !important;
+    background: var(--bg-sidebar) !important;
+    border-bottom: 1px solid var(--border-mid) !important;
   }
 
-  .page-content { padding: 16px !important; }
+  .page-content { padding: 12mm 15mm 16mm !important; }
 
   .card, .kpi-card, .ai-block, .seg-card {
     break-inside: avoid;
@@ -1068,6 +1117,21 @@ body::after { display: none; }
         <span class="section-num">01</span>
         <span class="section-title">{{ _NAV_EXEC }}</span>
         <span class="section-subtitle">{{ _PERIOD }} {{ date_range }}</span>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:14px">
+        <div class="card" style="padding:12px">
+          <div class="card-title">Type de rapport</div>
+          <div class="ai-text">{{ report_type_label }}</div>
+        </div>
+        <div class="card" style="padding:12px">
+          <div class="card-title">Services inclus</div>
+          <div class="ai-text">{{ services_list }}</div>
+        </div>
+        <div class="card" style="padding:12px">
+          <div class="card-title">Sections demandées</div>
+          <div class="ai-text">{{ sections_selected_text }}</div>
+        </div>
       </div>
 
       <!-- KPI GRID -->

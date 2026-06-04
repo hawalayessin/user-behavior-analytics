@@ -1,0 +1,14 @@
+\begin{tabular}{lrrrrrl}
+\toprule
+Algorithme & ROC-AUC & PR-AUC & Accuracy & F1 & Temps & Interpretabilite \\
+\midrule
+Random Forest (class\_weight/scale\_pos\_weight) & 0.7720 & 0.4155 & 0.7690 & 0.4110 & 7.2527 & Moyenne \\
+Random Forest (SMOTE) & 0.7717 & 0.4154 & 0.7680 & 0.4113 & 15.6111 & Moyenne \\
+XGBoost (class\_weight/scale\_pos\_weight) & 0.7682 & 0.4062 & 0.7616 & 0.4122 & 1.1742 & Moyenne \\
+XGBoost (SMOTE) & 0.7588 & 0.3868 & 0.7697 & 0.3925 & 2.7929 & Moyenne \\
+SVM (RBF) (class\_weight/scale\_pos\_weight) & 0.6590 & 0.2341 & 0.7726 & 0.2693 & 0.1215 & Faible \\
+SVM (RBF) (SMOTE) & 0.6542 & 0.2387 & 0.7832 & 0.2529 & 0.2570 & Faible \\
+Logistic Regression (SMOTE) & 0.6093 & 0.2600 & 0.7724 & 0.2541 & 1.9416 & Forte \\
+Logistic Regression (class\_weight/scale\_pos\_weight) & 0.6093 & 0.2600 & 0.7724 & 0.2541 & 0.6028 & Forte \\
+\bottomrule
+\end{tabular}

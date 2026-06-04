@@ -6,6 +6,7 @@ from datetime import date, datetime, time
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.utils.temporal import get_data_bounds
@@ -13,6 +14,17 @@ from app.utils.temporal import get_data_bounds
 
 _SEGMENT_ORDER = ["Power Users", "Regular Loyals", "Occasional Users", "Trial Only"]
 _SUCCESS_STATUS_SQL = "UPPER(TRIM(COALESCE(be.status, ''))) = 'SUCCESS'"
+
+
+def _exec_with_timeout_retry(db: Session, sql_text, params: dict):
+    try:
+        return db.execute(sql_text, params)
+    except OperationalError as exc:
+        if "statement timeout" not in str(exc).lower():
+            raise
+        db.rollback()
+        db.execute(text("SET LOCAL statement_timeout = 0"))
+        return db.execute(sql_text, params)
 
 
 def _normalize_range(
@@ -63,7 +75,8 @@ def get_user_segments(
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
 
-    rows = db.execute(
+    rows = _exec_with_timeout_retry(
+        db,
         text(
             f"""
             WITH user_stats AS (
@@ -116,13 +129,14 @@ def get_user_segments(
                     CASE
                         WHEN us.billing_count = 0
                             THEN 'Trial Only'
-                        WHEN us.billing_count >= COALESCE(p.p75_billing, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(p.p75_revenue, us.revenue + 1)
+                        WHEN us.billing_count >= 2
+                          OR us.active_days >= 3
+                          OR us.sub_count >= 3
                             THEN 'Power Users'
-                        WHEN us.billing_count <= COALESCE(p.p25_billing, us.billing_count)
-                          AND us.revenue <= COALESCE(p.p25_revenue, us.revenue)
-                            THEN 'Occasional Users'
-                        ELSE 'Regular Loyals'
+                        WHEN us.active_days >= 2
+                          OR us.sub_count >= 2
+                            THEN 'Regular Loyals'
+                        ELSE 'Occasional Users'
                     END AS segment
                 FROM user_stats us
                 CROSS JOIN percentiles p
@@ -159,7 +173,8 @@ def get_segment_distribution(
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
 
-    rows = db.execute(
+    rows = _exec_with_timeout_retry(
+        db,
         text(
             f"""
             WITH user_stats AS (
@@ -170,6 +185,8 @@ def get_segment_distribution(
                         SUM(COALESCE(st.price, 0)) FILTER (WHERE {_SUCCESS_STATUS_SQL}),
                         0
                     ) AS revenue,
+                    COUNT(DISTINCT DATE(be.event_datetime)) AS active_days,
+                    COUNT(DISTINCT s.id) AS sub_count,
                     MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
@@ -183,30 +200,21 @@ def get_segment_distribution(
                   {service_filter}
                 GROUP BY s.user_id
             ),
-            pct AS (
-                SELECT
-                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY billing_count) AS p25_b,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY billing_count) AS p75_b,
-                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY revenue) AS p25_r,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY revenue) AS p75_r
-                FROM user_stats
-                WHERE billing_count > 0
-            ),
             segmented AS (
                 SELECT
                     CASE
                         WHEN us.billing_count = 0
                             THEN 'Trial Only'
-                        WHEN us.billing_count >= COALESCE(pct.p75_b, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(pct.p75_r, us.revenue + 1)
+                        WHEN us.billing_count >= 2
+                          OR us.active_days >= 3
+                          OR us.sub_count >= 3
                             THEN 'Power Users'
-                        WHEN us.billing_count <= COALESCE(pct.p25_b, us.billing_count)
-                          AND us.revenue <= COALESCE(pct.p25_r, us.revenue)
-                            THEN 'Occasional Users'
-                        ELSE 'Regular Loyals'
+                        WHEN us.active_days >= 2
+                          OR us.sub_count >= 2
+                            THEN 'Regular Loyals'
+                        ELSE 'Occasional Users'
                     END AS segment
                 FROM user_stats us
-                CROSS JOIN pct
             ),
             stats AS (
                 SELECT segment, COUNT(*) AS cnt
@@ -267,7 +275,8 @@ def get_segment_kpis(
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
 
-    row = db.execute(
+    row = _exec_with_timeout_retry(
+        db,
         text(
             f"""
             WITH user_stats AS (
@@ -278,6 +287,8 @@ def get_segment_kpis(
                         SUM(COALESCE(st.price, 0)) FILTER (WHERE {_SUCCESS_STATUS_SQL}),
                         0
                     ) AS revenue,
+                    COUNT(DISTINCT DATE(be.event_datetime)) AS active_days,
+                    COUNT(DISTINCT s.id) AS sub_count,
                     MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
@@ -293,10 +304,6 @@ def get_segment_kpis(
             ),
             pct AS (
                 SELECT
-                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY billing_count) AS p25_b,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY billing_count) AS p75_b,
-                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY revenue) AS p25_r,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY revenue) AS p75_r,
                     AVG(revenue) AS avg_revenue
                 FROM user_stats
                 WHERE billing_count > 0
@@ -307,18 +314,18 @@ def get_segment_kpis(
                     CASE
                         WHEN us.billing_count = 0
                             THEN 'Trial Only'
-                        WHEN us.billing_count >= COALESCE(pct.p75_b, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(pct.p75_r, us.revenue + 1)
+                        WHEN us.billing_count >= 2
+                          OR us.active_days >= 3
+                          OR us.sub_count >= 3
                             THEN 'Power Users'
-                        WHEN us.billing_count <= COALESCE(pct.p25_b, us.billing_count)
-                          AND us.revenue <= COALESCE(pct.p25_r, us.revenue)
-                            THEN 'Occasional Users'
-                        ELSE 'Regular Loyals'
+                        WHEN us.active_days >= 2
+                          OR us.sub_count >= 2
+                            THEN 'Regular Loyals'
+                        ELSE 'Occasional Users'
                     END AS segment,
                     us.revenue,
                     us.has_churn
                 FROM user_stats us
-                CROSS JOIN pct
             ),
             stats AS (
                 SELECT
@@ -402,7 +409,8 @@ def get_segment_profiles(
     start, end = _normalize_range(db, start_date, end_date)
     service_filter = _service_filter(service_id)
 
-    rows = db.execute(
+    rows = _exec_with_timeout_retry(
+        db,
         text(
             f"""
             WITH user_stats AS (
@@ -416,6 +424,7 @@ def get_segment_profiles(
                     COUNT(DISTINCT DATE(be.event_datetime)) AS active_days,
                     COUNT(DISTINCT DATE(be.event_datetime))
                         FILTER (WHERE be.event_datetime >= :end - INTERVAL '30 day') AS active_days_30d,
+                    COUNT(DISTINCT s.id) AS sub_count,
                     MAX(CASE WHEN s.status IN ('cancelled', 'expired') THEN 1 ELSE 0 END) AS has_churn
                 FROM subscriptions s
                                 LEFT JOIN billing_events be
@@ -429,35 +438,26 @@ def get_segment_profiles(
                   {service_filter}
                 GROUP BY s.user_id
             ),
-            pct AS (
-                SELECT
-                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY billing_count) AS p25_b,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY billing_count) AS p75_b,
-                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY revenue) AS p25_r,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY revenue) AS p75_r
-                FROM user_stats
-                WHERE billing_count > 0
-            ),
             segmented AS (
                 SELECT
                     us.user_id,
                     CASE
                         WHEN us.billing_count = 0
                             THEN 'Trial Only'
-                        WHEN us.billing_count >= COALESCE(pct.p75_b, us.billing_count + 1)
-                         AND us.revenue >= COALESCE(pct.p75_r, us.revenue + 1)
+                        WHEN us.billing_count >= 2
+                          OR us.active_days >= 3
+                          OR us.sub_count >= 3
                             THEN 'Power Users'
-                        WHEN us.billing_count <= COALESCE(pct.p25_b, us.billing_count)
-                          AND us.revenue <= COALESCE(pct.p25_r, us.revenue)
-                            THEN 'Occasional Users'
-                        ELSE 'Regular Loyals'
+                        WHEN us.active_days >= 2
+                          OR us.sub_count >= 2
+                            THEN 'Regular Loyals'
+                        ELSE 'Occasional Users'
                     END AS segment,
                     us.revenue,
                     us.active_days,
                     us.active_days_30d,
                     us.has_churn
                 FROM user_stats us
-                CROSS JOIN pct
             ),
             churn AS (
                 SELECT

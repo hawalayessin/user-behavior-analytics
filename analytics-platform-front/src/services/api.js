@@ -6,6 +6,8 @@ const api = axios.create({
 })
 
 let inMemoryAccessToken = null
+let authRefreshHandler = null
+let authFailureHandler = null
 
 export function setAccessToken(token) {
   inMemoryAccessToken = token || null
@@ -13,6 +15,14 @@ export function setAccessToken(token) {
 
 export function getAccessToken() {
   return inMemoryAccessToken
+}
+
+export function setAuthRefreshHandler(handler) {
+  authRefreshHandler = typeof handler === "function" ? handler : null
+}
+
+export function setAuthFailureHandler(handler) {
+  authFailureHandler = typeof handler === "function" ? handler : null
 }
 
 const inFlightGetRequests = new Map()
@@ -73,6 +83,49 @@ api.interceptors.request.use((config) => {
   }
   return config
 })
+
+function shouldAttemptTokenRefresh(error) {
+  const status = error?.response?.status
+  const config = error?.config
+  if (status !== 401 || !config || config._retry || config.skipAuthRefresh) {
+    return false
+  }
+
+  const url = String(config.url || "")
+  return !(
+    url.includes("/auth/login") ||
+    url.includes("/auth/refresh") ||
+    url.includes("/auth/logout")
+  )
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (!shouldAttemptTokenRefresh(error)) {
+      return Promise.reject(error)
+    }
+
+    const originalRequest = error.config
+    originalRequest._retry = true
+
+    try {
+      const newToken = authRefreshHandler ? await authRefreshHandler() : null
+      if (newToken) {
+        originalRequest.headers = originalRequest.headers || {}
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        return api(originalRequest)
+      }
+    } catch {
+      // Fall through to auth failure handling below.
+    }
+
+    if (authFailureHandler) {
+      authFailureHandler()
+    }
+    return Promise.reject(error)
+  },
+)
 
 export async function getWithCache(url, { params = null, force = false, ttlMs = DEFAULT_GET_CACHE_TTL_MS } = {}) {
   const cacheKey = buildCacheKey(url, params)

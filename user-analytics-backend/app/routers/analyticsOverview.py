@@ -395,7 +395,19 @@ def _summary_sms_block(params: dict, service_id: Optional[str]):
                 FROM sms_events
             ),
             cur AS (
-                SELECT se.*
+                SELECT
+                    se.*,
+                    (
+                        LOWER(COALESCE(se.event_type, '')) = 'otp'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%otp%'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%code%'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%verification%'
+                    ) AS is_otp_flag,
+                    (
+                        LOWER(COALESCE(se.event_type, '')) IN ('subscription', 'activation', 'resubscribe')
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%activation%'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%subscribe%'
+                    ) AS is_activation_flag
                 FROM sms_events se
                 CROSS JOIN anchor a
                 WHERE a.ts IS NOT NULL
@@ -404,7 +416,19 @@ def _summary_sms_block(params: dict, service_id: Optional[str]):
                   {sf_sms}
             ),
             prev AS (
-                SELECT se.*
+                SELECT
+                    se.*,
+                    (
+                        LOWER(COALESCE(se.event_type, '')) = 'otp'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%otp%'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%code%'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%verification%'
+                    ) AS is_otp_flag,
+                    (
+                        LOWER(COALESCE(se.event_type, '')) IN ('subscription', 'activation', 'resubscribe')
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%activation%'
+                        OR LOWER(COALESCE(se.message_content, '')) LIKE '%subscribe%'
+                    ) AS is_activation_flag
                 FROM sms_events se
                 CROSS JOIN anchor a
                 WHERE a.ts IS NOT NULL
@@ -415,11 +439,11 @@ def _summary_sms_block(params: dict, service_id: Optional[str]):
             cur_rates AS (
                 SELECT
                     COALESCE(
-                        ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        ROUND(COUNT(*) FILTER (WHERE is_otp_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                         0
                     ) AS otp_templates_pct,
                     COALESCE(
-                        ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        ROUND(COUNT(*) FILTER (WHERE is_activation_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                         0
                     ) AS activation_templates_pct,
                     COALESCE(
@@ -433,11 +457,11 @@ def _summary_sms_block(params: dict, service_id: Optional[str]):
             prev_rates AS (
                 SELECT
                     COALESCE(
-                        ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        ROUND(COUNT(*) FILTER (WHERE is_otp_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                         0
                     ) AS otp_templates_pct,
                     COALESCE(
-                        ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                        ROUND(COUNT(*) FILTER (WHERE is_activation_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                         0
                     ) AS activation_templates_pct
                 FROM prev
@@ -947,7 +971,19 @@ def _compute_overview_payload(
             FROM sms_events
         ),
         cur AS (
-            SELECT se.*
+            SELECT
+                se.*,
+                (
+                    LOWER(COALESCE(se.event_type, '')) = 'otp'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%otp%'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%code%'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%verification%'
+                ) AS is_otp_flag,
+                (
+                    LOWER(COALESCE(se.event_type, '')) IN ('subscription', 'activation', 'resubscribe')
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%activation%'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%subscribe%'
+                ) AS is_activation_flag
             FROM sms_events se
             CROSS JOIN anchor a
             WHERE a.ts IS NOT NULL
@@ -956,7 +992,19 @@ def _compute_overview_payload(
               {"AND se.service_id = CAST(:service_id AS uuid)" if service_id else ""}
         ),
         prev AS (
-            SELECT se.*
+            SELECT
+                se.*,
+                (
+                    LOWER(COALESCE(se.event_type, '')) = 'otp'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%otp%'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%code%'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%verification%'
+                ) AS is_otp_flag,
+                (
+                    LOWER(COALESCE(se.event_type, '')) IN ('subscription', 'activation', 'resubscribe')
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%activation%'
+                    OR LOWER(COALESCE(se.message_content, '')) LIKE '%subscribe%'
+                ) AS is_activation_flag
             FROM sms_events se
             CROSS JOIN anchor a
             WHERE a.ts IS NOT NULL
@@ -967,11 +1015,11 @@ def _compute_overview_payload(
         cur_rates AS (
             SELECT
                 COALESCE(
-                    ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    ROUND(COUNT(*) FILTER (WHERE is_otp_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                     0
                 ) AS otp_templates_pct,
                 COALESCE(
-                    ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    ROUND(COUNT(*) FILTER (WHERE is_activation_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                     0
                 ) AS activation_templates_pct,
                 COALESCE(
@@ -985,11 +1033,11 @@ def _compute_overview_payload(
         prev_rates AS (
             SELECT
                 COALESCE(
-                    ROUND(COUNT(*) FILTER (WHERE is_otp = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    ROUND(COUNT(*) FILTER (WHERE is_otp_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                     0
                 ) AS otp_templates_pct,
                 COALESCE(
-                    ROUND(COUNT(*) FILTER (WHERE is_activation = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
+                    ROUND(COUNT(*) FILTER (WHERE is_activation_flag = true) * 100.0 / NULLIF(COUNT(*), 0), 1),
                     0
                 ) AS activation_templates_pct
             FROM prev

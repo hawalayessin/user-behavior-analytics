@@ -1,0 +1,87 @@
+{
+  "data_source": {
+    "type": "analytics_db",
+    "builder": "ml_models.churn_predictor.ChurnPredictor.generate_training_dataset",
+    "features": [
+      "days_since_last_activity",
+      "nb_activities_7d",
+      "nb_activities_30d",
+      "billing_failures_30d",
+      "days_since_first_charge",
+      "avg_retention_d7"
+    ],
+    "target_column": "churned"
+  },
+  "dataset_quality": {
+    "n_rows": 272209,
+    "n_features": 6,
+    "n_positive": 43819,
+    "n_negative": 228390,
+    "positive_rate": 0.160975573915631,
+    "missing_values_total": 0,
+    "numeric_features": 6,
+    "categorical_features": 0,
+    "class_imbalance_ratio": 5.212122595221251
+  },
+  "split": {
+    "train_rows": 190546,
+    "validation_rows": 40831,
+    "random_state": 42,
+    "stratify": true
+  },
+  "curve": [
+    {
+      "fraction": 0.02,
+      "train_rows": 3810,
+      "train_roc_auc": 0.6196954628651146,
+      "validation_roc_auc": 0.6132149756800662,
+      "generalization_gap": 0.006480487185048345,
+      "fit_seconds": 0.027157599999554805
+    },
+    {
+      "fraction": 0.05,
+      "train_rows": 9527,
+      "train_roc_auc": 0.6213660959206321,
+      "validation_roc_auc": 0.6132150156484762,
+      "generalization_gap": 0.00815108027215583,
+      "fit_seconds": 0.027909100000215403
+    },
+    {
+      "fraction": 0.1,
+      "train_rows": 19054,
+      "train_roc_auc": 0.6217893781442776,
+      "validation_roc_auc": 0.6124828898567343,
+      "generalization_gap": 0.009306488287543324,
+      "fit_seconds": 0.06538589999945543
+    },
+    {
+      "fraction": 0.25,
+      "train_rows": 47636,
+      "train_roc_auc": 0.6152437811621232,
+      "validation_roc_auc": 0.6132429158191476,
+      "generalization_gap": 0.0020008653429756107,
+      "fit_seconds": 0.18092199999955483
+    },
+    {
+      "fraction": 0.5,
+      "train_rows": 95273,
+      "train_roc_auc": 0.6150881390006212,
+      "validation_roc_auc": 0.6132153287343549,
+      "generalization_gap": 0.0018728102662662893,
+      "fit_seconds": 0.20530969999981608
+    },
+    {
+      "fraction": 1.0,
+      "train_rows": 190546,
+      "train_roc_auc": 0.6126308907403464,
+      "validation_roc_auc": 0.6132151844039854,
+      "generalization_gap": -0.0005842936636389906,
+      "fit_seconds": 0.4916528000003382
+    }
+  ],
+  "artifacts": {
+    "plot": "C:\\Users\\Yessine-PC\\Desktop\\pfev0\\reports\\churn_model_comparison\\logistic_regression_overfitting_curve.png",
+    "csv": "C:\\Users\\Yessine-PC\\Desktop\\pfev0\\reports\\churn_model_comparison\\logistic_regression_overfitting_curve.csv",
+    "interpretation": "C:\\Users\\Yessine-PC\\Desktop\\pfev0\\reports\\churn_model_comparison\\logistic_regression_overfitting_interpretation.md"
+  }
+}

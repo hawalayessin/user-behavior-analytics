@@ -97,7 +97,7 @@ def get_campaigns_list(
     end_date: Optional[date] = Query(default=None),
     service_id: Optional[str] = Query(default=None),
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=200),
     db: Session = Depends(get_db),
     user = Depends(get_current_user),
 ):
@@ -515,4 +515,3 @@ def get_campaign_timeline(
             for r in rows
         ]
     }
-

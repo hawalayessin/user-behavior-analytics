@@ -14,6 +14,8 @@ from app.services.business_rules import build_trial_exception_summary
 
 router = APIRouter(prefix="/analytics", tags=["Trial Analytics"])
 
+TRIAL_KPIS_CACHE_VERSION = "2026-06-04-v2-paid-conversion"
+
 
 # ══════════════════════════════════════════════════════════════════
 # GET /analytics/trial/kpis
@@ -33,6 +35,7 @@ def get_trial_kpis(
             "start_date": start_dt.isoformat(),
             "end_date": end_dt.isoformat(),
             "service_id": service_id or "all",
+            "version": TRIAL_KPIS_CACHE_VERSION,
         },
     )
 
@@ -71,32 +74,68 @@ def _compute_trial_kpis(
     }
 
     sf = "AND service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
+    sf_s = "AND s.service_id = CAST(:service_id AS uuid)" if valid_service_id else ""
 
     # ── 1. Total Trials Started ────────────────────────────────
     total_trials = db.execute(text(f"""
-        SELECT COUNT(*) AS total
+        SELECT COUNT(DISTINCT user_id) AS total
         FROM subscriptions
         WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
           AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+          AND subscription_start_date <= CAST(:anchor_dt AS timestamp)
         {sf}
     """), params).scalar() or 0
 
     # ── 2. Conversion & status breakdown ───────────────────────
     conversion_data = db.execute(text(f"""
+        WITH selected_trial_users AS (
+            SELECT DISTINCT s.user_id
+            FROM subscriptions s
+            WHERE s.subscription_start_date >= CAST(:start_dt AS timestamp)
+              AND s.subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
+              AND s.subscription_start_date <= CAST(:anchor_dt AS timestamp)
+              {sf_s}
+        ),
+        paid_users AS (
+            SELECT DISTINCT s.user_id
+            FROM subscriptions s
+            JOIN billing_events be ON be.subscription_id = s.id
+            WHERE UPPER(TRIM(COALESCE(be.status, ''))) = 'SUCCESS'
+              {sf_s}
+        ),
+        active_trial_users AS (
+            SELECT DISTINCT s.user_id
+            FROM subscriptions s
+            JOIN selected_trial_users stu ON stu.user_id = s.user_id
+            WHERE LOWER(TRIM(COALESCE(s.status, ''))) IN ('trial', 'pending')
+              {sf_s}
+        ),
+        aggregates AS (
+            SELECT
+                COUNT(*) AS total_trial_users,
+                COUNT(*) FILTER (WHERE pu.user_id IS NOT NULL) AS converted_users,
+                COUNT(*) FILTER (WHERE pu.user_id IS NULL) AS trial_only_users
+            FROM selected_trial_users stu
+            LEFT JOIN paid_users pu ON pu.user_id = stu.user_id
+        )
         SELECT
-            COUNT(*) FILTER (WHERE status IN ('trial', 'pending', 'active', 'cancelled', 'expired')) AS total_all,
-                        COUNT(*) FILTER (WHERE status = 'active')       AS active_subs,
-                        COUNT(*) FILTER (WHERE status IN ('cancelled', 'expired')) AS dropped_subs,
-            COUNT(*) FILTER (WHERE status IN ('trial', 'pending')) AS trial_subs
-        FROM subscriptions
-        WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
-          AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-        {sf}
+            a.total_trial_users,
+            a.converted_users,
+            a.trial_only_users,
+            (SELECT COUNT(*) FROM active_trial_users) AS active_trial_users,
+            GREATEST(
+                a.trial_only_users - (SELECT COUNT(*) FROM active_trial_users),
+                0
+            ) AS dropped_unconverted_users
+        FROM aggregates a
     """), params).fetchone()
 
-    total_all    = conversion_data.total_all    or 0
-    active_count = conversion_data.active_subs  or 0
-    conversion_rate = round((active_count / total_all * 100), 1) if total_all > 0 else 0.0
+    total_trial_users = int(conversion_data.total_trial_users or 0)
+    converted_users = int(conversion_data.converted_users or 0)
+    trial_only_users = int(conversion_data.trial_only_users or 0)
+    active_trial_users = int(conversion_data.active_trial_users or 0)
+    dropped_unconverted_users = int(conversion_data.dropped_unconverted_users or 0)
+    conversion_rate = round((converted_users / total_trial_users * 100), 1) if total_trial_users > 0 else 0.0
 
     # ── 3. Average Trial Duration ──────────────────────────────
     # ✅ GREATEST(0, ...) évite les valeurs négatives
@@ -142,31 +181,8 @@ def _compute_trial_kpis(
     total_count    = dropoff_data.total_count      or 0
     dropoff_j3     = round((dropoff_count / total_count * 100), 1) if total_count > 0 else 0.0
 
-    # ── 5. Trial-only users (never converted to active) ────────
-    trial_only = db.execute(text(f"""
-        WITH trial_users AS (
-            SELECT DISTINCT user_id
-            FROM subscriptions
-            WHERE subscription_start_date >= CAST(:start_dt AS timestamp)
-              AND subscription_start_date <= CAST(:end_dt AS timestamp) + INTERVAL '1 day'
-              {sf}
-        ),
-        has_active AS (
-            SELECT DISTINCT user_id
-            FROM subscriptions
-            WHERE status = 'active'
-              {sf}
-        )
-        SELECT
-          COUNT(*) AS trial_only_users,
-          COUNT(*) * 100.0 / NULLIF((SELECT COUNT(*) FROM trial_users), 0) AS trial_only_rate
-        FROM trial_users tu
-        LEFT JOIN has_active ha ON ha.user_id = tu.user_id
-        WHERE ha.user_id IS NULL
-    """), params).fetchone()
-
-    trial_only_users = int(trial_only.trial_only_users or 0)
-    trial_only_rate = float(trial_only.trial_only_rate or 0.0)
+    # ── 5. Trial-only users (no successful paid billing) ───────
+    trial_only_rate = round((trial_only_users / total_trial_users * 100), 1) if total_trial_users > 0 else 0.0
 
     # ── 6. Business exceptions (promotion / trial extension) ──────────
     exceptions_row = db.execute(text(f"""
@@ -203,10 +219,10 @@ def _compute_trial_kpis(
         "dropoff_j3":        float(dropoff_j3),
         "trial_only_users":  trial_only_users,
         "trial_only_rate":   trial_only_rate,
-        "active_trials":     int(conversion_data.trial_subs or 0),
-        "converted_trials":  int(conversion_data.active_subs or 0),
-        "cancelled_trials":  int(conversion_data.dropped_subs or 0),
-        "dropped_trials":    int(conversion_data.dropped_subs or 0),
+        "active_trials":     active_trial_users,
+        "converted_trials":  converted_users,
+        "cancelled_trials":  dropped_unconverted_users,
+        "dropped_trials":    dropped_unconverted_users,
         "business_exception_rules": exception_summary,
     }
 

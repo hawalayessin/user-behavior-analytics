@@ -3,7 +3,7 @@ import { FileText, Check, Loader2, Download, AlertCircle, ChevronDown, X, Lightb
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const REPORT_TYPES = [
   {
@@ -128,7 +128,7 @@ export default function ReportGeneratorPage() {
   const [includeAI, setIncludeAI] = useState(true);
   const [includeRecs, setIncludeRecs] = useState(true);
   const [reportLanguage, setReportLanguage] = useState('fr');
-  const [geminiPromptTemplate, setGeminiPromptTemplate] = useState('');
+  const [reportTheme, setReportTheme] = useState('dark');
   const [periodStart, setPeriodStart] = useState('2025-09-01');
   const [periodEnd, setPeriodEnd] = useState('2025-10-31');
 
@@ -143,7 +143,9 @@ export default function ReportGeneratorPage() {
   const [histLoading, setHistLoading] = useState(false);
 
   const pollingRef = useRef(null);
+  const pollingBusyRef = useRef(false);
   const fakeProgressRef = useRef(null);
+  const historyBusyRef = useRef(false);
   const servicesDropdownRef = useRef(null);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
 
@@ -213,6 +215,8 @@ export default function ReportGeneratorPage() {
     if (pollingRef.current) clearInterval(pollingRef.current);
 
     pollingRef.current = setInterval(async () => {
+      if (pollingBusyRef.current) return;
+      pollingBusyRef.current = true;
       try {
         const res = await authFetch(`${API_BASE}/reports/status/${id}`);
         if (!res) return;
@@ -239,6 +243,8 @@ export default function ReportGeneratorPage() {
       } catch {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
+      } finally {
+        pollingBusyRef.current = false;
       }
     }, 2000);
   };
@@ -297,7 +303,7 @@ export default function ReportGeneratorPage() {
     setSelectedSections(mapped);
   }, [reportType]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (overrides = {}) => {
     if (!access_token) {
       setError('Session expirée. Veuillez vous reconnecter.');
       navigate('/login');
@@ -354,10 +360,10 @@ export default function ReportGeneratorPage() {
           services_included: selectedServices,
           sections_included: selectedSections,
           distribution_format: 'pdf',
-          include_ai_insights: includeAI,
+          include_ai_insights: overrides.includeAI ?? includeAI,
           include_recommendations: includeRecs,
           language: reportLanguage,
-          gemini_prompt_template: geminiPromptTemplate,
+          report_theme: reportTheme,
         }),
       });
       if (!res) return;
@@ -407,19 +413,43 @@ export default function ReportGeneratorPage() {
     }
   };
 
+  const handleConsult = async (id) => {
+    if (!access_token) {
+      setError('Session expirée. Veuillez vous reconnecter.');
+      navigate('/login');
+      return;
+    }
+    try {
+      const res = await authFetch(
+        `${API_BASE}/reports/download/${id}`,
+        {
+          headers: { Authorization: `Bearer ${access_token}` },
+        }
+      );
+      if (!res) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setError('Consultation impossible.');
+    }
+  };
+
   const fetchHistory = async () => {
     if (!access_token) return;
+    if (historyBusyRef.current) return;
+    historyBusyRef.current = true;
     setHistLoading(true);
     try {
-      const res = await authFetch(`${API_BASE}/reports/history`, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      });
+      const res = await authFetch(`${API_BASE}/reports/history`);
       if (!res) return;
       const data = await res.json();
       setHistory(data);
     } catch {
       console.error('History fetch failed');
     } finally {
+      historyBusyRef.current = false;
       setHistLoading(false);
     }
   };
@@ -785,16 +815,57 @@ export default function ReportGeneratorPage() {
                   </select>
                 </div>
                 <div style={styles.aiConfigBlock}>
-                  <label style={styles.aiConfigLabel}>Gemini custom prompt</label>
-                  <textarea
-                    value={geminiPromptTemplate}
-                    onChange={(e) => setGeminiPromptTemplate(e.target.value)}
-                    placeholder="Ex: Prioritize concise recommendations, include quantified impact and confidence score."
-                    style={styles.aiConfigTextarea}
-                  />
+                  <label style={styles.aiConfigLabel}>PDF theme</label>
+                  <div style={styles.themeSegmented}>
+                    {[
+                      { id: 'dark', label: 'Dark' },
+                      { id: 'light', label: 'Light' },
+                    ].map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => setReportTheme(theme.id)}
+                        style={{
+                          ...styles.themeSegmentButton,
+                          ...(reportTheme === theme.id
+                            ? styles.themeSegmentButtonActive
+                            : {}),
+                        }}
+                      >
+                        {theme.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+              <div style={styles.economyModeCard}>
+                <p style={styles.economyModeText}>
+                  Economy mode generates the report with business rules without calling the Gemini API.
+                  Recommended for daily tests.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIncludeAI(false);
+                    handleGenerate({ includeAI: false });
+                  }}
+                  disabled={isLaunching}
+                  style={{
+                    ...styles.economyModeButton,
+                    ...(isLaunching && styles.generateButtonDisabled),
+                  }}
+                >
+                  Generate without AI (save quota)
+                </button>
+              </div>
             </div>
+
+            {error && (
+              <div style={styles.inlineErrorBox}>
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
 
             {/* Generate Button */}
             <button
@@ -926,9 +997,11 @@ export default function ReportGeneratorPage() {
             <div style={styles.previewStats}>
               <span style={styles.statChip}>~18 pages estimated</span>
               <span style={styles.statChip}>PDF Format</span>
-              <span style={styles.statChip}>Gemini AI included</span>
               <span style={styles.statChip}>
-                {selectedServices.length} services
+                {includeAI ? 'Gemini AI included' : 'Rule-based mode'}
+              </span>
+              <span style={styles.statChip}>
+                {reportTheme === 'dark' ? 'Dark theme' : 'Light theme'}
               </span>
             </div>
           </div>
@@ -937,7 +1010,9 @@ export default function ReportGeneratorPage() {
           <div style={styles.historyCard}>
             <div style={styles.historyHeader}>
               <h3 style={styles.historyTitle}>Recent Reports</h3>
-              <button style={styles.seeAllButton}>View all →</button>
+              <button style={styles.seeAllButton}>
+                {histLoading ? 'Loading...' : 'View all ->'}
+              </button>
             </div>
 
             {history.length === 0 ? (
@@ -1057,7 +1132,7 @@ export default function ReportGeneratorPage() {
 
             <p style={styles.modalSubtitle}>
               {activeRun.status === 'success'
-                ? 'Your PDF report is ready to download'
+                ? 'Your PDF report is ready. Choose how you want to open it.'
                 : 'AI is analyzing your DigMaco data...'}
             </p>
 
@@ -1161,23 +1236,34 @@ export default function ReportGeneratorPage() {
               )}
 
               {activeRun.status === 'success' && (
-                <>
-                  <button
-                    onClick={() => {
-                      handleDownload(reportId);
-                    }}
-                    style={styles.buttonPrimary}
-                  >
-                    <Download size={16} />
-                    Download PDF
-                  </button>
+                <div className="rg-success-actions" style={styles.successActions}>
+                  <div className="rg-success-action-row" style={styles.successActionRow}>
+                    <button
+                      onClick={() => {
+                        handleConsult(reportId);
+                      }}
+                      style={styles.buttonPrimary}
+                    >
+                      <FileText size={16} />
+                      <span>Consult Report</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDownload(reportId);
+                      }}
+                      style={styles.buttonOutlined}
+                    >
+                      <Download size={16} />
+                      <span>Download Report</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => setShowModal(false)}
-                    style={styles.buttonOutlined}
+                    style={styles.buttonGhost}
                   >
                     Close
                   </button>
-                </>
+                </div>
               )}
 
               {activeRun.status === 'failed' && (
@@ -1244,6 +1330,9 @@ export default function ReportGeneratorPage() {
         }
         .rg-ai-option-card {
           flex-wrap: wrap;
+        }
+        .rg-success-action-row {
+          grid-template-columns: 1fr !important;
         }
       }
       .rg-ai-option-card {
@@ -1738,6 +1827,30 @@ const styles = {
     fontSize: '12px',
     fontWeight: 600,
     color: 'var(--color-text-secondary)',
+  },
+  themeSegmented: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '6px',
+    padding: '4px',
+    borderRadius: '10px',
+    backgroundColor: 'var(--color-bg-elevated)',
+    border: '1px solid var(--color-border)',
+  },
+  themeSegmentButton: {
+    border: 'none',
+    borderRadius: '7px',
+    padding: '9px 12px',
+    backgroundColor: 'transparent',
+    color: 'var(--color-text-muted)',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  themeSegmentButtonActive: {
+    backgroundColor: 'var(--color-primary)',
+    color: 'white',
+    boxShadow: '0 8px 20px rgba(37, 99, 235, 0.22)',
   },
   aiConfigSelect: {
     backgroundColor: 'var(--color-bg-elevated)',
@@ -2286,14 +2399,40 @@ const styles = {
     color: '#ef4444',
     marginBottom: '20px',
   },
+  inlineErrorBox: {
+    width: '100%',
+    padding: '12px 14px',
+    backgroundColor: 'var(--color-danger-bg)',
+    border: '1px solid var(--color-danger)',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '12px',
+    color: 'var(--color-danger)',
+  },
 
   modalButtons: {
     display: 'flex',
     gap: '12px',
     width: '100%',
   },
+  successActions: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: '10px',
+  },
+  successActionRow: {
+    width: '100%',
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+  },
   buttonPrimary: {
     flex: 1,
+    minHeight: '44px',
     padding: '12px 16px',
     backgroundColor: 'var(--color-primary)',
     color: 'white',
@@ -2306,10 +2445,12 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
+    whiteSpace: 'nowrap',
     transition: 'opacity 0.2s ease',
   },
   buttonOutlined: {
     flex: 1,
+    minHeight: '44px',
     padding: '12px 16px',
     backgroundColor: 'transparent',
     color: 'var(--color-text-secondary)',
@@ -2318,7 +2459,46 @@ const styles = {
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap',
     transition: 'all 0.2s ease',
   },
+  buttonGhost: {
+    alignSelf: 'center',
+    minWidth: '96px',
+    padding: '8px 14px',
+    backgroundColor: 'transparent',
+    color: 'var(--color-text-muted)',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  economyModeCard: {
+    padding: '12px 16px',
+    backgroundColor: 'var(--color-bg-elevated)',
+    borderRadius: '8px',
+    border: '1px solid var(--color-border)',
+    marginTop: '12px',
+  },
+  economyModeText: {
+    fontSize: '11px',
+    color: 'var(--color-text-muted)',
+    margin: '0 0 8px 0',
+    lineHeight: 1.5,
+  },
+  economyModeButton: {
+    fontSize: '12px',
+    padding: '6px 14px',
+    background: 'transparent',
+    border: '1px solid var(--color-border)',
+    borderRadius: '6px',
+    color: 'var(--color-text-secondary)',
+    cursor: 'pointer',
+  },
 };
-

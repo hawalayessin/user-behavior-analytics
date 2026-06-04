@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
+import api from "../services/api"
 
 /**
  * Hook to fetch Trial Users list
@@ -23,14 +24,8 @@ export function useTrialUsers(filters = {}) {
       if (filters?.page) params.append("page", String(filters.page))
       if (filters?.limit) params.append("page_size", String(filters.limit))
 
-      const res = await window.fetch(`/api/users/trial?${params.toString()}`)
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
-      }
-
-      const json = await res.json()
-      setData(json)
+      const res = await api.get("/users/trial", { params })
+      setData(res.data)
       setError(null)
     } catch (err) {
       console.error("Trial users fetch error:", err)

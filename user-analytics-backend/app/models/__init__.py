@@ -19,6 +19,7 @@ from .analyst_note import AnalystNote
 from .import_logs import ImportLog
 from .report_history import ReportHistory
 from .refresh_tokens import RefreshToken
+from .anomaly_notification_read import AnomalyNotificationRead
 
 __all__ = [
     "User",
@@ -37,4 +38,5 @@ __all__ = [
     "ImportLog",
     "ReportHistory",
     "RefreshToken",
+    "AnomalyNotificationRead",
 ]

@@ -220,10 +220,10 @@ export default function RunAIModelsPage() {
     });
   };
 
-  const churnAccuracy =
-    churnMetrics.data?.accuracy != null
-      ? `${(Number(churnMetrics.data.accuracy) * 100).toFixed(1)}%`
-      : "0.0%";
+  const churnBalancedAccuracy =
+    churnMetrics.data?.balanced_accuracy != null
+      ? `${(Number(churnMetrics.data.balanced_accuracy) * 100).toFixed(1)}%`
+      : "N/A";
   const churnLastRun = formatLastRun(churnMetrics.data?.trained_at);
 
   const segDominantPct =
@@ -304,8 +304,8 @@ export default function RunAIModelsPage() {
           icon={TrendingDown}
           title="Churn Prediction"
           subtitle="Logistic Regression model trained on subscriber activity and recharge frequency."
-          primaryMetricLabel="Accuracy"
-          primaryMetricValue={churnAccuracy}
+          primaryMetricLabel="Balanced Acc."
+          primaryMetricValue={churnBalancedAccuracy}
           secondaryMetricLabel="Last Run"
           secondaryMetricValue={churnLastRun}
           loadPct={0}

@@ -4,12 +4,12 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: analytics
-      POSTGRES_DB: analytics
+      POSTGRES_DB: analytics_demo
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - analytics_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, "pg_isready -U analytics -d analytics"]
+      test: [CMD-SHELL, "pg_isready -U analytics -d analytics_demo"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,8 +18,8 @@ services:
     build: ./user-analytics-backend
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg2://analytics:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@analytics_postgres:5432/analytics
-      ANALYTICS_CONN: postgresql+psycopg2://analytics:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@analytics_postgres:5432/analytics
+      DATABASE_URL: postgresql+psycopg2://analytics:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@analytics_postgres:5432/analytics_demo
+      ANALYTICS_CONN: postgresql+psycopg2://analytics:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@analytics_postgres:5432/analytics_demo
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}

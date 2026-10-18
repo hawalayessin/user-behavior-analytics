@@ -11,8 +11,8 @@
 ```bash
 cp .env.example .env
 pip install -r requirements-dev.txt
-make migrate
-make seed
+python scripts/init_demo_database.py --confirm-empty-demo
+
 make dev
 ```
 
@@ -28,11 +28,13 @@ npm run dev
 | Commande | Action |
 |----------|--------|
 | make dev | Lancer FastAPI |
-| make migrate | Appliquer migrations |
-| make seed | Seeder la base analytics |
+| python scripts/init_demo_database.py --confirm-empty-demo | Appliquer migrations |
+|  | Seeder la base analytics |
 | make etl | ETL prod_db -> analytics |
 | make test | Tests unitaires |
 | make lint | Verifier le code |
 
 
 See the [root README](../README.md) for required secrets, isolated databases and CI.
+
+The inherited migrations are not a fresh-database installer; see the root migration limitation.

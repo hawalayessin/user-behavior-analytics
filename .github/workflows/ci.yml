@@ -6,7 +6,7 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql+psycopg2://analytics:test@localhost:5432/analytics
+      DATABASE_URL: postgresql+psycopg2://analytics:test@localhost:5432/analytics_test
       SECRET_KEY: ci-only-signing-key-not-used-in-a-deployment
       REDIS_URL: redis://localhost:6379/0
     services:
@@ -15,10 +15,10 @@ jobs:
         env:
           POSTGRES_USER: analytics
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: analytics
+          POSTGRES_DB: analytics_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U analytics -d analytics"
+          --health-cmd "pg_isready -U analytics -d analytics_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
       redis:
         image: redis:7-alpine
@@ -35,7 +35,7 @@ jobs:
           cache-dependency-path: user-analytics-backend/requirements*.txt
       - run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangocairo-1.0-0
       - run: pip install -r requirements-dev.txt
-      - run: alembic upgrade head
+      - run: python scripts/init_demo_database.py --confirm-empty-demo --users 20
       - run: python -m pytest -q
   frontend:
     runs-on: ubuntu-latest

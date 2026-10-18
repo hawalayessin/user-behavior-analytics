@@ -44,3 +44,10 @@ RAPPORT*.md
 
 reports/generated/
 .vscode/
+# Local diagnostics and environment overrides
+*.bak.*
+.report_all_files.txt
+tmp_xhtml2pdf_test.py
+reorganize_report*.json
+.env.*
+!.env.example

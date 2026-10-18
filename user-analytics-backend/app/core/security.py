@@ -5,7 +5,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 
-SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me")
+SECRET_KEY: str = os.getenv("SECRET_KEY", "")
+if len(SECRET_KEY) < 32 or SECRET_KEY == "change-me":
+    raise RuntimeError("Set SECRET_KEY to a new random value of at least 32 characters.")
 ALGORITHM: str = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
 REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -27,7 +29,7 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-# ✅ expires_delta ajouté
+# âœ… expires_delta ajoutÃ©
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     payload = data.copy()
     expire = datetime.now(timezone.utc) + (

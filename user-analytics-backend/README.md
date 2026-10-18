@@ -1,4 +1,4 @@
-﻿# User Analytics Platform - PFE DigMaco
+# User Analytics Platform - PFE DigMaco
 
 ## Stack
 - Backend: FastAPI + PostgreSQL + Alembic + SQLAlchemy
@@ -10,7 +10,7 @@
 ### Backend
 ```bash
 cp .env.example .env
-pip install -e .
+pip install -r requirements-dev.txt
 make migrate
 make seed
 make dev
@@ -18,7 +18,7 @@ make dev
 
 ### Frontend
 ```bash
-cd user-analytics-frontend
+cd ../analytics-platform-front
 cp .env.example .env
 npm install
 npm run dev
@@ -34,3 +34,5 @@ npm run dev
 | make test | Tests unitaires |
 | make lint | Verifier le code |
 
+
+See the [root README](../README.md) for required secrets, isolated databases and CI.

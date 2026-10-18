@@ -54,3 +54,9 @@ async def no_auth_client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+@pytest.fixture
+def anyio_backend():
+    # The application uses asyncio tasks; do not also run it under Trio.
+    return "asyncio"

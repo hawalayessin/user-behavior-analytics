@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
-export function useChurnPredictionScores({ top = 10, threshold = 0.4, store = false, filters = {} } = {}) {
+export function useChurnPredictionScores({ page = 1, pageSize = 10, threshold = 0.4, store = false, filters = {} } = {}) {
   const normalizedFilters = useMemo(() => ({
     start_date: filters?.start_date ?? null,
     end_date: filters?.end_date ?? null,
@@ -14,7 +14,8 @@ export function useChurnPredictionScores({ top = 10, threshold = 0.4, store = fa
       "ml",
       "churn",
       "scores",
-      top,
+      page,
+      pageSize,
       threshold,
       store,
       normalizedFilters.start_date,
@@ -24,7 +25,8 @@ export function useChurnPredictionScores({ top = 10, threshold = 0.4, store = fa
     queryFn: async () => {
       const res = await api.get("/ml/churn/scores", {
         params: {
-          top,
+          page,
+          page_size: pageSize,
           threshold,
           store,
           start_date: normalizedFilters.start_date,
@@ -43,4 +45,3 @@ export function useChurnPredictionScores({ top = 10, threshold = 0.4, store = fa
     refetch,
   }
 }
-

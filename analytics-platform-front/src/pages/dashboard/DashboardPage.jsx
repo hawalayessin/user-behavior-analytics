@@ -12,11 +12,14 @@ import OverviewTab from "../../components/dashboard/tabs/OverviewTab";
 import EngagementTab from "../../components/dashboard/tabs/EngagementTab";
 import RevenueTab from "../../components/dashboard/tabs/RevenueTab";
 import TrialChurnTab from "../../components/dashboard/tabs/TrialChurnTab";
-import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 import { useOverview } from "../../hooks/useOverview";
 import { useNRR } from "../../hooks/useNRR";
 
-const DEFAULT_FILTERS = DEFAULT_ANALYTICS_FILTERS;
+const DEFAULT_FILTERS = {
+  start_date: null,
+  end_date: null,
+  service_id: null,
+};
 
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 function SkeletonBlock({ className }) {
@@ -76,7 +79,7 @@ export default function DashboardPage() {
   );
 
   const { data, loading, error, refetch } = useOverview(normalizedFilters);
-  const { data: nrr, loading: nrrLoading, error: nrrError } = useNRR();
+  const { data: nrr, loading: nrrLoading, error: nrrError } = useNRR(normalizedFilters);
 
   const insightGuide = useMemo(() => {
     if (!data) {

@@ -6,12 +6,17 @@ import {
   ChevronDown,
   Search,
   Download,
+  FileText,
+  BarChart3,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import FilterBar from "../../components/dashboard/FilterBar";
 import KPICard from "../../components/dashboard/KPICard";
 import TrialDropoffChart from "../../components/dashboard/TrialDropoffChart";
 import SubscriptionDonutChart from "../../components/dashboard/SubscriptionDonutChart";
+import PeakEvidenceCard from "../../components/dashboard/PeakEvidenceCard";
 import { useTrialKPIs } from "../../hooks/useTrialKPIs";
 import { useTrialUsers } from "../../hooks/useTrialUsers";
 import { useTrialDropoffByDay } from "../../hooks/useTrialDropoffByDay";
@@ -79,7 +84,7 @@ export default function FreeTrialBehaviorPage() {
   const [page, setPage] = useState(1);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  const [toastMsg, setToastMsg] = useState(null);
+  const [toast, setToast] = useState(null);
 
   // ── Debounce search 400ms ─────────────────────────────────
   useEffect(() => {
@@ -189,6 +194,15 @@ export default function FreeTrialBehaviorPage() {
     ];
   }, [dropoffByDayData]);
 
+  const peakDropoff = useMemo(
+    () =>
+      dropoffChartData.reduce(
+        (max, row) => (Number(row.value ?? 0) > Number(max?.value ?? -1) ? row : max),
+        null,
+      ),
+    [dropoffChartData],
+  );
+
   const managementNotes = dropoffCausesData?.management_notes ?? [];
 
   const sortedTrialUsers = useMemo(() => {
@@ -226,9 +240,9 @@ export default function FreeTrialBehaviorPage() {
   };
 
   // ── Toast ─────────────────────────────────────────────────
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
   // ── Build rows for export ─────────────────────────────────
@@ -268,7 +282,7 @@ export default function FreeTrialBehaviorPage() {
       const json = res.data;
       return json.data ?? [];
     } catch (err) {
-      showToast("❌ Export failed: " + err.message);
+      showToast("Export failed: " + err.message, "error");
       return [];
     } finally {
       setExportLoading(false);
@@ -278,7 +292,7 @@ export default function FreeTrialBehaviorPage() {
   // ── Export CSV ────────────────────────────────────────────
   const exportCSV = async () => {
     const allUsers = await fetchAllTrialUsersForExport();
-    if (!allUsers.length) return showToast("⚠️ No data to export");
+    if (!allUsers.length) return showToast("No data to export", "warning");
 
     const rows = buildRows(allUsers);
     const headers = [
@@ -308,13 +322,13 @@ export default function FreeTrialBehaviorPage() {
     a.download = `trial_users_export_${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`✅ ${allUsers.length} trial users exported to CSV`);
+    showToast(`${allUsers.length} trial users exported to CSV`);
   };
 
   // ── Export Excel ──────────────────────────────────────────
   const exportExcel = async () => {
     const allUsers = await fetchAllTrialUsersForExport();
-    if (!allUsers.length) return showToast("⚠️ No data to export");
+    if (!allUsers.length) return showToast("No data to export", "warning");
 
     const rows = buildRows(allUsers);
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -333,7 +347,7 @@ export default function FreeTrialBehaviorPage() {
       wb,
       `trial_users_export_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
-    showToast(`✅ ${allUsers.length} trial users exported to Excel`);
+    showToast(`${allUsers.length} trial users exported to Excel`);
   };
 
   return (
@@ -376,7 +390,7 @@ export default function FreeTrialBehaviorPage() {
                 <KPICard
                   title="Total Trial Users"
                   value={kpis.total_trials.toLocaleString()}
-                  subtitle="Unique users in selected period"
+                  subtitle="Users whose first trial started in selected period"
                   icon={TrendingUp}
                   iconColor="#3B82F6"
                   iconBg="bg-blue-500/10"
@@ -463,6 +477,32 @@ export default function FreeTrialBehaviorPage() {
         )}
 
         {/* ── 2x2 Grid: Charts + Table ──────────────────────── */}
+        {!kpiError && !kpiLoading && kpis && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <PeakEvidenceCard
+              title="Peak Drop-off Day"
+              value={(peakDropoff?.value ?? 0).toLocaleString()}
+              subtitle={(peakDropoff?.label ?? "Selected period").replace("\n", " ")}
+              icon={TrendingDown}
+              accent="rose"
+            />
+            <PeakEvidenceCard
+              title="Converted Trials"
+              value={kpis.converted_trials.toLocaleString()}
+              subtitle={`${kpis.conversion_rate.toFixed(1)}% conversion in selected period`}
+              icon={TrendingUp}
+              accent="emerald"
+            />
+            <PeakEvidenceCard
+              title="Trial-only Peak Risk"
+              value={kpis.trial_only_users.toLocaleString()}
+              subtitle={`${kpis.trial_only_rate.toFixed(1)}% never converted`}
+              icon={AlertTriangle}
+              accent="amber"
+            />
+          </div>
+        )}
+
         {!kpiError && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Row 1: TrialDropoffChart + SubscriptionDonutChart */}
@@ -572,7 +612,8 @@ export default function FreeTrialBehaviorPage() {
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-700 transition"
                   >
-                    📄 Export CSV
+                    <FileText size={14} />
+                    Export CSV
                   </button>
                   <div className="border-t border-slate-700" />
                   <button
@@ -582,7 +623,8 @@ export default function FreeTrialBehaviorPage() {
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-700 transition"
                   >
-                    📊 Export Excel
+                    <BarChart3 size={14} />
+                    Export Excel
                   </button>
                 </div>
               )}
@@ -814,9 +856,16 @@ export default function FreeTrialBehaviorPage() {
         </div>
       </div>
 
-      {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-600 bg-slate-800 text-sm text-slate-100 shadow-xl">
-          {toastMsg}
+      {toast && (
+        <div className="fixed top-6 left-1/2 z-[80] flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-slate-100 shadow-xl">
+          {toast.type === "warning" ? (
+            <AlertCircle size={16} className="text-amber-300" />
+          ) : toast.type === "error" ? (
+            <XCircle size={16} className="text-red-300" />
+          ) : (
+            <CheckCircle size={16} className="text-emerald-300" />
+          )}
+          {toast.message}
         </div>
       )}
     </>

@@ -237,12 +237,11 @@ const RoleBadge = ({ role }) => {
   const styles = {
     admin: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
     analyst: "bg-slate-700 text-slate-300 border-slate-600",
-    viewer: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
   };
 
   return (
     <span
-      className={`px-2 py-0.5 rounded text-xs border ${styles[role] || styles.viewer}`}
+      className={`px-2 py-0.5 rounded text-xs border ${styles[role] || "bg-slate-700 text-slate-300 border-slate-600"}`}
     >
       {role}
     </span>
@@ -251,9 +250,15 @@ const RoleBadge = ({ role }) => {
 
 const StatusBadge = ({ isActive }) =>
   isActive ? (
-    <span className="text-sm text-emerald-400">● ACTIVE</span>
+    <span className="inline-flex items-center gap-1.5 text-sm text-emerald-400">
+      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+      ACTIVE
+    </span>
   ) : (
-    <span className="text-sm text-slate-500">● INACTIVE</span>
+    <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
+      <span className="h-2 w-2 rounded-full bg-slate-500" />
+      INACTIVE
+    </span>
   );
 
 const formatLastLogin = (datetime) => {

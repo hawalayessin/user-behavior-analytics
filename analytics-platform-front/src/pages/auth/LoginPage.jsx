@@ -147,7 +147,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="user@name.tn"
+                  placeholder="user@Digmaco.tn"
                   required
                   className="w-full h-12 pl-12 pr-4 bg-slate-800/50 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
                 />
@@ -240,22 +240,11 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember Me */}
-            <div className="flex items-center gap-2">
-              <input
-                id="remember"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
-              <label
-                htmlFor="remember"
-                className="text-sm text-slate-400 cursor-pointer select-none"
-              >
-                Remember me
-              </label>
-            </div>
+          
+           
+            
+           
+            
 
             {/* Submit */}
             <button

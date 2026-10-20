@@ -1,8 +1,16 @@
 ﻿import axios from "axios"
 
+import { isDemoMode } from "../demo/config"
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
   withCredentials: true,
+  ...(isDemoMode ? {
+    adapter: async (config) => {
+      const { demoAdapter } = await import("../demo/adapter")
+      return demoAdapter(config)
+    },
+  } : {}),
 })
 
 let inMemoryAccessToken = null
@@ -28,7 +36,7 @@ export function setAuthFailureHandler(handler) {
 const inFlightGetRequests = new Map()
 const getResponseCache = new Map()
 const DEFAULT_GET_CACHE_TTL_MS = 5 * 60 * 1000
-const GET_CACHE_STORAGE_KEY = "digmaco:get-cache:v1"
+const GET_CACHE_STORAGE_KEY = isDemoMode ? "digmaco:get-cache:demo:v1" : "digmaco:get-cache:v1"
 
 function loadPersistedGetCache() {
   try {

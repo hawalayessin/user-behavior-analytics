@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import PropTypes from "prop-types"
-import { X, AlertCircle } from "lucide-react"
+import { AlertCircle, CheckCircle, X, XCircle } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -107,9 +107,11 @@ export default function UserRowDetail({ userId, onClose }) {
               <div className="space-y-1 max-h-96 overflow-y-auto">
                 {detail.billing_events.slice(0, 10).map((event, idx) => (
                   <div key={idx} className="flex items-center gap-2 text-xs py-1">
-                    <span className={event.success ? "text-emerald-400" : "text-red-400"}>
-                      {event.success ? "✅" : "❌"}
-                    </span>
+                    {event.success ? (
+                      <CheckCircle size={14} className="text-emerald-400" />
+                    ) : (
+                      <XCircle size={14} className="text-red-400" />
+                    )}
                     <span className="text-slate-400 flex-1">
                       {new Date(event.date).toLocaleDateString("fr-FR")}
                     </span>

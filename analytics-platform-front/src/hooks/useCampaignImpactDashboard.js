@@ -20,7 +20,7 @@ export function useCampaignImpactDashboard(filters = {}) {
       "analytics",
       "campaigns",
       "dashboard",
-      "sms-kpis-v2",
+      "inventory-total-v3",
       normalizedFilters.start_date,
       normalizedFilters.end_date,
       normalizedFilters.service_id,

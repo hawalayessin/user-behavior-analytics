@@ -260,7 +260,7 @@ export default function Topbar({ pageTitle }) {
                       className="text-xs mt-0.5"
                       style={{ color: "var(--color-text-muted)" }}
                     >
-                      {item.section} � {item.route}
+                      {item.section} - {item.route}
                     </div>
                   </button>
                 ))

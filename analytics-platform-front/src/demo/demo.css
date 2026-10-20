@@ -1,0 +1,7 @@
+@media (max-width: 767px) {
+  .portfolio-demo main { padding: 16px; min-width: 0; }
+  .portfolio-demo main > div { min-width: 0; }
+  .portfolio-demo main .w-fit:has(> button) { max-width: 100%; overflow-x: auto; }
+  .portfolio-demo main .w-fit:has(> button) > button { flex-shrink: 0; }
+  .portfolio-demo footer { font-size: 10px; gap: 8px; flex-wrap: wrap; }
+}

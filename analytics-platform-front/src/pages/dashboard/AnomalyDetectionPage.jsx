@@ -114,8 +114,8 @@ function getHeatmapColor(value) {
   return "rgba(239, 68, 68, 0.28)";
 }
 
-function getHeatmapLabel(value) {
-  return "● ".repeat(value);
+function getHeatmapDots(value) {
+  return Array.from({ length: Number(value || 0) });
 }
 
 function TimelineTooltip({ active, payload, label }) {
@@ -765,7 +765,17 @@ export default function AnomalyDetectionPage() {
                                 }}
                                 title={`${cell.count} anomalies`}
                               >
-                                {getHeatmapLabel(cell.severity_score)}
+                                <span className="inline-flex items-center justify-center gap-1">
+                                  {getHeatmapDots(cell.severity_score).map(
+                                    (_, index) => (
+                                      <span
+                                        key={index}
+                                        className="h-1.5 w-1.5 rounded-full"
+                                        style={{ backgroundColor: THEME.text }}
+                                      />
+                                    ),
+                                  )}
+                                </span>
                               </td>
                             );
                           })}
@@ -779,7 +789,7 @@ export default function AnomalyDetectionPage() {
                 className="text-xs mt-4"
                 style={{ color: "var(--color-text-muted)" }}
               >
-                ● = Medium | ●● = High | ●●● = Critical
+                1 dot = Medium | 2 dots = High | 3 dots = Critical
               </p>
             </>
           )}

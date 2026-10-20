@@ -7,6 +7,7 @@ import ServiceActivityTable from "../components/dashboard/userActivity/ServiceAc
 import UserGrowthChart from "../components/dashboard/userActivity/UserGrowthChart";
 import UserDistributionByServiceChart from "../components/dashboard/userActivity/UserDistributionByServiceChart";
 import ActivityHeatmap from "../components/dashboard/userActivity/ActivityHeatmap";
+import PeakEvidenceCard from "../components/dashboard/PeakEvidenceCard";
 import { useUserActivity } from "../hooks/useUserActivity";
 import { useOverview } from "../hooks/useOverview";
 import { DEFAULT_ANALYTICS_FILTERS } from "../constants/dateFilters";
@@ -23,12 +24,25 @@ function getDefaultFilters() {
   return { ...DEFAULT_ANALYTICS_FILTERS };
 }
 
+function formatDisplayDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 const KPISkeleton = () => (
   <div className="w-full h-32 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
 );
 const ChartSkeleton = () => (
   <div className="w-full h-96 bg-slate-800 animate-pulse rounded-xl border border-slate-700" />
 );
+
+const DAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export default function UserActivityPage() {
   const [filters, setFilters] = useState(getDefaultFilters());
@@ -63,6 +77,21 @@ export default function UserActivityPage() {
   const kpis = useMemo(() => {
     if (!activityData?.kpis) return null;
     return {
+      active_users_period: activityData.kpis.active_users_period ?? 0,
+      avg_dau_period:
+        activityData.kpis.avg_dau_period ?? activityData.kpis.dau_today ?? 0,
+      avg_wau_period:
+        activityData.kpis.avg_wau_period ??
+        activityData.kpis.wau_current_week ??
+        0,
+      avg_mau_period:
+        activityData.kpis.avg_mau_period ??
+        activityData.kpis.mau_current_month ??
+        0,
+      period_stickiness_pct:
+        activityData.kpis.period_stickiness_pct ??
+        activityData.kpis.stickiness_pct ??
+        0,
       dau_today: activityData.kpis.dau_today ?? 0,
       wau_current_week: activityData.kpis.wau_current_week ?? 0,
       mau_current_month: activityData.kpis.mau_current_month ?? 0,
@@ -71,6 +100,34 @@ export default function UserActivityPage() {
       avg_lifetime_days: activityData.kpis.avg_lifetime_days ?? 0,
     };
   }, [activityData]);
+
+  const periodLabel = useMemo(() => {
+    const start = formatDisplayDate(activityData?.filters_applied?.start_date);
+    const end = formatDisplayDate(activityData?.filters_applied?.end_date);
+    if (!start || !end) return "selected period";
+    return `${start} - ${end}`;
+  }, [activityData?.filters_applied?.end_date, activityData?.filters_applied?.start_date]);
+
+  const kpiAnchorLabel = formatDisplayDate(activityData?.kpi_anchor ?? activityData?.data_anchor);
+
+  const peakInsights = useMemo(() => {
+    const trend = activityData?.dau_trend ?? [];
+    const peakDau = trend.reduce(
+      (max, row) => (Number(row.dau ?? 0) > Number(max?.dau ?? -1) ? row : max),
+      null,
+    );
+    const peakWau = trend.reduce(
+      (max, row) => (Number(row.wau ?? 0) > Number(max?.wau ?? -1) ? row : max),
+      null,
+    );
+    const heatmap = activityData?.activity_heatmap ?? [];
+    const peakHour = heatmap.reduce(
+      (max, row) => (Number(row.count ?? 0) > Number(max?.count ?? -1) ? row : max),
+      null,
+    );
+
+    return { peakDau, peakWau, peakHour };
+  }, [activityData?.activity_heatmap, activityData?.dau_trend]);
 
   const handleApplyFilters = (f) => {
     setFilters(f);
@@ -86,6 +143,11 @@ export default function UserActivityPage() {
           <p className="text-sm text-slate-400">
             Comprehensive analysis of engagement and activity
           </p>
+          {kpiAnchorLabel && (
+            <p className="mt-1 text-xs text-slate-500">
+              Period: {periodLabel} · Data anchor: {kpiAnchorLabel}
+            </p>
+          )}
         </div>
 
         {/* ── Filter Bar ────────────────────────────────────── */}
@@ -117,9 +179,9 @@ export default function UserActivityPage() {
             ) : kpis ? (
               <>
                 <KPICard
-                  title="DAU (Last 24h)"
-                  value={kpis.dau_today.toLocaleString()}
-                  subtitle="Unique active users in last 24h"
+                  title="Avg DAU (Period)"
+                  value={Math.round(kpis.avg_dau_period).toLocaleString()}
+                  subtitle={`Average daily active users · ${periodLabel}`}
                   icon={Users}
                   iconColor="#7C3AED"
                   iconBg="bg-purple-500/10"
@@ -127,9 +189,9 @@ export default function UserActivityPage() {
                   trendLabel="stable"
                 />
                 <KPICard
-                  title="WAU (Last 7 days)"
-                  value={kpis.wau_current_week.toLocaleString()}
-                  subtitle="Active users in last 7 days"
+                  title="Avg WAU (Period)"
+                  value={Math.round(kpis.avg_wau_period).toLocaleString()}
+                  subtitle="Average weekly active users in selected period"
                   icon={TrendingUp}
                   iconColor="#3B82F6"
                   iconBg="bg-blue-500/10"
@@ -137,9 +199,9 @@ export default function UserActivityPage() {
                   trendLabel="stable"
                 />
                 <KPICard
-                  title="MAU (Current month)"
-                  value={kpis.mau_current_month.toLocaleString()}
-                  subtitle="Unique active users in current month window"
+                  title="Avg MAU (Period)"
+                  value={Math.round(kpis.avg_mau_period).toLocaleString()}
+                  subtitle="Average monthly active users across the period"
                   icon={Calendar}
                   iconColor="#10B981"
                   iconBg="bg-green-500/10"
@@ -148,8 +210,8 @@ export default function UserActivityPage() {
                 />
                 <KPICard
                   title="Stickiness"
-                  value={`${kpis.stickiness_pct.toFixed(1)}%`}
-                  subtitle="DAU / MAU × 100"
+                  value={`${kpis.period_stickiness_pct.toFixed(1)}%`}
+                  subtitle="Avg DAU / Avg MAU × 100"
                   icon={Zap}
                   iconColor="#F59E0B"
                   iconBg="bg-amber-500/10"
@@ -183,6 +245,36 @@ export default function UserActivityPage() {
         )}
 
         {/* ── DAU Trend Chart ───────────────────────────────── */}
+        {!activityError && !activityLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <PeakEvidenceCard
+              title="Peak DAU"
+              value={(peakInsights.peakDau?.dau ?? 0).toLocaleString()}
+              subtitle={formatDisplayDate(peakInsights.peakDau?.date) ?? periodLabel}
+              icon={Users}
+              accent="cyan"
+            />
+            <PeakEvidenceCard
+              title="Peak WAU"
+              value={(peakInsights.peakWau?.wau ?? 0).toLocaleString()}
+              subtitle={formatDisplayDate(peakInsights.peakWau?.date) ?? periodLabel}
+              icon={TrendingUp}
+              accent="emerald"
+            />
+            <PeakEvidenceCard
+              title="Peak Hour"
+              value={(peakInsights.peakHour?.count ?? 0).toLocaleString()}
+              subtitle={
+                peakInsights.peakHour
+                  ? `${DAYS_EN[peakInsights.peakHour.day] ?? "Day"} ${peakInsights.peakHour.hour}:00`
+                  : "No activity peak"
+              }
+              icon={Clock}
+              accent="amber"
+            />
+          </div>
+        )}
+
         {!activityError && (
           <div>
             {activityLoading ? (

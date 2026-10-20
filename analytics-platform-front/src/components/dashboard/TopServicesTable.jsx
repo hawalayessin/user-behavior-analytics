@@ -1,10 +1,39 @@
 import { useState } from "react"
 import PropTypes from "prop-types"
 import { useNavigate } from "react-router-dom"
-import { Download, ChevronDown } from "lucide-react"
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  FileText,
+  Medal,
+} from "lucide-react"
 import * as XLSX from "xlsx"
 
-const RANK_EMOJI = { 1: "🥇", 2: "🥈", 3: "🥉" }
+const RANK_COLORS = {
+  1: "text-amber-300",
+  2: "text-slate-300",
+  3: "text-orange-300",
+}
+
+function RankCell({ rank }) {
+  if (rank <= 3) {
+    return (
+      <span className="inline-flex h-6 w-6 items-center justify-center">
+        <Medal
+          size={18}
+          className={RANK_COLORS[rank]}
+          aria-label={`Rank ${rank}`}
+        />
+      </span>
+    )
+  }
+
+  return <span className="text-slate-500">#{rank}</span>
+}
 
 function HealthBadge({ pct }) {
   if (pct < 5)  return (
@@ -33,11 +62,11 @@ function churnColor(pct) {
 export default function TopServicesTable({ services }) {
   const navigate = useNavigate()
   const [exportOpen, setExportOpen] = useState(false)
-  const [toastMsg, setToastMsg] = useState(null)
+  const [toast, setToast] = useState(null)
 
-  const showToast = (msg) => {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3500)
+  const showToast = (message, type = "success") => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3500)
   }
 
   const healthLabel = (pct) => {
@@ -58,7 +87,7 @@ export default function TopServicesTable({ services }) {
 
   const exportCSV = () => {
     const rows = buildRows(services)
-    if (!rows.length) return showToast("⚠️ No data to export")
+    if (!rows.length) return showToast("No data to export", "warning")
 
     const headers = [
       "Rank",
@@ -86,12 +115,12 @@ export default function TopServicesTable({ services }) {
     a.download = `top_services_${new Date().toISOString().split("T")[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    showToast(`✅ ${rows.length} services exported to CSV`)
+    showToast(`${rows.length} services exported to CSV`)
   }
 
   const exportExcel = () => {
     const rows = buildRows(services)
-    if (!rows.length) return showToast("⚠️ No data to export")
+    if (!rows.length) return showToast("No data to export", "warning")
 
     const ws = XLSX.utils.json_to_sheet(rows)
     const wb = XLSX.utils.book_new()
@@ -108,7 +137,7 @@ export default function TopServicesTable({ services }) {
       wb,
       `top_services_${new Date().toISOString().split("T")[0]}.xlsx`,
     )
-    showToast(`✅ ${rows.length} services exported to Excel`)
+    showToast(`${rows.length} services exported to Excel`)
   }
 
   return (
@@ -136,7 +165,8 @@ export default function TopServicesTable({ services }) {
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-200 hover:bg-slate-800/60 transition"
                   >
-                    📄 Export CSV
+                    <FileText size={14} />
+                    Export CSV
                   </button>
                   <div className="border-t border-slate-800" />
                   <button
@@ -146,7 +176,8 @@ export default function TopServicesTable({ services }) {
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-200 hover:bg-slate-800/60 transition"
                   >
-                    📊 Export Excel
+                    <BarChart3 size={14} />
+                    Export Excel
                   </button>
                 </div>
               )}
@@ -156,7 +187,10 @@ export default function TopServicesTable({ services }) {
               onClick={() => navigate("/management/services")}
               className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
             >
-              View All Services →
+              <span className="inline-flex items-center gap-1">
+                View All Services
+                <ChevronRight size={14} />
+              </span>
             </button>
           </div>
         </div>
@@ -178,9 +212,7 @@ export default function TopServicesTable({ services }) {
                 className="border-b border-slate-800 hover:bg-slate-800/30 transition-colors"
               >
                 <td className="px-5 py-3">
-                  {RANK_EMOJI[i + 1] ?? (
-                    <span className="text-slate-500">#{i + 1}</span>
-                  )}
+                  <RankCell rank={i + 1} />
                 </td>
                 <td className="px-5 py-3 text-slate-200 font-medium">{svc.name}</td>
                 <td className="px-5 py-3 text-slate-300">{svc.active_subs.toLocaleString()}</td>
@@ -197,9 +229,14 @@ export default function TopServicesTable({ services }) {
         </table>
       </div>
 
-      {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg text-sm shadow-xl border border-slate-800 bg-slate-900 text-slate-100">
-          {toastMsg}
+      {toast && (
+        <div className="fixed top-6 left-1/2 z-[80] flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-xl">
+          {toast.type === "warning" ? (
+            <AlertTriangle size={16} className="text-amber-300" />
+          ) : (
+            <CheckCircle size={16} className="text-emerald-300" />
+          )}
+          {toast.message}
         </div>
       )}
     </>
@@ -218,3 +255,4 @@ TopServicesTable.propTypes = {
 }
 
 HealthBadge.propTypes = { pct: PropTypes.number.isRequired }
+RankCell.propTypes = { rank: PropTypes.number.isRequired }

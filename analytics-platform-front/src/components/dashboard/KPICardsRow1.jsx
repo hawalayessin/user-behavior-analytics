@@ -2,10 +2,12 @@ import PropTypes from "prop-types";
 import { Users, UserCheck, Wallet, TrendingDown } from "lucide-react";
 import KPICard from "./KPICard";
 
-export default function KPICardsRow1({ data, metrics }) {
+export default function KPICardsRow1({ data }) {
   const total = data.subscriptions.total || 0;
   const monthlyRevenue = data.revenue?.mrr || 0;
   const churnRate = data.churn?.churn_rate_month_pct || 0;
+  const churnedInWindow = data.churn?.total || 0;
+  const churnRateBase = data.churn?.churn_rate_month_base || 0;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -20,7 +22,7 @@ export default function KPICardsRow1({ data, metrics }) {
       <KPICard
         title="Active Subscriptions"
         value={(data.subscriptions.active || 0).toLocaleString()}
-        subtitle={`${total > 0 ? Math.round(((data.subscriptions.active || 0) * 100) / total) : 0}% of confirmed subs`}
+        subtitle={`DB count - ${total > 0 ? Math.round(((data.subscriptions.active || 0) * 100) / total) : 0}% of confirmed subs`}
         icon={UserCheck}
         iconColor="#10B981"
         iconBg="bg-emerald-500/20"
@@ -34,9 +36,13 @@ export default function KPICardsRow1({ data, metrics }) {
         iconBg="bg-emerald-500/20"
       />
       <KPICard
-        title="Churn Rate"
+        title="30-Day Churn Rate"
         value={`${Number(churnRate).toFixed(1)}%`}
-        subtitle="Monthly churn rate"
+        subtitle={
+          churnRateBase > 0
+            ? `${churnedInWindow.toLocaleString()} churned / ${churnRateBase.toLocaleString()} exposed subs`
+            : "period unsubscriptions / exposed subscriptions"
+        }
         icon={TrendingDown}
         iconColor="#EF4444"
         iconBg="bg-red-500/20"
@@ -47,5 +53,4 @@ export default function KPICardsRow1({ data, metrics }) {
 
 KPICardsRow1.propTypes = {
   data: PropTypes.object.isRequired,
-  metrics: PropTypes.object.isRequired,
 };

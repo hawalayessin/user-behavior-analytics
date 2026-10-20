@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import PropTypes from "prop-types"
+import { AlertTriangle } from "lucide-react"
 import {
   PieChart,
   Pie,
@@ -159,8 +160,11 @@ export default function InactivityAnalysis({ data, inactive_count }) {
       {/* Critical Alert */}
       {critical && critical.count > 0 && (
         <div className="border-l-4 border-orange-500 bg-slate-900/50 p-4 rounded-r-lg">
-          <p className="text-sm text-slate-200 leading-relaxed">
-            <span className="mr-2">⚠️</span>
+          <p className="flex items-start gap-2 text-sm text-slate-200 leading-relaxed">
+            <AlertTriangle
+              size={16}
+              className="mt-0.5 shrink-0 text-orange-300"
+            />
             <span className="font-semibold">
               {critical.count?.toLocaleString()} utilisateurs inactifs depuis +30j
             </span>

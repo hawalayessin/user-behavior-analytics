@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle, Info, Lightbulb, Sparkles, Zap } from 'lucide-react';
 
 export default function PremiumPDFTemplate({ data = {} }) {
   const {
@@ -124,7 +125,7 @@ export default function PremiumPDFTemplate({ data = {} }) {
           {/* AI Summary Box */}
           <div style={styles.aiSummaryBox(colors)}>
             <div style={styles.aiHeader(colors)}>
-              <span style={styles.aiIcon}>✨</span>
+              <Sparkles size={18} style={styles.aiIcon(colors.primary)} />
               <span style={styles.aiTitle(colors)}>AI-Generated Executive Summary</span>
             </div>
             <p style={styles.aiText(colors)}>
@@ -220,7 +221,10 @@ export default function PremiumPDFTemplate({ data = {} }) {
 
           {/* AI Recommendations */}
           <div style={styles.recommendationBox(colors)}>
-            <div style={styles.recTitle(colors)}>💡 AI Recommendations</div>
+            <div style={styles.recTitle(colors)}>
+              <Lightbulb size={16} style={styles.recIcon(colors)} />
+              <span>AI Recommendations</span>
+            </div>
             <ul style={styles.recList(colors)}>
               <li style={styles.recItem(colors)}>Launch re-engagement campaign for inactive users (potential 5.2% churn reduction)</li>
               <li style={styles.recItem(colors)}>Implement tiered pricing strategy to address price sensitivity</li>
@@ -448,7 +452,7 @@ export default function PremiumPDFTemplate({ data = {} }) {
           <div style={styles.alertsList}>
             <div style={styles.alertCard(colors, 'critical')}>
               <div style={styles.alertHeader(colors, 'critical')}>
-                <span style={styles.alertIcon}>⚠️</span>
+                <AlertTriangle size={16} style={styles.alertIcon} />
                 <span style={styles.alertType(colors)}>Critical Anomaly</span>
               </div>
               <div style={styles.alertContent(colors)}>
@@ -464,7 +468,7 @@ export default function PremiumPDFTemplate({ data = {} }) {
 
             <div style={styles.alertCard(colors, 'warning')}>
               <div style={styles.alertHeader(colors, 'warning')}>
-                <span style={styles.alertIcon}>⚡</span>
+                <Zap size={16} style={styles.alertIcon} />
                 <span style={styles.alertType(colors)}>Warning Anomaly</span>
               </div>
               <div style={styles.alertContent(colors)}>
@@ -480,7 +484,7 @@ export default function PremiumPDFTemplate({ data = {} }) {
 
             <div style={styles.alertCard(colors, 'info')}>
               <div style={styles.alertHeader(colors, 'info')}>
-                <span style={styles.alertIcon}>ℹ️</span>
+                <Info size={16} style={styles.alertIcon} />
                 <span style={styles.alertType(colors)}>Notable Trend</span>
               </div>
               <div style={styles.alertContent(colors)}>
@@ -885,9 +889,10 @@ const styles = {
     gap: '8px',
   }),
 
-  aiIcon: {
-    fontSize: '18px',
-  },
+  aiIcon: (color) => ({
+    color,
+    flexShrink: 0,
+  }),
 
   aiTitle: (colors) => ({
     fontSize: '13px',
@@ -1098,6 +1103,14 @@ const styles = {
     fontWeight: '700',
     color: colors.text,
     marginBottom: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  }),
+
+  recIcon: (colors) => ({
+    color: colors.primary,
+    flexShrink: 0,
   }),
 
   recList: (colors) => ({
@@ -1276,7 +1289,7 @@ const styles = {
   },
 
   alertIcon: {
-    fontSize: '16px',
+    flexShrink: 0,
   },
 
   alertType: (colors) => ({

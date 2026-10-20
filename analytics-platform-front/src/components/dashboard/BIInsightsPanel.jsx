@@ -1,4 +1,11 @@
 import PropTypes from "prop-types";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Lightbulb,
+  Search,
+  Sparkles,
+} from "lucide-react";
 
 const SEVERITY_STYLES = {
   red: {
@@ -18,8 +25,17 @@ const SEVERITY_STYLES = {
   },
 };
 
+const ICONS = {
+  alert: AlertTriangle,
+  check: CheckCircle,
+  lightbulb: Lightbulb,
+  sparkles: Sparkles,
+};
+
 function InsightCard({ icon, title, message, severity }) {
   const palette = SEVERITY_STYLES[severity] || SEVERITY_STYLES.amber;
+  const Icon = ICONS[icon] || ICONS.alert;
+
   return (
     <div
       className="rounded-xl border p-4"
@@ -28,8 +44,12 @@ function InsightCard({ icon, title, message, severity }) {
         borderColor: palette.borderColor,
       }}
     >
-      <p className="font-semibold text-sm mb-1">
-        {icon} {title}
+      <p
+        className="font-semibold text-sm mb-1 flex items-center gap-2"
+        style={{ color: palette.color }}
+      >
+        <Icon size={15} />
+        <span>{title}</span>
       </p>
       <p
         className="text-xs leading-relaxed opacity-90"
@@ -61,7 +81,10 @@ export default function BIInsightsPanel({ insights, variant = "default" }) {
               : "var(--color-text-primary)",
           }}
         >
-          🔍 Automated BI Insights
+          <span className="inline-flex items-center gap-2">
+            <Search size={16} />
+            Automated BI Insights
+          </span>
         </h3>
         <p
           className="text-xs mt-0.5"
@@ -86,7 +109,7 @@ BIInsightsPanel.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       severity: PropTypes.oneOf(["red", "amber", "green"]).isRequired,
-      icon: PropTypes.string.isRequired,
+      icon: PropTypes.oneOf(["alert", "check", "lightbulb", "sparkles"]),
       title: PropTypes.string.isRequired,
       message: PropTypes.string.isRequired,
     }),
@@ -94,7 +117,7 @@ BIInsightsPanel.propTypes = {
 };
 
 InsightCard.propTypes = {
-  icon: PropTypes.string.isRequired,
+  icon: PropTypes.oneOf(["alert", "check", "lightbulb", "sparkles"]),
   title: PropTypes.string.isRequired,
   message: PropTypes.string.isRequired,
   severity: PropTypes.oneOf(["red", "amber", "green"]).isRequired,

@@ -16,10 +16,10 @@ const CustomTooltip = ({ active, payload }) => {
 
 export default function SubscriptionDonutChart({ data }) {
 
-  // ✅ SAFE fallback
+  // SAFE fallback
   const safeData = data ?? []
 
-  // ✅ calcul total ici (plus jamais undefined)
+  // calcul total ici (plus jamais undefined)
   const total = safeData.reduce((sum, item) => sum + (item.value ?? 0), 0)
 
   return (

@@ -7,6 +7,10 @@ import {
   Search,
   Download,
   Users,
+  FileText,
+  BarChart3,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { FixedSizeList as List } from "react-window";
@@ -72,7 +76,7 @@ export default function UserListSection({
   const [cursorByPage, setCursorByPage] = useState({ 1: null });
   const [exportOpen, setExportOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  const [toastMsg, setToastMsg] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const currentCursor = cursorByPage[page] ?? null;
 
@@ -164,9 +168,9 @@ export default function UserListSection({
       <ChevronDown size={14} className="opacity-20" />
     );
 
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
   const buildRows = (list) =>
@@ -199,7 +203,7 @@ export default function UserListSection({
       const json = res.data;
       return json.data ?? [];
     } catch (err) {
-      showToast("❌ Export failed: " + err.message);
+      showToast("Export failed: " + err.message, "error");
       return [];
     } finally {
       setExportLoading(false);
@@ -208,7 +212,7 @@ export default function UserListSection({
 
   const exportCSV = async () => {
     const allUsers = await fetchAllUsersForExport();
-    if (!allUsers.length) return showToast("⚠️ No data to export");
+    if (!allUsers.length) return showToast("No data to export", "warning");
 
     const rows = buildRows(allUsers);
     const headers = [
@@ -237,12 +241,12 @@ export default function UserListSection({
     a.download = `users_export_${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`✅ ${allUsers.length} users exported to CSV`);
+    showToast(`${allUsers.length} users exported to CSV`);
   };
 
   const exportExcel = async () => {
     const allUsers = await fetchAllUsersForExport();
-    if (!allUsers.length) return showToast("⚠️ No data to export");
+    if (!allUsers.length) return showToast("No data to export", "warning");
 
     const rows = buildRows(allUsers);
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -260,7 +264,7 @@ export default function UserListSection({
       wb,
       `users_export_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
-    showToast(`✅ ${allUsers.length} users exported to Excel`);
+    showToast(`${allUsers.length} users exported to Excel`);
   };
 
   return (
@@ -332,7 +336,8 @@ export default function UserListSection({
                 }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-700 transition"
               >
-                📄 Export CSV
+                <FileText size={14} />
+                Export CSV
               </button>
               <div className="border-t border-slate-700" />
               <button
@@ -342,7 +347,8 @@ export default function UserListSection({
                 }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left text-slate-300 hover:bg-slate-700 transition"
               >
-                📊 Export Excel
+                <BarChart3 size={14} />
+                Export Excel
               </button>
             </div>
           )}
@@ -531,9 +537,16 @@ export default function UserListSection({
       </div>
 
       {/* Toast */}
-      {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-600 bg-slate-800 text-sm text-slate-100 shadow-xl">
-          {toastMsg}
+      {toast && (
+        <div className="fixed top-6 left-1/2 z-[80] flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-slate-100 shadow-xl">
+          {toast.type === "warning" ? (
+            <AlertCircle size={16} className="text-amber-300" />
+          ) : toast.type === "error" ? (
+            <XCircle size={16} className="text-red-300" />
+          ) : (
+            <CheckCircle size={16} className="text-emerald-300" />
+          )}
+          {toast.message}
         </div>
       )}
     </div>

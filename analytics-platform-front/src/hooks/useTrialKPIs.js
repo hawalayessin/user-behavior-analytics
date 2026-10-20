@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
 const LONG_CACHE_MS = 24 * 60 * 60 * 1000
-const TRIAL_KPIS_QUERY_VERSION = "2026-06-04-v2-paid-conversion"
+const TRIAL_KPIS_QUERY_VERSION = "2026-06-05-v3-first-trial-users"
 
 /**
  * Hook to fetch Free Trial KPIs

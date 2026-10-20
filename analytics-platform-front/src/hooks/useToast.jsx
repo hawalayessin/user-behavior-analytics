@@ -22,7 +22,7 @@ export const useToast = () => {
 
 const ToastComponent = ({ toast, onDismiss }) => {
   const baseStyles =
-    "fixed top-4 right-4 px-4 py-3 rounded-lg border flex items-center gap-2 animate-slide-in"
+    "fixed top-6 left-1/2 z-[80] flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm shadow-xl backdrop-blur"
 
   const styles = {
     success: "bg-emerald-500/20 border-emerald-500 text-emerald-300",
@@ -33,8 +33,13 @@ const ToastComponent = ({ toast, onDismiss }) => {
   return (
     <div className={`${baseStyles} ${styles[toast.type] || styles.info}`}>
       <span>{toast.message}</span>
-      <button onClick={onDismiss} className="ml-2 font-bold hover:opacity-75">
-        ×
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="ml-2 font-bold hover:opacity-75"
+        aria-label="Dismiss notification"
+      >
+        &times;
       </button>
     </div>
   )

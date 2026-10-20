@@ -47,13 +47,14 @@ const ACTIVE_SCORING_FEATURES = [
 export default function ChurnPredictionDashboard() {
   const { showToast, Toast } = useToast();
 
-  const [topN, setTopN] = useState(10);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [threshold, setThreshold] = useState(0.4);
 
   // Memoize options to prevent unnecessary hook re-triggers
   const scoresOptions = useMemo(
-    () => ({ top: topN, threshold }),
-    [topN, threshold],
+    () => ({ page, pageSize, threshold }),
+    [page, pageSize, threshold],
   );
 
   const metrics = useChurnPredictionMetrics();
@@ -352,7 +353,7 @@ export default function ChurnPredictionDashboard() {
                         />
                         <XAxis
                           dataKey="train_size"
-                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                          tickFormatter={(v) => v < 1000 ? String(v) : `${(v / 1000).toFixed(0)}k`}
                           tick={{ fontSize: 11, fill: "#94a3b8" }}
                         />
                         <YAxis
@@ -422,18 +423,41 @@ export default function ChurnPredictionDashboard() {
       <div className="mt-6">
         <Card
           title={`Top risky users (max risk per user)`}
-          subtitle={`Showing top ${topN} users - threshold=${threshold}`}
+          subtitle={`Page ${scores.data?.page ?? 1} of ${scores.data?.total_pages ?? 1} (${scores.data?.total ?? 0} users) - threshold=${threshold}`}
           right={
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-medium">Top:</span>
-              <input
-                type="number"
-                min="1"
-                max="200"
-                value={topN}
-                onChange={(e) => setTopN(Number(e.target.value))}
-                className="w-20 px-3 py-2 text-xs bg-[#0F1117] border border-slate-700 rounded-lg text-slate-200 focus:outline-none"
-              />
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-slate-500">Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  className="px-2 py-1.5 text-xs bg-[#0F1117] border border-slate-700 rounded-lg text-slate-200 focus:outline-none"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  className="px-2 py-1.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Prev
+                </button>
+                <span className="px-2 py-1.5 text-xs text-slate-400 min-w-[4rem] text-center">
+                  {scores.data?.page ?? 1} / {scores.data?.total_pages ?? 1}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(scores.data?.total_pages ?? 1, page + 1))}
+                  disabled={page >= (scores.data?.total_pages ?? 1)}
+                  className="px-2 py-1.5 text-xs rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           }
         >

@@ -408,6 +408,76 @@ html.light .import-observatory {
   --import-code-text: #e2e8f0;
 }
 
+.notes-observatory {
+  --notes-bg: #0b1326;
+  --notes-surface-lowest: #060e20;
+  --notes-surface-low: #131b2e;
+  --notes-surface: #171f33;
+  --notes-surface-high: #222a3d;
+  --notes-surface-highest: #2d3449;
+  --notes-panel-glass: rgba(19, 27, 46, 0.84);
+  --notes-modal-backdrop: rgba(11, 19, 38, 0.8);
+  --notes-text: #dae2fd;
+  --notes-heading: #f8fafc;
+  --notes-muted: #8c909f;
+  --notes-subtle: #bcc7de;
+  --notes-soft: #c2c6d6;
+  --notes-primary: #adc6ff;
+  --notes-primary-strong: #4d8eff;
+  --notes-primary-soft: rgba(173, 198, 255, 0.1);
+  --notes-primary-card: rgba(77, 142, 255, 0.05);
+  --notes-primary-border: rgba(173, 198, 255, 0.2);
+  --notes-divider: rgba(66, 71, 84, 0.3);
+  --notes-row-alt: rgba(23, 31, 51, 0.35);
+  --notes-row-hover: rgba(255, 255, 255, 0.04);
+  --notes-input: #060e20;
+  --notes-input-border: rgba(66, 71, 84, 0.4);
+  --notes-cta-text: #00285d;
+  --notes-danger: #ffb4ab;
+  --notes-danger-bg: rgba(147, 0, 10, 0.3);
+  --notes-danger-text: #ffdad6;
+  --notes-success-text: #86efac;
+  --notes-success-bg: rgba(16, 185, 129, 0.1);
+  --notes-success-border: rgba(16, 185, 129, 0.2);
+  --notes-glow: 0 0 32px rgba(173, 198, 255, 0.06);
+  --notes-modal-shadow: 0 25px 70px rgba(77, 142, 255, 0.1);
+}
+
+html.light .notes-observatory {
+  --notes-bg: #f8fafc;
+  --notes-surface-lowest: #ffffff;
+  --notes-surface-low: #edf3fb;
+  --notes-surface: #f1f5f9;
+  --notes-surface-high: #ffffff;
+  --notes-surface-highest: #e8eef7;
+  --notes-panel-glass: rgba(255, 255, 255, 0.88);
+  --notes-modal-backdrop: rgba(15, 23, 42, 0.34);
+  --notes-text: #1e293b;
+  --notes-heading: #0f172a;
+  --notes-muted: #64748b;
+  --notes-subtle: #475569;
+  --notes-soft: #334155;
+  --notes-primary: #2563eb;
+  --notes-primary-strong: #60a5fa;
+  --notes-primary-soft: rgba(37, 99, 235, 0.1);
+  --notes-primary-card: rgba(37, 99, 235, 0.06);
+  --notes-primary-border: rgba(37, 99, 235, 0.18);
+  --notes-divider: rgba(148, 163, 184, 0.28);
+  --notes-row-alt: rgba(241, 245, 249, 0.78);
+  --notes-row-hover: rgba(37, 99, 235, 0.06);
+  --notes-input: #ffffff;
+  --notes-input-border: rgba(148, 163, 184, 0.45);
+  --notes-cta-text: #ffffff;
+  --notes-danger: #dc2626;
+  --notes-danger-bg: rgba(220, 38, 38, 0.08);
+  --notes-danger-text: #991b1b;
+  --notes-success-text: #047857;
+  --notes-success-bg: rgba(16, 185, 129, 0.08);
+  --notes-success-border: rgba(16, 185, 129, 0.22);
+  --notes-glow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  --notes-modal-shadow: 0 25px 70px rgba(15, 23, 42, 0.18);
+}
+
 .import-observatory .import-step-rail::before {
   background-color: var(--import-divider);
 }
@@ -486,4 +556,21 @@ html.light .import-observatory {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+@keyframes notesFilterSweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(360%);
+  }
+}
+
+.notes-filter-sweep {
+  animation: notesFilterSweep 1.25s ease-in-out infinite;
+}
+
+.dashboard-filter-sweep {
+  animation: notesFilterSweep 1.25s ease-in-out infinite;
 }

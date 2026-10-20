@@ -6,6 +6,13 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  FileText,
+  BarChart3,
+  CheckCircle,
+  XCircle,
+  Award,
+  Users,
+  TrendingUp,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -15,6 +22,7 @@ import CohortHeatmap from "../../components/dashboard/retention/CohortHeatmap";
 import RetentionCurve from "../../components/dashboard/retention/RetentionCurve";
 import ServiceRetentionRadar from "../../components/dashboard/retention/ServiceRetentionRadar";
 import EngagementHealthPanel from "../../components/dashboard/EngagementHealthPanel";
+import PeakEvidenceCard from "../../components/dashboard/PeakEvidenceCard";
 
 import { useRetentionKPIs } from "../../hooks/useRetentionKPIs";
 import { useRetentionHeatmap } from "../../hooks/useRetentionHeatmap";
@@ -70,7 +78,7 @@ export default function RetentionPage() {
   const [sortDir, setSortDir] = useState("desc");
   const [exportOpen, setExportOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
-  const [toastMsg, setToastMsg] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput), 400);
@@ -131,6 +139,22 @@ export default function RetentionPage() {
   const totalCount = cohortsData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 
+  const peakInsights = useMemo(() => {
+    const heatmapRows = heatmapData?.data ?? [];
+    const largestCohort = heatmapRows.reduce(
+      (max, row) =>
+        Number(row.total_users ?? 0) > Number(max?.total_users ?? -1)
+          ? row
+          : max,
+      null,
+    );
+    const bestD30Service = (curveData?.data ?? []).reduce(
+      (max, row) => (Number(row.d30 ?? 0) > Number(max?.d30 ?? -1) ? row : max),
+      null,
+    );
+    return { largestCohort, bestD30Service };
+  }, [curveData?.data, heatmapData?.data]);
+
   const filteredCohorts = useMemo(() => {
     if (!search) return cohorts;
     const s = search.toLowerCase();
@@ -175,9 +199,9 @@ export default function RetentionPage() {
     setPage(1);
   };
 
-  const showToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 3500);
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
   const handleRecomputeCohorts = async () => {
@@ -193,13 +217,13 @@ export default function RetentionPage() {
       const freshness = result?.freshness;
       if (freshness?.up_to_date) {
         showToast(
-          `✅ Cohorts recalculated • up to date (${freshness.max_cohort_month})`,
+          `Cohorts recalculated • up to date (${freshness.max_cohort_month})`,
         );
       } else {
-        showToast("⚠️ Cohorts recalculated, freshness check needs attention");
+        showToast("Cohorts recalculated, freshness check needs attention", "warning");
       }
     } catch {
-      showToast("❌ Failed to recalculate cohorts");
+      showToast("Failed to recalculate cohorts", "error");
     }
   };
 
@@ -216,7 +240,7 @@ export default function RetentionPage() {
 
   const exportCSV = async () => {
     const rows = buildRows(sortedCohorts);
-    if (!rows.length) return showToast("⚠️ No data to export");
+    if (!rows.length) return showToast("No data to export", "warning");
 
     const headers = [
       "Cohort",
@@ -245,12 +269,12 @@ export default function RetentionPage() {
     a.download = `cohorts_retention_${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`✅ ${rows.length} cohorts exported to CSV`);
+    showToast(`${rows.length} cohorts exported to CSV`);
   };
 
   const exportExcel = async () => {
     const rows = buildRows(sortedCohorts);
-    if (!rows.length) return showToast("⚠️ No data to export");
+    if (!rows.length) return showToast("No data to export", "warning");
 
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -268,7 +292,7 @@ export default function RetentionPage() {
       wb,
       `cohorts_retention_${new Date().toISOString().split("T")[0]}.xlsx`,
     );
-    showToast(`✅ ${rows.length} cohorts exported to Excel`);
+    showToast(`${rows.length} cohorts exported to Excel`);
   };
 
   const radarSource = useMemo(() => {
@@ -342,8 +366,8 @@ export default function RetentionPage() {
           </div>
         )}
 
-        {!kpiError && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+	        {!kpiError && (
+	          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {kpiLoading
               ? Array.from({ length: 4 }).map((_, i) => <KPISkeleton key={i} />)
               : kpis && (
@@ -393,10 +417,36 @@ export default function RetentionPage() {
                     />
                   </>
                 )}
-          </div>
-        )}
+	          </div>
+	        )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+	        {!kpiError && !kpiLoading && kpis && (
+	          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+	            <PeakEvidenceCard
+	              title="Best Retention Peak"
+	              value={`${kpis.best_d7.toFixed(1)}%`}
+	              subtitle={`Cohort ${kpis.best}`}
+	              icon={Award}
+	              accent="amber"
+	            />
+	            <PeakEvidenceCard
+	              title="Largest Cohort"
+	              value={(peakInsights.largestCohort?.total_users ?? 0).toLocaleString()}
+	              subtitle={`${peakInsights.largestCohort?.cohort ?? "Selected period"} · ${peakInsights.largestCohort?.service ?? "All services"}`}
+	              icon={Users}
+	              accent="cyan"
+	            />
+	            <PeakEvidenceCard
+	              title="Best D30 Service"
+	              value={`${Number(peakInsights.bestD30Service?.d30 ?? 0).toFixed(1)}%`}
+	              subtitle={peakInsights.bestD30Service?.service ?? "No service data"}
+	              icon={TrendingUp}
+	              accent="emerald"
+	            />
+	          </div>
+	        )}
+
+	        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2">
             {heatmapLoading ? (
               <ChartSkeleton />
@@ -525,7 +575,8 @@ export default function RetentionPage() {
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition"
                     style={{ color: "var(--color-text-secondary)" }}
                   >
-                    📄 Export CSV
+                    <FileText size={14} />
+                    Export CSV
                   </button>
                   <div
                     style={{
@@ -540,7 +591,8 @@ export default function RetentionPage() {
                     className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left transition"
                     style={{ color: "var(--color-text-secondary)" }}
                   >
-                    📊 Export Excel
+                    <BarChart3 size={14} />
+                    Export Excel
                   </button>
                 </div>
               )}
@@ -825,16 +877,23 @@ export default function RetentionPage() {
         </div>
       </div>
 
-      {toastMsg && (
+      {toast && (
         <div
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg text-sm shadow-xl"
+          className="fixed top-6 left-1/2 z-[80] flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-lg px-4 py-3 text-sm shadow-xl"
           style={{
             border: "1px solid var(--color-border)",
             backgroundColor: "var(--color-bg-card)",
             color: "var(--color-text-primary)",
           }}
         >
-          {toastMsg}
+          {toast.type === "warning" ? (
+            <AlertCircle size={16} className="text-amber-300" />
+          ) : toast.type === "error" ? (
+            <XCircle size={16} className="text-red-300" />
+          ) : (
+            <CheckCircle size={16} className="text-emerald-300" />
+          )}
+          {toast.message}
         </div>
       )}
     </>

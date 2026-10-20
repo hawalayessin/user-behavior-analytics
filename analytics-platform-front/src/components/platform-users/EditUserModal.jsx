@@ -147,7 +147,6 @@ export default function EditUserModal({ user, onClose, onSuccess }) {
             >
               <option value="analyst">Analyst</option>
               <option value="admin">Admin</option>
-              <option value="viewer">Viewer</option>
             </select>
           </div>
 

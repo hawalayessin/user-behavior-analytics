@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import { Lightbulb } from "lucide-react";
 
 const DAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -177,8 +178,8 @@ export default function ActivityHeatmap({ data }) {
       {/* Peak Insight */}
       {peak && (
         <div className="border-l-4 border-purple-500 bg-slate-900/50 p-4 rounded-r-lg">
-          <p className="text-sm text-slate-200">
-            <span className="mr-2">💡</span>
+          <p className="flex items-start gap-2 text-sm text-slate-200">
+            <Lightbulb size={16} className="mt-0.5 shrink-0 text-purple-300" />
             <span className="font-semibold">Peak detected:</span>
             <span className="text-slate-400 ml-1">
               {peak.dayName} {peak.hours} - Optimal slot for SMS campaigns

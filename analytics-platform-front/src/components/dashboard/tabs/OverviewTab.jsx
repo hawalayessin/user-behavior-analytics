@@ -15,8 +15,8 @@ export default function OverviewTab({ data, filters }) {
 
   return (
     <div className="space-y-6">
-      <KPICardsRow1 data={data} metrics={metrics} />
-      <KPICardsRow2 data={data} metrics={metrics} />
+      <KPICardsRow1 data={data} />
+      <KPICardsRow2 data={data} metrics={metrics} filters={filters} />
 
       <TopServicesTable services={data.top_services} />
     </div>

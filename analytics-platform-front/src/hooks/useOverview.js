@@ -3,7 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import api from "../services/api"
 
 const LONG_CACHE_MS = 24 * 60 * 60 * 1000
-const OVERVIEW_QUERY_VERSION = "2026-04-13-engagement-trend-v4"
+const OVERVIEW_QUERY_VERSION = "2026-06-05-all-time-db-subscriptions-v1"
 
 export function useOverview(filters = {}) {
     const normalized = useMemo(

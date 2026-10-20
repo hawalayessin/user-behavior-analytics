@@ -39,7 +39,7 @@ export default function UserFilters({
 
       {/* Role Filter Tabs */}
       <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-lg">
-        {["all", "admin", "analyst", "viewer"].map((role) => (
+        {["all", "admin", "analyst"].map((role) => (
           <button
             key={role}
             onClick={() => onRoleFilter(role)}

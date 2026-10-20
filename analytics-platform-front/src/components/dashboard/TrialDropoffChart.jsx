@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { AlertTriangle } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -54,10 +55,13 @@ export default function TrialDropoffChart({ data }) {
       </ResponsiveContainer>
 
       {/* BI Annotation */}
-      <div className="mt-3 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs p-3 rounded-lg">
-        ⚠ Day 3 (48–72h) is the critical conversion decision point. Users who
-        fail to convert by 72h show ~94% churn probability. Focus retention
-        efforts on the first 3 days.
+      <div className="mt-3 flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs p-3 rounded-lg">
+        <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+        <span>
+          Day 3 (48–72h) is the critical conversion decision point. Users who
+          fail to convert by 72h show ~94% churn probability. Focus retention
+          efforts on the first 3 days.
+        </span>
       </div>
     </div>
   );

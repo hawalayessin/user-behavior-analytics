@@ -412,7 +412,7 @@ function ETLConfigPanel({
                 Source
               </p>
               <p className="font-mono text-xs" style={{ color: OBS.subtle }}>
-                hawala_db
+                {mode === "prod" ? "prod_db" : "prod_db"}
               </p>
             </div>
             <div
@@ -1121,7 +1121,11 @@ function ETLHistoryTable({ history, loading, onRefresh, onViewLog }) {
             color: "var(--color-text-muted)",
           }}
         >
-          <div style={{ fontSize: "32px", marginBottom: "8px" }}>ï¿½</div>
+          <ClipboardList
+            size={32}
+            strokeWidth={1.8}
+            style={{ margin: "0 auto 8px" }}
+          />
           <div>No pipeline has been executed yet.</div>
           <div style={{ fontSize: "12px", marginTop: "4px" }}>
             Run your first ETL pipeline above.

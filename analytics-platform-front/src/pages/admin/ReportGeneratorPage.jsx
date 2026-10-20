@@ -2,6 +2,8 @@
 import { FileText, Check, Loader2, Download, AlertCircle, ChevronDown, X, Lightbulb, Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { CalendarPicker } from '../../components/dashboard/FilterBar';
+import digmacoLogo from '../../assets/digmaco.png';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -83,8 +85,8 @@ const SECTIONS = [
   },
   {
     id: 'raw_data',
-    label: 'Raw Data Export',
-    desc: 'Detailed data tables',
+    label: 'Technical Appendix',
+    desc: 'Readable source data summary; full JSON is optional',
     default: false,
   },
 ];
@@ -106,7 +108,7 @@ const GENERATION_STEPS = [
 
 const REPORT_TYPE_SECTIONS = {
   executive: ['summary', 'activity'],
-  churn: ['churn', 'retention', 'trial'],
+  churn: ['summary', 'churn', 'retention', 'trial'],
   ai_segmentation: ['summary', 'ai_segmentation', 'campaigns'],
   full: SECTIONS.map((s) => s.id),
 };
@@ -127,10 +129,12 @@ export default function ReportGeneratorPage() {
   );
   const [includeAI, setIncludeAI] = useState(true);
   const [includeRecs, setIncludeRecs] = useState(true);
+  const [includeFullJson, setIncludeFullJson] = useState(false);
   const [reportLanguage, setReportLanguage] = useState('fr');
   const [reportTheme, setReportTheme] = useState('dark');
   const [periodStart, setPeriodStart] = useState('2025-09-01');
   const [periodEnd, setPeriodEnd] = useState('2025-10-31');
+  const [openCalendar, setOpenCalendar] = useState(null);
 
   const [activeRun, setActiveRun] = useState(null);
   const [reportId, setReportId] = useState(null);
@@ -197,9 +201,13 @@ export default function ReportGeneratorPage() {
   }, [allServiceIds]);
 
   const toggleSection = (id) => {
-    setSelectedSections((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
+    setSelectedSections((prev) => {
+      if (prev.includes(id)) {
+        if (id === 'raw_data') setIncludeFullJson(false);
+        return prev.filter((s) => s !== id);
+      }
+      return [...prev, id];
+    });
   };
 
   const toggleAllSections = () => {
@@ -347,6 +355,10 @@ export default function ReportGeneratorPage() {
     }, 400);
 
     try {
+      const sectionsForRequest =
+        reportType === 'full'
+          ? REPORT_TYPE_SECTIONS.full
+          : selectedSections;
       const res = await authFetch(`${API_BASE}/reports/generate`, {
         method: 'POST',
         headers: {
@@ -358,10 +370,11 @@ export default function ReportGeneratorPage() {
           period_start: periodStart,
           period_end: periodEnd,
           services_included: selectedServices,
-          sections_included: selectedSections,
+          sections_included: sectionsForRequest,
           distribution_format: 'pdf',
           include_ai_insights: overrides.includeAI ?? includeAI,
           include_recommendations: includeRecs,
+          include_full_json: includeFullJson,
           language: reportLanguage,
           report_theme: reportTheme,
         }),
@@ -554,20 +567,28 @@ export default function ReportGeneratorPage() {
               <div className="rg-date-range-row" style={styles.dateRangeRow}>
                 <div style={styles.dateField}>
                   <label style={styles.aiConfigLabel}>Start date</label>
-                  <input
-                    type="date"
+                  <CalendarPicker
+                    label="Report start date"
                     value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
-                    style={styles.aiConfigSelect}
+                    max={periodEnd}
+                    isOpen={openCalendar === 'start'}
+                    onToggle={() =>
+                      setOpenCalendar((prev) => (prev === 'start' ? null : 'start'))
+                    }
+                    onChange={setPeriodStart}
                   />
                 </div>
                 <div style={styles.dateField}>
                   <label style={styles.aiConfigLabel}>End date</label>
-                  <input
-                    type="date"
+                  <CalendarPicker
+                    label="Report end date"
                     value={periodEnd}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
-                    style={styles.aiConfigSelect}
+                    min={periodStart}
+                    isOpen={openCalendar === 'end'}
+                    onToggle={() =>
+                      setOpenCalendar((prev) => (prev === 'end' ? null : 'end'))
+                    }
+                    onChange={setPeriodEnd}
                   />
                 </div>
               </div>
@@ -801,6 +822,43 @@ export default function ReportGeneratorPage() {
                     />
                   </button>
                 </div>
+
+                <div className="rg-ai-option-card" style={styles.aiOptionCard}>
+                  <div style={styles.aiOptionLeft}>
+                    <div style={styles.aiOptionTitle}>
+                      Full JSON Export
+                    </div>
+                    <p style={styles.aiOptionDesc}>
+                      Add the raw machine-readable metrics after the source summary.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const next = !includeFullJson;
+                      setIncludeFullJson(next);
+                      if (next) {
+                        setSelectedSections((prev) =>
+                          prev.includes('raw_data') ? prev : [...prev, 'raw_data']
+                        );
+                      }
+                    }}
+                    style={{
+                      ...styles.toggleSwitch,
+                      backgroundColor: includeFullJson
+                        ? 'var(--color-primary)'
+                        : 'var(--color-border)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...styles.toggleThumb,
+                        transform: includeFullJson
+                          ? 'translateX(20px)'
+                          : 'translateX(0)',
+                      }}
+                    />
+                  </button>
+                </div>
               </div>
               <div style={styles.aiConfigRow}>
                 <div style={styles.aiConfigBlock}>
@@ -950,22 +1008,23 @@ export default function ReportGeneratorPage() {
                 >
                   <div style={styles.pageHeaderBar}>
                     <div style={styles.pageLogoArea}>
-                      <div style={styles.pageLogoBadge}>
-                        <FileText size={20} color="#adc6ff" />
-                      </div>
-                      <span style={styles.pageLogoText}>DIGMACO</span>
+                      <img
+                        src={digmacoLogo}
+                        alt="DIGMACO"
+                        style={styles.pageLogoImage}
+                      />
                     </div>
                     <span style={styles.pageRefId}>ID: REF-2025-042</span>
                   </div>
 
                   <div style={styles.pageTitleArea}>
                     <h4 style={styles.pageMainTitle}>
-                      RAPPORT
+                      ANALYTICS
                       <br />
-                      ANALYTIQUE
+                      REPORT
                     </h4>
                     <p style={styles.pageDateRange}>
-                      Septembre – Octobre 2025
+                      September – October 2025
                     </p>
                   </div>
 
@@ -2011,22 +2070,12 @@ const styles = {
   pageLogoArea: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
   },
-  pageLogoBadge: {
-    width: '24px',
+  pageLogoImage: {
+    width: '86px',
     height: '24px',
-    backgroundColor: '#0f1e35',
-    borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageLogoText: {
-    fontSize: '10px',
-    fontWeight: 700,
-    color: '#1f2937',
-    letterSpacing: '0.05em',
+    objectFit: 'contain',
+    display: 'block',
   },
   pageRefId: {
     fontSize: '9px',

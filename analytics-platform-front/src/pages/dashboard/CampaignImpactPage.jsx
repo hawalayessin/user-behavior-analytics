@@ -6,6 +6,7 @@ import {
   TrendingUp,
   Target,
   Award,
+  Info,
 } from "lucide-react";
 
 import FilterBar from "../../components/dashboard/FilterBar";
@@ -17,6 +18,7 @@ import {
 } from "../../hooks/useCampaignImpactDashboard";
 import { DEFAULT_ANALYTICS_FILTERS } from "../../constants/dateFilters";
 import CampaignPerformanceChart from "../../components/dashboard/campaign/CampaignPerformanceChart";
+import PeakEvidenceCard from "../../components/dashboard/PeakEvidenceCard";
 
 function SkeletonCard() {
   return (
@@ -197,6 +199,28 @@ export default function CampaignImpactPage() {
       gapToBestPct,
     };
   }, [kpis.conversion_rate, monthlyTrend, topCampaigns]);
+
+  const peakInsights = useMemo(() => {
+    const peakMonth = monthlyTrend.reduce(
+      (max, row) =>
+        Number(row.subscriptions ?? 0) > Number(max?.subscriptions ?? -1)
+          ? row
+          : max,
+      null,
+    );
+    const peakType = byTypeData.reduce(
+      (max, row) =>
+        Number(row.subscriptions ?? 0) > Number(max?.subscriptions ?? -1)
+          ? row
+          : max,
+      null,
+    );
+    return {
+      peakMonth,
+      peakType,
+      topCampaign: topCampaigns[0] ?? null,
+    };
+  }, [byTypeData, monthlyTrend, topCampaigns]);
 
   const qualityAlerts = useMemo(() => {
     const qualityScore = Number(effectiveDataQuality.quality_score ?? 0);
@@ -435,6 +459,9 @@ export default function CampaignImpactPage() {
                 <p className="text-3xl font-bold text-slate-100">
                   {(kpis.total_campaigns ?? 0).toLocaleString()}
                 </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {(kpis.period_campaigns ?? kpis.total_campaigns ?? 0).toLocaleString()} in selected period
+                </p>
               </div>
             </div>
 
@@ -535,9 +562,35 @@ export default function CampaignImpactPage() {
             </div>
           </>
         )}
-      </div>
+	      </div>
 
-      {/* Data Quality Standardization */}
+	      {!dashLoading && (
+	        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+	          <PeakEvidenceCard
+	            title="Peak Campaign Month"
+	            value={(peakInsights.peakMonth?.subscriptions ?? 0).toLocaleString()}
+	            subtitle={`${peakInsights.peakMonth?.month ?? "Selected period"} · ${(peakInsights.peakMonth?.campaign_count ?? 0).toLocaleString()} campaigns`}
+	            icon={TrendingUp}
+	            accent="cyan"
+	          />
+	          <PeakEvidenceCard
+	            title="Top Campaign"
+	            value={(peakInsights.topCampaign?.subscriptions ?? 0).toLocaleString()}
+	            subtitle={peakInsights.topCampaign?.name ?? "No campaign data"}
+	            icon={Award}
+	            accent="violet"
+	          />
+	          <PeakEvidenceCard
+	            title="Top Campaign Type"
+	            value={(peakInsights.peakType?.subscriptions ?? 0).toLocaleString()}
+	            subtitle={peakInsights.peakType?.type ?? "No type data"}
+	            icon={Target}
+	            accent="emerald"
+	          />
+	        </div>
+	      )}
+
+	      {/* Data Quality Standardization */}
       {!dashLoading && (
         <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
           <div className="flex items-center justify-between gap-4 mb-4">
@@ -991,7 +1044,7 @@ export default function CampaignImpactPage() {
         <div className="bg-slate-800/50 border border-cyan-500/30 rounded-xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-cyan-500/20 flex items-center justify-center">
-              <span className="text-cyan-400 text-sm">ℹ</span>
+              <Info size={14} className="text-cyan-400" />
             </div>
             <span className="text-xs font-bold text-cyan-400 uppercase">
               INFO
@@ -1012,7 +1065,7 @@ export default function CampaignImpactPage() {
     </div>
 
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-lg border border-slate-600 bg-slate-800 text-sm text-slate-100 shadow-xl">
+        <div className="fixed top-6 left-1/2 z-[80] flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-4 py-3 text-sm text-slate-100 shadow-xl">
           {toast}
         </div>
       )}

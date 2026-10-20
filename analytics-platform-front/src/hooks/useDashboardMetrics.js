@@ -48,7 +48,7 @@ export function useDashboardMetrics(data) {
     const dropoffBarData = [
       { label: "Jour 1\n0–24h", value: churn.dropoff.day1 ?? 0, fill: "#6366F1" },
       { label: "Jour 2\n24–48h", value: churn.dropoff.day2 ?? 0, fill: "#F59E0B" },
-      { label: "Jour 3\n48–72h ⚠", value: churn.dropoff.day3 ?? 0, fill: "#EF4444" },
+      { label: "Jour 3\n48–72h", value: churn.dropoff.day3 ?? 0, fill: "#EF4444" },
     ]
 
     const stickiness = engagement.stickiness_pct ?? 0
@@ -88,7 +88,7 @@ export function useDashboardMetrics(data) {
       {
         id: "churn",
         severity: isChurnCritical ? "red" : "green",
-        icon: isChurnCritical ? "🔴" : "🟢",
+        icon: isChurnCritical ? "alert" : "check",
         title: isChurnCritical ? "Alerte Churn" : "Churn Sous Contrôle",
         message: isChurnCritical
           ? `Churn mensuel à ${churn.churn_rate_month_pct}% — dépasse le seuil critique de 5%.`
@@ -97,7 +97,7 @@ export function useDashboardMetrics(data) {
       {
         id: "conversion",
         severity: isConversionBelowBM ? "amber" : "green",
-        icon: isConversionBelowBM ? "🟡" : "🟢",
+        icon: isConversionBelowBM ? "alert" : "check",
         title: isConversionBelowBM ? "Conversion sous benchmark" : "Conversion atteinte",
         message: isConversionBelowBM
           ? `Conversion à ${subscriptions.conversion_rate_pct}% — sous le benchmark (18–25%).`
@@ -106,7 +106,7 @@ export function useDashboardMetrics(data) {
       {
         id: "stickiness",
         severity: isStickinessLow ? "amber" : "green",
-        icon: isStickinessLow ? "🟡" : "🟢",
+        icon: isStickinessLow ? "alert" : "check",
         title: isStickinessLow ? "Faible rétention quotidienne" : "Bonne rétention",
         message: isStickinessLow
           ? `Stickiness à ${stickiness}% — envisagez des campagnes de ré-engagement.`
@@ -115,7 +115,7 @@ export function useDashboardMetrics(data) {
       {
         id: "billing",
         severity: isBillingAlert ? "red" : "green",
-        icon: isBillingAlert ? "🔴" : "🟢",
+        icon: isBillingAlert ? "alert" : "check",
         title: isBillingAlert ? "Alerte Billing" : "Billing opérationnel",
         message: isBillingAlert
           ? `${revenue.failed_pct}% d'échecs — ${revenue.billing_failed} transactions échouées.`
@@ -138,7 +138,7 @@ export function useDashboardMetrics(data) {
       engagementBars,
       biInsights,
     }
-    // ✅ data est un objet — JSON.stringify force le recalcul quand le contenu change
+    // data est un objet — JSON.stringify force le recalcul quand le contenu change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(data)])
 }

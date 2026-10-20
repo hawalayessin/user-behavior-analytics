@@ -1,8 +1,15 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { X } from "lucide-react";
 
 const METRICS = ["DAU", "MAU", "WAU", "Churn", "MRR", "Conversion Rate"];
+
+const fieldClass =
+  "mt-2 w-full rounded-t-lg border-0 border-b-2 border-[var(--notes-input-border)] bg-[var(--notes-input)] px-4 py-3 text-sm text-[var(--notes-text)] outline-none ring-0 transition focus:border-[var(--notes-primary)] focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50";
+
+const labelClass =
+  "text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-[var(--notes-subtle)]";
 
 export default function NotePanel({
   open,
@@ -101,165 +108,186 @@ export default function NotePanel({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-lg bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+    <div className="notes-observatory fixed inset-0 z-50 flex items-center justify-center bg-[var(--notes-modal-backdrop)] px-4 backdrop-blur-sm">
+      <button
+        type="button"
+        aria-label="Close note form"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+
+      <div className="relative flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-[var(--notes-divider)] bg-[var(--notes-panel-glass)] shadow-[var(--notes-modal-shadow)] backdrop-blur-3xl">
+        <div className="flex items-start justify-between px-8 pb-6 pt-8">
           <div>
-            <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-2xl font-bold tracking-tight text-[var(--notes-text)]">
+              {title}
+            </h2>
+            <p className="mt-1 text-sm font-medium text-[var(--notes-soft)] opacity-80">
               Add context to KPIs and reporting.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-800 text-slate-400"
+            className="rounded-full p-2 text-[var(--notes-soft)] transition hover:bg-[var(--notes-surface-highest)] hover:text-[var(--notes-text)]"
+            aria-label="Close"
           >
-            <X size={18} />
+            <X size={22} />
           </button>
         </div>
 
         <form
+          id="analyst-note-form"
           onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto p-6 space-y-4"
+          className="flex-1 overflow-y-auto px-8 pb-8"
         >
-          {error && (
-            <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-200">
-              {error}
-            </div>
-          )}
+          <div className="space-y-6">
+            {error && (
+              <div className="rounded-lg bg-[var(--notes-danger-bg)] p-3 text-sm text-[var(--notes-danger-text)]">
+                {error}
+              </div>
+            )}
 
-          <div className="flex items-center gap-2">
-            <input
-              id="global-note"
-              type="checkbox"
-              checked={isGlobal}
-              onChange={handleGlobalToggle}
-              className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-500"
-            />
-            <label htmlFor="global-note" className="text-sm text-slate-300">
-              Global note (no service, campaign, or metric)
-            </label>
-          </div>
-
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Service
-            </label>
-            <select
-              name="service_id"
-              value={form.service_id}
-              onChange={handleChange}
-              disabled={isGlobal}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100"
-            >
-              <option value="">Select service</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Campaign (optional)
-            </label>
-            <select
-              name="campaign_id"
-              value={form.campaign_id}
-              onChange={handleChange}
-              disabled={isGlobal}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100"
-            >
-              <option value="">No campaign</option>
-              {campaigns.map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>
-                  {campaign.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Metric
-            </label>
-            <select
-              name="metric"
-              value={form.metric}
-              onChange={handleChange}
-              disabled={isGlobal}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100"
-            >
-              <option value="">Select metric</option>
-              {METRICS.map((metric) => (
-                <option key={metric} value={metric}>
-                  {metric}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
-                Period Start
+            <div className="flex items-center gap-3 py-1">
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  id="global-note"
+                  type="checkbox"
+                  checked={isGlobal}
+                  onChange={handleGlobalToggle}
+                  className="peer sr-only"
+                />
+                <span className="h-6 w-11 rounded-full bg-[var(--notes-surface-highest)] transition peer-checked:bg-[var(--notes-primary)] peer-focus:outline-none" />
+                <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5" />
               </label>
-              <input
-                type="date"
-                name="period_start"
-                value={form.period_start}
-                onChange={handleChange}
-                className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-400">
-                Period End
+              <label
+                htmlFor="global-note"
+                className="text-sm font-medium tracking-wide text-[var(--notes-text)]"
+              >
+                Global note (no service, campaign, or metric)
               </label>
-              <input
-                type="date"
-                name="period_end"
-                value={form.period_end}
+            </div>
+
+            <div>
+              <label className={labelClass}>Service</label>
+              <select
+                name="service_id"
+                value={form.service_id}
                 onChange={handleChange}
-                className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100"
+                disabled={isGlobal}
+                className={fieldClass}
+              >
+                <option value="">Select service</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className={labelClass}>Campaign (optional)</label>
+                <select
+                  name="campaign_id"
+                  value={form.campaign_id}
+                  onChange={handleChange}
+                  disabled={isGlobal}
+                  className={fieldClass}
+                >
+                  <option value="">No campaign</option>
+                  {campaigns.map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={labelClass}>Metric</label>
+                <select
+                  name="metric"
+                  value={form.metric}
+                  onChange={handleChange}
+                  disabled={isGlobal}
+                  className={fieldClass}
+                >
+                  <option value="">Select metric</option>
+                  {METRICS.map((metric) => (
+                    <option key={metric} value={metric}>
+                      {metric}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className={labelClass}>Period Start</label>
+                <input
+                  type="date"
+                  name="period_start"
+                  value={form.period_start}
+                  onChange={handleChange}
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Period End</label>
+                <input
+                  type="date"
+                  name="period_end"
+                  value={form.period_end}
+                  onChange={handleChange}
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-end justify-between gap-3">
+                <label className={labelClass}>Content</label>
+                <span
+                  className={`text-[0.6875rem] font-bold ${
+                    form.content.length > 0 && form.content.trim().length < 10
+                      ? "text-[var(--notes-danger)]"
+                      : "text-[var(--notes-muted)]"
+                  }`}
+                >
+                  {form.content.length} / 2500
+                </span>
+              </div>
+              <textarea
+                name="content"
+                value={form.content}
+                onChange={handleChange}
+                rows={5}
+                className={`${fieldClass} resize-none`}
+                placeholder="Write your contextual note..."
               />
+              <p className="mt-2 text-[0.6875rem] italic text-[var(--notes-muted)]">
+                Minimum 10 characters.
+              </p>
             </div>
           </div>
 
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-400">
-              Content
-            </label>
-            <textarea
-              name="content"
-              value={form.content}
-              onChange={handleChange}
-              rows={5}
-              className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100"
-              placeholder="Write your contextual note..."
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              Minimum 10 characters.
-            </p>
-          </div>
         </form>
 
-        <div className="border-t border-slate-800 px-6 py-4 flex justify-end gap-3">
+        <div className="flex justify-end gap-3 bg-[var(--notes-surface-low)]/60 px-8 py-6">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 text-sm font-semibold"
+            className="rounded-lg border border-[var(--notes-divider)] px-6 py-2.5 text-sm font-semibold tracking-wide text-[var(--notes-text)] transition hover:bg-[var(--notes-surface-highest)] active:scale-95"
           >
             Cancel
           </button>
           <button
-            type="button"
-            onClick={handleSubmit}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold"
+            type="submit"
+            form="analyst-note-form"
+            className="rounded-lg bg-gradient-to-br from-[var(--notes-primary-strong)] to-[var(--notes-primary)] px-8 py-2.5 text-sm font-bold tracking-wide text-[var(--notes-cta-text)] shadow-lg transition hover:brightness-110 active:scale-95"
           >
             {initialNote ? "Save Changes" : "Create Note"}
           </button>

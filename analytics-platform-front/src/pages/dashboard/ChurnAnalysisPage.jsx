@@ -1,5 +1,5 @@
-﻿import React, { useState } from "react";
-import { AlertCircle, RotateCcw } from "lucide-react";
+import React, { useState } from "react";
+import { AlertCircle, RotateCcw, TrendingDown } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -18,6 +18,7 @@ import {
 
 import FilterBar from "../../components/dashboard/FilterBar";
 import KPICard from "../../components/dashboard/KPICard";
+import PeakEvidenceCard from "../../components/dashboard/PeakEvidenceCard";
 import { useChurnDashboard } from "../../hooks/useChurnDashboard";
 import { useReactivationKPIs } from "../../hooks/useReactivationKPIs";
 import { useReactivationByService } from "../../hooks/useReactivationByService";
@@ -75,6 +76,21 @@ export default function ChurnAnalysisPage() {
   const reactivationChartData = [...(reactivationByService || [])]
     .sort((a, b) => (b.reactivated_users || 0) - (a.reactivated_users || 0))
     .slice(0, 10);
+  const peakInsights = React.useMemo(() => {
+    const dailyPeak = (charts?.daily_trend ?? []).reduce(
+      (max, row) => (Number(row.churned ?? 0) > Number(max?.churned ?? -1) ? row : max),
+      null,
+    );
+    const servicePeak = (charts?.by_service ?? []).reduce(
+      (max, row) => (Number(row.churned ?? 0) > Number(max?.churned ?? -1) ? row : max),
+      null,
+    );
+    const curvePeak = (charts?.churn_curve ?? []).reduce(
+      (max, row) => (Number(row.trial ?? 0) > Number(max?.trial ?? -1) ? row : max),
+      null,
+    );
+    return { dailyPeak, servicePeak, curvePeak };
+  }, [charts?.by_service, charts?.churn_curve, charts?.daily_trend]);
 
   return (
     <div className="space-y-6">
@@ -117,31 +133,35 @@ export default function ChurnAnalysisPage() {
       )}
 
       {/* KPI Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+	      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         {isLoading
-          ? Array.from({ length: 4 }).map((_, i) => <KPISkeleton key={i} />)
+          ? Array.from({ length: 5 }).map((_, i) => <KPISkeleton key={i} />)
           : kpis && (
               <>
                 <KPICard
-                  title="Global Churn Rate"
-                  value={`${kpis.global_churn_rate?.rate ?? 0}%`}
-                  subtitle={`${kpis.global_churn_rate?.churned || 0} / ${kpis.global_churn_rate?.total || 0}`}
+                  title="Historical Churn Rate"
+                  value={`${Number(kpis.global_churn_rate?.rate ?? 0).toFixed(2)}%`}
+                  subtitle={`${(kpis.global_churn_rate?.churned || 0).toLocaleString()} cancelled/expired / ${(kpis.global_churn_rate?.total || 0).toLocaleString()} total subs`}
                   icon={RotateCcw}
                   iconColor="#a12c7b"
                   iconBg="bg-red-500/10"
                 />
                 <KPICard
-                  title="TRIAL CHURN"
-                  value={`${kpis.trial_churn?.rate ?? kpis.monthly_churn_rate?.rate ?? 0}%`}
-                  subtitle="Critical"
+                  title="30-Day Churn Rate"
+                  value={`${Number(kpis.monthly_churn_rate?.rate ?? 0).toFixed(1)}%`}
+                  subtitle={`${(kpis.monthly_churn_rate?.churned || 0).toLocaleString()} churned / ${(kpis.monthly_churn_rate?.total || 0).toLocaleString()} exposed subs`}
+                  icon={RotateCcw}
+                  iconColor="#a12c7b"
+                  iconBg="bg-red-500/10"
+                />
+                <KPICard
+                  title="Trial Share of Churn"
+                  value={`${Number(kpis.trial_churn?.rate ?? 0).toFixed(1)}%`}
+                  subtitle={`${(kpis.trial_churn?.count || 0).toLocaleString()} trial churns / ${(kpis.trial_churn?.total || 0).toLocaleString()} churns`}
                   icon={RotateCcw}
                   iconColor="#964219"
                   iconBg="bg-orange-500/10"
-                  alert={
-                    (kpis.trial_churn?.rate ??
-                      kpis.monthly_churn_rate?.rate ??
-                      0) >= 40
-                  }
+                  alert={(kpis.trial_churn?.rate ?? 0) >= 40}
                 />
                 <KPICard
                   title="AVG TIME TO CHURN"
@@ -160,10 +180,36 @@ export default function ChurnAnalysisPage() {
                   iconBg="bg-gray-500/10"
                 />
               </>
-            )}
-      </div>
+	            )}
+	      </div>
 
-      {/* Charts Grid */}
+	      {!isLoading && kpis && (
+	        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+	          <PeakEvidenceCard
+	            title="Peak Churn Day"
+	            value={(peakInsights.dailyPeak?.churned ?? 0).toLocaleString()}
+	            subtitle={peakInsights.dailyPeak?.date ?? "Selected period"}
+	            icon={TrendingDown}
+	            accent="rose"
+	          />
+	          <PeakEvidenceCard
+	            title="Most Affected Service"
+	            value={(peakInsights.servicePeak?.churned ?? 0).toLocaleString()}
+	            subtitle={peakInsights.servicePeak?.service_name ?? "No service data"}
+	            icon={RotateCcw}
+	            accent="amber"
+	          />
+	          <PeakEvidenceCard
+	            title="Peak Trial Churn Curve"
+	            value={`${Number(peakInsights.curvePeak?.trial ?? 0).toFixed(1)}%`}
+	            subtitle={`Day ${peakInsights.curvePeak?.day ?? "?"}`}
+	            icon={TrendingDown}
+	            accent="violet"
+	          />
+	        </div>
+	      )}
+
+	      {/* Charts Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Trend Chart */}
         <div
@@ -318,7 +364,8 @@ export default function ChurnAnalysisPage() {
             Reactivation after Churn
           </h2>
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            Users who subscribed again after churn, overall and by service
+            Same-service reactivation: users who churned then subscribed again to
+            the identical service (not cross-service migration)
           </p>
         </div>
 
@@ -334,7 +381,7 @@ export default function ChurnAnalysisPage() {
                 value={(
                   reactivationKpis?.reactivated_users ?? 0
                 ).toLocaleString()}
-                subtitle="Unique churned users re-subscribed"
+                subtitle="Unique users who re-subscribed to the same service"
                 icon={RotateCcw}
                 iconColor="#01696f"
                 iconBg="bg-teal-500/10"
@@ -342,7 +389,7 @@ export default function ChurnAnalysisPage() {
               <KPICard
                 title="Reactivation Rate"
                 value={reactivationRateLabel}
-                subtitle="Reactivated / churned users"
+                subtitle="Same-service reactivated / churned users in period"
                 icon={RotateCcw}
                 iconColor="#a12c7b"
                 iconBg="bg-red-500/10"
@@ -357,8 +404,11 @@ export default function ChurnAnalysisPage() {
               />
               <KPICard
                 title="Recovered Revenue"
-                value={`$${Number(reactivationKpis?.recovered_revenue ?? 0).toLocaleString()}`}
-                subtitle="Post-reactivation successful billing"
+                value={`${Number(reactivationKpis?.recovered_revenue ?? 0).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })} TND`}
+                subtitle="Successful billing on the reactivation subscription"
                 icon={RotateCcw}
                 iconColor="#7a7974"
                 iconBg="bg-gray-500/10"
@@ -474,8 +524,9 @@ export default function ChurnAnalysisPage() {
             className="mt-3 text-xs"
             style={{ color: "var(--color-text-muted)" }}
           >
-            A reactivated user is a churned user who later subscribed again to
-            the same service.
+            A reactivated user churned in the selected period, then started a
+            new subscription to the same service (distinct from cross-service
+            migration paths).
           </p>
         </div>
       </div>

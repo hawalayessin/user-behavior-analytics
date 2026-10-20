@@ -298,7 +298,7 @@ export default function UserSegmentationPage() {
       id: "1",
       type: "warning",
       severity: "red",
-      icon: "⚠️",
+      icon: "alert",
       title: "Trial Only — Critical Churn Risk",
       message:
         "42.4% churn rate detected. Launch a targeted SMS re-engagement campaign within 72 hours of trial expiration to recover at-risk users.",
@@ -307,7 +307,7 @@ export default function UserSegmentationPage() {
       id: "2",
       type: "success",
       severity: "green",
-      icon: "✨",
+      icon: "sparkles",
       title: "Power Users — Upsell Opportunity",
       message:
         "18% of subscribers generate 45% of revenue. Consider offering premium bundles or multi-service packages to this high-value segment.",
@@ -316,7 +316,7 @@ export default function UserSegmentationPage() {
       id: "3",
       type: "info",
       severity: "amber",
-      icon: "ðŸ’¡",
+      icon: "lightbulb",
       title: "Occasional Users — Conversion Potential",
       message:
         "25% of the base with low ARPU (2.1 TND). An automated weekly re-engagement SMS could increase engagement by 15–20%.",

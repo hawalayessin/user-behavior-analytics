@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { AlertTriangle } from "lucide-react";
 import ChurnPieChart from "../ChurnPieChart";
 import TrialDropoffChart from "../TrialDropoffChart";
 import { useDashboardMetrics } from "../../../hooks/useDashboardMetrics";
@@ -31,7 +32,7 @@ export default function TrialChurnTab({ data, filters }) {
     ? [
         { label: "Day 1\n0–24h", value: dropoff.day1 ?? 0, fill: "#6366F1" },
         { label: "Day 2\n24–48h", value: dropoff.day2 ?? 0, fill: "#F59E0B" },
-        { label: "Day 3\n48–72h ⚠", value: dropoff.day3 ?? 0, fill: "#EF4444" },
+        { label: "Day 3\n48–72h", value: dropoff.day3 ?? 0, fill: "#EF4444" },
       ]
     : [
         {
@@ -45,7 +46,7 @@ export default function TrialChurnTab({ data, filters }) {
           fill: "#F59E0B",
         },
         {
-          label: "Day 3\n48–72h ⚠",
+          label: "Day 3\n48–72h",
           value: churn?.dropoff?.day3 ?? 0,
           fill: "#EF4444",
         },
@@ -125,10 +126,13 @@ export default function TrialChurnTab({ data, filters }) {
       </div>
 
       {/* Critical zone alert */}
-      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm p-4 rounded-xl">
-        ⚠️ <strong>Critical zone (48–72h)</strong> — Users who do not convert
-        before 72h show ~94% churn probability. Focus retention efforts on the
-        first 3 days of the trial.
+      <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm p-4 rounded-xl">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+        <span>
+          <strong>Critical zone (48–72h)</strong> — Users who do not convert
+          before 72h show ~94% churn probability. Focus retention efforts on
+          the first 3 days of the trial.
+        </span>
       </div>
     </div>
   );

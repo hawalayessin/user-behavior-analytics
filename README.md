@@ -14,14 +14,7 @@ The deployed demo runs entirely in the browser with a small synthetic dataset: 1
 
 The demo supports service/date filters, subscriber search, pagination, adjustable risk thresholds, local analyst notes, theme switching and downloadable sample PDF reports.
 
-## Run the Demo Locally
 
-```sh
-git switch codex/portfolio-demo
-cd analytics-platform-front
-npm ci
-npm run dev:demo
-```
 
 For Vercel, use `analytics-platform-front` as the root directory. The demo branch includes the build and SPA routing configuration. Vercel production tracks `codex/portfolio-demo`.
 
